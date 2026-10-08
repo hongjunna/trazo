@@ -1941,3 +1941,418 @@
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
+
+/* ───────── 공유 · 폴더 · 커뮤니티 ───────── */
+.form-group {
+  margin-top: 16px;
+}
+
+.form-hint--error {
+  color: var(--c-danger);
+}
+
+.form-hint--ok {
+  color: var(--c-success);
+}
+
+.tool-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.menu--floating {
+  position: fixed;
+  z-index: 1100;
+  min-width: 180px;
+}
+
+.menu__item:disabled {
+  opacity: 0.45;
+}
+
+.menu__item--danger,
+.menu__item--danger svg {
+  color: var(--c-danger);
+}
+
+.menu__item--danger:hover {
+  background: var(--c-danger-soft);
+}
+
+.visibility-picker .segmented {
+  width: 100%;
+}
+
+.visibility-tag,
+.muted-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-full);
+  background: var(--c-surface-3);
+  color: var(--c-text-2);
+  font-size: 11.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.visibility-tag--link {
+  background: #E8F1FB;
+  color: #2563A6;
+}
+
+.visibility-tag--public {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+
+.share-link {
+  display: flex;
+  gap: 6px;
+}
+
+.share-link .input {
+  flex: 1;
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.share-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--c-surface-2);
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.share-count b {
+  color: var(--c-text);
+}
+
+/* 내 코스 폴더 */
+.folder-bar {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  max-width: 200px;
+  padding: 0 12px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--c-surface);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-2);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--c-surface-2);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--c-primary);
+  background: var(--c-primary);
+  color: #fff;
+}
+
+.chip__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip__count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.chip--add {
+  border-style: dashed;
+  color: var(--c-primary);
+}
+
+.folder-head {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--c-text-2);
+}
+
+.folder-head__name {
+  font-weight: 700;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-head__meta {
+  font-size: 12.5px;
+  margin-right: auto;
+}
+
+/* 커뮤니티 */
+.community-card {
+  width: 100%;
+  height: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.community-card .course-card__title,
+.community-card .course-card__meta,
+.community-card .counts {
+  display: flex;
+}
+
+.community-card__author {
+  font-weight: 650;
+  color: var(--c-text);
+}
+
+.counts {
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+  font-size: 12.5px;
+  color: var(--c-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.counts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.counts__liked {
+  color: var(--c-danger);
+}
+
+.counts__liked svg {
+  fill: currentColor;
+}
+
+.load-more {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 4px;
+}
+
+/* 공유 코스 보기 */
+.viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.course-map {
+  height: 300px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--c-surface-3);
+}
+
+.viewer__byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  border-width: 0;
+  box-shadow: none;
+}
+
+.viewer__author {
+  font-weight: 700;
+}
+
+.viewer__time {
+  font-size: 12.5px;
+  color: var(--c-text-3);
+}
+
+.viewer__stats {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.viewer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viewer__note {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.viewer__note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.viewer .elevation--inline {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.like-btn--on {
+  border-color: #F3B8B0;
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+}
+
+.like-btn--on svg {
+  fill: currentColor;
+}
+
+/* 댓글 */
+.comments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-border);
+}
+
+.comments__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.comments__empty {
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--c-text-3);
+  text-align: center;
+}
+
+.comments__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.comment {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.comment:last-child {
+  border-bottom: none;
+}
+
+.comment__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.comment__author {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.comment__time {
+  font-size: 12px;
+  color: var(--c-text-3);
+  margin-right: auto;
+}
+
+.comment__body {
+  margin: 2px 0 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.textarea {
+  width: 100%;
+  height: auto;
+  min-height: 64px;
+  padding: 10px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.comment-form__bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.comment-form__bar .form-hint {
+  margin: 0 auto 0 0;
+}
+
+.comment-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  border: 1px dashed var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.comment-login:hover {
+  background: var(--c-surface-3);
+}
+
+@media (max-width: 767px) {
+  .course-map {
+    height: 220px;
+  }
+
+  .share-link .btn {
+    width: auto;
+  }
+}

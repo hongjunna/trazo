@@ -7,11 +7,13 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { markerIcons, HOVER_MARKER_ICON } from './constants';
 import { useHistoryState } from './hooks/useHistoryState';
 import { useIsMobile } from './hooks/useMediaQuery';
-import { fetchRoutePath, saveCourse, downloadTCX, updateCourse } from './api/courseApi';
+import { useNickname } from './hooks/useNickname';
+import { fetchRoutePath, saveCourse, downloadTCX, updateCourse, apiErrorMessage } from './api/courseApi';
 import { auth, loginWithGoogle, logout, authErrorMessage } from './firebase';
 import { SPORTS, SPORT_IDS, isSport, defaultRouteOptions } from './sports';
 import { buildGpx, buildTrackIndex, courseStats, distanceKm, distanceMarkers, flattenCourse, nearestOnTrack, safeFileName } from './utils/course';
 import { readStored, writeStored } from './utils/storage';
+import { shareTokenFromPath, visibilityOf } from './utils/share';
 import { COLORS } from './styles/theme';
 
 import AccountButton from './components/AccountButton';
@@ -22,6 +24,10 @@ import ElevationPanel from './components/ElevationPanel';
 import { MapContextMenu, MapControls, MapHint, RouteStatus } from './components/MapOverlays';
 import RoutingHelpDialog from './components/RoutingHelpDialog';
 import SaveCourseDialog from './components/SaveCourseDialog';
+import ShareDialog from './components/ShareDialog';
+import SharedCourseDialog from './components/SharedCourseDialog';
+import CommunityDialog from './components/CommunityDialog';
+import NicknameDialog from './components/NicknameDialog';
 import SportPicker from './components/SportPicker';
 import Button from './components/ui/Button';
 import SegmentedControl from './components/ui/SegmentedControl';
@@ -33,6 +39,8 @@ const storedView = readStored('trazo:view', null);
 const INITIAL_VIEW = storedView && Number.isFinite(storedView.lat) && Number.isFinite(storedView.lng)
   ? { center: { lat: storedView.lat, lng: storedView.lng }, level: Number.isInteger(storedView.level) ? storedView.level : 5 }
   : { center: { lat: 37.521285, lng: 126.999852 }, level: 5 };
+// 공유 링크(/c/<토큰>)로 들어오면 공유받은 코스부터 보여줍니다.
+const INITIAL_SHARE_TOKEN = shareTokenFromPath(window.location.pathname);
 
 const initialRouteOptions = () => {
   const stored = readStored('trazo:routeOptions', {});
@@ -103,6 +111,13 @@ function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(Boolean(auth));
   const [authBusy, setAuthBusy] = useState(false);
+  const { nickname, nicknameRef, setNickname, loadNickname } = useNickname();
+  const [isNicknameEditOpen, setIsNicknameEditOpen] = useState(false);
+
+  // --- 커뮤니티 · 공유 ---
+  const [isCommunityOpen, setIsCommunityOpen] = useState(false);
+  const [sharedToken, setSharedToken] = useState(INITIAL_SHARE_TOKEN);
+  const [shareTarget, setShareTarget] = useState(null); // 저장 직후 공유 설정을 보여줄 코스
 
   // --- 지도 ---
   const [map, setMap] = useState(null);
@@ -117,7 +132,7 @@ function App() {
   const [sport, setSport] = useState(isSport(storedSport) ? storedSport : 'bike');
   // 처음 방문하면 종목부터 고르게 합니다. 한 번 고른 뒤에는 종목 선택 화면을 닫을 수 있습니다.
   const [hasPickedSport, setHasPickedSport] = useState(isSport(storedSport));
-  const [isSportPickerOpen, setIsSportPickerOpen] = useState(!isSport(storedSport));
+  const [isSportPickerOpen, setIsSportPickerOpen] = useState(!isSport(storedSport) && !INITIAL_SHARE_TOKEN);
   const [routeOptionsBySport, setRouteOptionsBySport] = useState(initialRouteOptions);
   const [speedBySport, setSpeedBySport] = useState(initialSpeeds);
   const [isAutoRouting, setIsAutoRouting] = useState(true);
@@ -135,6 +150,8 @@ function App() {
 
   const [title, setTitle] = useState(null); // null이면 종목 기본 이름을 보여줍니다.
   const [currentId, setCurrentId] = useState(null);
+  // 저장된 코스의 폴더·공개 범위. 다시 저장할 때 기본값으로 씁니다.
+  const [currentMeta, setCurrentMeta] = useState(null);
   const [savedState, setSavedState] = useState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
   const displayTitle = title ?? currentSport.defaultTitle;
   const hasMarkers = currentMarkers.length > 0;
@@ -439,9 +456,15 @@ function App() {
       setUser(nextUser);
       setAuthLoading(false);
       setIsLibraryOpen(false);
+      setIsNicknameEditOpen(false);
+      setShareTarget(null);
       setCurrentId(null);
+      setCurrentMeta(null);
+      // 닉네임이 없으면(처음 로그인) 닉네임 입력 창이 열립니다.
+      setNickname(undefined);
+      if (nextUser) loadNickname();
     }, (error) => { toast(authErrorMessage(error), { tone: 'error' }); setAuthLoading(false); });
-  }, [toast]);
+  }, [toast, setNickname, loadNickname]);
 
   const runAuth = async (action) => {
     if (!auth || authBusy || savingRef.current) return false;
@@ -465,6 +488,28 @@ function App() {
     return ok && handleLogin();
   };
 
+  // 담기·좋아요·댓글처럼 다른 사람에게 닉네임이 보이는 기능은 로그인하고 닉네임을 정한 뒤에 사용합니다.
+  const ensureMember = async (reason) => {
+    if (!(await requireLogin(reason))) return false;
+    const current = nicknameRef.current ?? await loadNickname();
+    if (current) return true;
+    if (current === null) toast('닉네임을 정하면 바로 이용할 수 있어요.');
+    else toast('계정 정보를 확인하지 못했어요. 잠시 후 다시 시도하세요.', { tone: 'error' });
+    return false;
+  };
+
+  const handleNicknameSaved = (next) => {
+    const isFirst = !nicknameRef.current;
+    setNickname(next);
+    setIsNicknameEditOpen(false);
+    toast(isFirst ? `${next}님, 환영해요!` : '닉네임을 바꿨어요.', { tone: 'success' });
+  };
+
+  const handleOpenCommunity = () => {
+    setSheetExpanded(false);
+    setIsCommunityOpen(true);
+  };
+
   // --- 저장 · 불러오기 ---
   const handleOpenSave = async () => {
     if (!hasCourse || isBusy) return;
@@ -472,25 +517,27 @@ function App() {
     setIsSaveOpen(true);
   };
 
-  const handleSubmitSave = async ({ mode, title: nextTitle }) => {
+  const handleSubmitSave = async ({ mode, title: nextTitle, folderId, visibility }) => {
     if (savingRef.current || routeRequestRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
     const snapshot = { course: JSON.stringify(currentState), sport, title: nextTitle };
+    const course = { title: nextTitle, markers: currentMarkers, polylines: currentPolylines, sport, visibility, folder_id: folderId };
     try {
-      if (mode === 'update' && currentId) {
-        await updateCourse(currentId, nextTitle, currentMarkers, currentPolylines, sport);
-      } else {
-        const response = await saveCourse(nextTitle, currentMarkers, currentPolylines, sport);
-        if (response.data.status !== 'success') throw new Error('save failed');
-        setCurrentId(response.data.course_id);
-      }
+      const response = mode === 'update' && currentId ? await updateCourse(currentId, course) : await saveCourse(course);
+      if (response.data.status !== 'success') throw new Error('save failed');
+      const saved = response.data.course;
+      setCurrentId(saved.id);
+      setCurrentMeta({ folderId: saved.folder_id ?? null, visibility: visibilityOf(saved) });
+      writeStored('trazo:lastFolder', saved.folder_id ?? null);
       setTitle(nextTitle);
       setSavedState(snapshot);
       setIsSaveOpen(false);
       toast(mode === 'update' ? '코스를 업데이트했어요.' : '내 코스에 저장했어요.', { tone: 'success' });
-    } catch {
-      toast('저장하지 못했어요. 로그인 상태와 인터넷 연결을 확인하세요.', { tone: 'error' });
+      // 공유하는 코스면 바로 링크를 복사할 수 있게 공유 설정을 보여줍니다.
+      if (visibilityOf(saved) !== 'private') setShareTarget(saved);
+    } catch (error) {
+      toast(apiErrorMessage(error, '저장하지 못했어요. 로그인 상태와 인터넷 연결을 확인하세요.'), { tone: 'error' });
     } finally {
       savingRef.current = false;
       setIsSaving(false);
@@ -502,16 +549,17 @@ function App() {
     setIsLibraryOpen(true);
   };
 
+  // 불러왔으면 true를 돌려줍니다.
   const handleLoadCourse = async (course) => {
-    if (savingRef.current) return;
-    if (isModified && course.id !== currentId) {
+    if (savingRef.current) return false;
+    if (isModified && hasMarkers && course.id !== currentId) {
       const ok = await confirm({
         title: '저장하지 않은 코스가 있어요',
         message: `'${course.title}'을(를) 불러오면 지금 만든 코스의 변경 사항이 사라져요.`,
         confirmLabel: '불러오기',
         tone: 'danger',
       });
-      if (!ok) return;
+      if (!ok) return false;
     }
     try {
       const loadedMarkers = JSON.parse(course.markers_json);
@@ -522,27 +570,44 @@ function App() {
       setIsLibraryOpen(false);
       setSport(loadedSport);
       writeStored('trazo:sport', loadedSport);
+      setHasPickedSport(true);
+      setIsSportPickerOpen(false);
       setTitle(course.title);
       setCurrentId(course.id);
+      setCurrentMeta({ folderId: course.folder_id ?? null, visibility: visibilityOf(course) });
       setSavedState({ course: JSON.stringify({ markers: loadedMarkers, polylines: loadedPolylines }), sport: loadedSport, title: course.title });
       const points = flattenCourse(loadedPolylines);
       fitToPoints(points.length ? points : loadedMarkers);
       toast(`'${course.title}'을(를) 불러왔어요.`, { tone: 'success' });
+      return true;
     } catch {
       toast('코스 데이터를 읽지 못했어요.', { tone: 'error' });
+      return false;
     }
   };
 
-  const handleCourseRenamed = (id, nextTitle) => {
-    if (id !== currentId) return;
-    setTitle(nextTitle);
-    setSavedState(prev => ({ ...prev, title: nextTitle }));
+  // 공유받아 내 코스에 담은 코스를 지도에서 열면 커뮤니티·공유 코스 창을 닫습니다.
+  const handleOpenCopiedCourse = async (course) => {
+    if (!(await handleLoadCourse(course))) return;
+    setSharedToken(null);
+    setIsCommunityOpen(false);
+  };
+
+  // 내 코스나 공유 설정에서 이름·폴더·공개 범위를 바꾼 코스가 지금 편집 중인 코스면 함께 반영합니다.
+  const handleCourseUpdated = (course) => {
+    if (course.id !== currentId) return;
+    setCurrentMeta({ folderId: course.folder_id ?? null, visibility: visibilityOf(course) });
+    if (course.title !== savedState.title) {
+      setTitle(course.title);
+      setSavedState(prev => ({ ...prev, title: course.title }));
+    }
   };
 
   const handleCourseDeleted = (id) => {
     if (id !== currentId) return;
     // 지도에 남은 코스는 저장되지 않은 새 코스가 됩니다.
     setCurrentId(null);
+    setCurrentMeta(null);
     setSavedState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
   };
 
@@ -584,6 +649,7 @@ function App() {
     hoverMarkerRef.current?.setVisible(false);
     setTitle(null);
     setCurrentId(null);
+    setCurrentMeta(null);
     setSavedState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
     setSheetExpanded(false);
     // 새 코스는 종목부터 고릅니다.
@@ -882,12 +948,15 @@ function App() {
   const account = (
     <AccountButton
       user={user}
+      nickname={nickname}
       configured={Boolean(auth)}
       loading={authLoading}
       busy={authBusy}
       onLogin={handleLogin}
       onLogout={handleLogout}
       onOpenLibrary={handleOpenLibrary}
+      onOpenCommunity={handleOpenCommunity}
+      onEditNickname={() => setIsNicknameEditOpen(true)}
       compact
     />
   );
@@ -989,8 +1058,9 @@ function App() {
               <ElevationPanel variant="inline" polylines={currentPolylines} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} hoverSource={hoverBus} />
             )}
             {settings}
-            <div className="tool-grid">
+            <div className="tool-grid tool-grid--3">
               <Button variant="secondary" icon="folder" onClick={handleOpenLibrary}>내 코스</Button>
+              <Button variant="secondary" icon="users" onClick={handleOpenCommunity}>커뮤니티</Button>
               <Button variant="ghost" icon="help" onClick={() => setIsHelpOpen(true)}>도움말</Button>
             </div>
           </BottomSheet>
@@ -1000,6 +1070,7 @@ function App() {
           <aside className="sidebar">
             <header className="sidebar__header">
               <Brand />
+              <Button variant="ghost" icon="users" iconSize={20} onClick={handleOpenCommunity} aria-label="커뮤니티" title="커뮤니티" />
               {user && <Button variant="ghost" icon="folder" iconSize={20} onClick={handleOpenLibrary} aria-label="내 코스" title="내 코스" />}
               {account}
             </header>
@@ -1036,7 +1107,7 @@ function App() {
           onClose={() => setIsLibraryOpen(false)}
           currentId={currentId}
           onLoad={handleLoadCourse}
-          onRenamed={handleCourseRenamed}
+          onUpdated={handleCourseUpdated}
           onDeleted={handleCourseDeleted}
         />
       )}
@@ -1046,8 +1117,47 @@ function App() {
           onClose={() => setIsSaveOpen(false)}
           defaultTitle={displayTitle}
           existingTitle={currentId ? savedState.title ?? displayTitle : null}
+          defaultFolderId={currentMeta ? currentMeta.folderId : readStored('trazo:lastFolder', null)}
+          defaultVisibility={currentMeta?.visibility ?? 'private'}
           onSubmit={handleSubmitSave}
           isSaving={isSaving}
+        />
+      )}
+      {shareTarget && (
+        <ShareDialog
+          course={shareTarget}
+          onUpdated={(course) => { setShareTarget(course); handleCourseUpdated(course); }}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
+      {isCommunityOpen && (
+        <CommunityDialog
+          userId={user?.uid ?? null}
+          ensureMember={ensureMember}
+          onOpenCourse={handleOpenCopiedCourse}
+          onClose={() => setIsCommunityOpen(false)}
+        />
+      )}
+      {sharedToken && (
+        <SharedCourseDialog
+          token={sharedToken}
+          userId={user?.uid ?? null}
+          ensureMember={ensureMember}
+          onOpenCourse={handleOpenCopiedCourse}
+          onClose={() => {
+            setSharedToken(null);
+            if (!hasPickedSport) setIsSportPickerOpen(true);
+          }}
+        />
+      )}
+      {user && (nickname === null || (isNicknameEditOpen && nickname)) && (
+        <NicknameDialog
+          key={nickname ?? 'new'}
+          initial={nickname}
+          required={nickname === null}
+          onSaved={handleNicknameSaved}
+          onClose={() => setIsNicknameEditOpen(false)}
+          onLogout={handleLogout}
         />
       )}
       <RoutingHelpDialog open={isHelpOpen} onClose={() => setIsHelpOpen(false)} sport={sport} />

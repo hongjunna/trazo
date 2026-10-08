@@ -1,5 +1,5 @@
 // src/components/AccountButton.jsx
-// 로그인 전: 구글 로그인 버튼 / 로그인 후: 프로필 사진을 누르면 내 코스·로그아웃 메뉴
+// 로그인 전: 구글 로그인 버튼 / 로그인 후: 프로필 사진을 누르면 내 코스·커뮤니티·닉네임 변경·로그아웃 메뉴
 import { useEffect, useRef, useState } from 'react';
 import Icon from './ui/Icon';
 
@@ -12,7 +12,7 @@ const GoogleMark = () => (
     </svg>
 );
 
-const AccountButton = ({ user, configured, loading, busy, onLogin, onLogout, onOpenLibrary, compact = false }) => {
+const AccountButton = ({ user, nickname, configured, loading, busy, onLogin, onLogout, onOpenLibrary, onOpenCommunity, onEditNickname, compact = false }) => {
     const [open, setOpen] = useState(false);
     const rootRef = useRef(null);
 
@@ -43,7 +43,7 @@ const AccountButton = ({ user, configured, loading, busy, onLogin, onLogout, onO
         );
     }
 
-    const name = user.displayName || user.email || '내 계정';
+    const name = nickname || user.displayName || user.email || '내 계정';
     return (
         <div className="account" ref={rootRef}>
             <button
@@ -66,6 +66,12 @@ const AccountButton = ({ user, configured, loading, busy, onLogin, onLogout, onO
                     </div>
                     <button type="button" role="menuitem" className="menu__item" onClick={() => { setOpen(false); onOpenLibrary(); }}>
                         <Icon name="folder" /> 내 코스
+                    </button>
+                    <button type="button" role="menuitem" className="menu__item" onClick={() => { setOpen(false); onOpenCommunity(); }}>
+                        <Icon name="users" /> 커뮤니티
+                    </button>
+                    <button type="button" role="menuitem" className="menu__item" disabled={!nickname} onClick={() => { setOpen(false); onEditNickname(); }}>
+                        <Icon name="pencil" /> 닉네임 변경
                     </button>
                     <button type="button" role="menuitem" className="menu__item" disabled={busy} onClick={() => { setOpen(false); onLogout(); }}>
                         <Icon name="logout" /> 로그아웃

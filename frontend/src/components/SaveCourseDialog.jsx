@@ -1,20 +1,24 @@
 // src/components/SaveCourseDialog.jsx
-// 저장: 불러온 코스면 "기존 코스 업데이트"와 "새 코스로 저장" 중에서 고르고, 이름을 정합니다.
+// 저장: 불러온 코스면 "기존 코스 업데이트"와 "새 코스로 저장" 중에서 고르고, 이름·폴더·공개 범위를 정합니다.
 import { useState } from 'react';
 import Dialog from './ui/Dialog';
 import Button from './ui/Button';
+import { FolderSelect } from './FolderSelect';
+import { VisibilityPicker } from './ShareDialog';
 
 const TITLE_MAX = 60;
 
-const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, onSubmit, isSaving }) => {
+const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, defaultFolderId = null, defaultVisibility = 'private', onSubmit, isSaving }) => {
     const [mode, setMode] = useState(existingTitle ? 'update' : 'new');
     const [title, setTitle] = useState(defaultTitle);
+    const [folderId, setFolderId] = useState(defaultFolderId);
+    const [visibility, setVisibility] = useState(defaultVisibility);
     const trimmed = title.trim();
 
     const submit = (event) => {
         event.preventDefault();
         if (!trimmed || isSaving) return;
-        onSubmit({ mode, title: trimmed.slice(0, TITLE_MAX) });
+        onSubmit({ mode, title: trimmed.slice(0, TITLE_MAX), folderId, visibility });
     };
 
     return (
@@ -24,7 +28,6 @@ const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, onSubmit
             dismissible={!isSaving}
             title="코스 저장"
             description={existingTitle ? '불러온 코스를 수정했어요. 어떻게 저장할까요?' : '내 코스에 저장하면 언제든 다시 불러와 고칠 수 있어요.'}
-            size="sm"
             footer={<>
                 <Button variant="secondary" onClick={onClose} disabled={isSaving}>취소</Button>
                 <Button variant="primary" type="submit" form="save-course-form" icon="save" loading={isSaving} disabled={!trimmed}>
@@ -63,6 +66,16 @@ const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, onSubmit
                     disabled={isSaving}
                 />
                 <p className="form-hint">{trimmed.length}/{TITLE_MAX}자</p>
+
+                <div className="form-group">
+                    <label className="form-label" htmlFor="save-course-folder">폴더</label>
+                    <FolderSelect id="save-course-folder" value={folderId} onChange={setFolderId} disabled={isSaving} />
+                </div>
+
+                <div className="form-group">
+                    <span className="form-label">공개 범위</span>
+                    <VisibilityPicker value={visibility} onChange={setVisibility} disabled={isSaving} />
+                </div>
             </form>
         </Dialog>
     );
