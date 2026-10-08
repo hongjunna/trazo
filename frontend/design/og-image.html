@@ -1,0 +1,109 @@
+<!doctype html>
+<!--
+  링크 미리보기 이미지(og:image) 원본. 1200×900(4:3)으로 그리고, 화면을 캡처해 public/og-image.png로 저장합니다.
+  페이스북·슬랙 등은 1.91:1로 위아래를 잘라 보여주므로, 로고와 소개 문구는 가운데(위아래 136px 안쪽)에 둡니다.
+  다시 만들기: README의 "링크 미리보기 이미지" 참고
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  html, body { margin: 0; }
+  body {
+    width: 1200px;
+    height: 900px;
+    overflow: hidden;
+    font-family: 'Pretendard Variable', Pretendard, sans-serif;
+    background: radial-gradient(120% 90% at 22% 18%, #0F6370 0%, #0B4F57 45%, #072F34 100%);
+    color: #fff;
+    position: relative;
+  }
+  svg.bg { position: absolute; inset: 0; }
+  .content {
+    position: absolute;
+    left: 110px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .brand { display: flex; align-items: center; gap: 30px; }
+  .mark {
+    width: 150px;
+    height: 150px;
+    border-radius: 38px;
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.25);
+    display: grid;
+    place-items: center;
+  }
+  .name { font-size: 132px; font-weight: 850; letter-spacing: -4px; line-height: 1; }
+  .tagline { margin-top: 44px; font-size: 54px; font-weight: 750; letter-spacing: -1.5px; line-height: 1.2; }
+  .tagline b { color: #8FCE3A; font-weight: 800; }
+  .sub { margin-top: 18px; font-size: 30px; font-weight: 500; color: rgba(255, 255, 255, 0.72); letter-spacing: -0.5px; }
+  .chips { margin-top: 34px; display: flex; gap: 12px; }
+  .chip {
+    padding: 10px 22px;
+    border-radius: 999px;
+    border: 2px solid rgba(143, 206, 58, 0.75);
+    color: #DDF2BF;
+    font-size: 26px;
+    font-weight: 700;
+    background: rgba(143, 206, 58, 0.08);
+  }
+</style>
+</head>
+<body>
+  <svg class="bg" width="1200" height="900" viewBox="0 0 1200 900" aria-hidden="true">
+    <defs>
+      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="10" />
+      </filter>
+    </defs>
+    <!-- 등고선 -->
+    <g fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="2">
+      <path d="M760 120c120-40 300-10 360 90s20 230-90 290-260 40-330-40-60-300 60-340z" />
+      <path d="M790 170c95-30 235-5 280 75s15 180-70 225-205 30-260-30-45-235 50-270z" />
+      <path d="M820 220c70-22 170-4 205 55s10 130-52 165-150 22-190-22-34-172 37-198z" />
+      <path d="M852 268c45-14 108-2 130 36s6 84-34 106-96 14-121-14-22-110 25-128z" />
+      <path d="M884 314c22-7 52-1 63 18s3 40-16 51-46 7-58-7-11-53 11-62z" />
+      <path d="M-60 760c140-90 330-70 420 10s70 200-60 240-330 20-420-60-80-110 60-190z" />
+      <path d="M-20 790c110-68 260-52 330 8s52 150-48 182-258 16-328-46-62-84 46-144z" />
+      <path d="M20 820c80-48 186-36 236 6s38 104-34 128-184 12-234-32-44-60 32-102z" />
+      <path d="M560 -40c90 10 170 70 160 150s-110 120-200 100-150-90-120-160 70-100 160-90z" />
+      <path d="M570 0c62 8 118 50 110 104s-76 82-138 68-104-62-82-110 48-70 110-62z" />
+    </g>
+    <!-- 점을 찍어 이은 코스 -->
+    <path d="M610 820 C 700 700, 690 600, 800 560 S 930 470, 960 380 S 1020 230, 1120 170"
+          fill="none" stroke="#8FCE3A" stroke-opacity="0.35" stroke-width="30" stroke-linecap="round" filter="url(#glow)" />
+    <path d="M610 820 C 700 700, 690 600, 800 560 S 930 470, 960 380 S 1020 230, 1120 170"
+          fill="none" stroke="#0A3B41" stroke-width="22" stroke-linecap="round" />
+    <path d="M610 820 C 700 700, 690 600, 800 560 S 930 470, 960 380 S 1020 230, 1120 170"
+          fill="none" stroke="#8FCE3A" stroke-width="13" stroke-linecap="round" />
+    <circle cx="800" cy="560" r="12" fill="#FFFFFF" stroke="#8FCE3A" stroke-width="6" />
+    <circle cx="960" cy="380" r="12" fill="#FFFFFF" stroke="#8FCE3A" stroke-width="6" />
+    <circle cx="610" cy="820" r="20" fill="#0B4F57" stroke="#FFFFFF" stroke-width="8" />
+    <circle cx="1120" cy="170" r="24" fill="#FFFFFF" />
+    <circle cx="1120" cy="170" r="10" fill="#C0392B" />
+  </svg>
+
+  <div class="content">
+    <div class="brand">
+      <div class="mark">
+        <svg width="112" height="112" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M10 50C34 50 30 14 54 14" fill="none" stroke="#8FCE3A" stroke-width="8" stroke-linecap="round" />
+          <circle cx="32" cy="32" r="3.6" fill="#FFFFFF" />
+          <circle cx="10" cy="50" r="7" fill="#0B4F57" stroke="#FFFFFF" stroke-width="4" />
+          <circle cx="54" cy="14" r="7.5" fill="#FFFFFF" />
+        </svg>
+      </div>
+      <div class="name">Trazo</div>
+    </div>
+    <div class="tagline"><b>점</b>을 찍어 그리는<br>나만의 코스</div>
+    <div class="sub">자전거·러닝 코스를 그리고 GPX로 내려받으세요</div>
+    <div class="chips"><span class="chip">자전거</span><span class="chip">러닝</span><span class="chip">GPX · FIT · TCX</span></div>
+  </div>
+</body>
+</html>
