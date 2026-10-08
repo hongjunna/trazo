@@ -80,7 +80,7 @@ const SmartRoutingHelpModal = ({ isOpen, onClose }) => {
 
                 {/* Tip */}
                 <div style={{ padding: '15px 20px', backgroundColor: COLORS.background, fontSize: '13px', color: COLORS.textSub }}>
-                    💡 <strong>도움말:</strong> 직선 모드에서도 TopoRider는 지형 데이터를 분석해 고도를 계산합니다.
+                    💡 <strong>도움말:</strong> 직선 모드에서도 Trazo는 지형 데이터를 분석해 고도를 계산합니다.
                 </div>
 
                 {/* Footer */}

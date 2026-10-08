@@ -1,4 +1,6 @@
-# TopoRider
+# Trazo (트라소)
+
+Trazo는 스페인어로 획이나 선을 뜻하며, 지도 위에 선을 그어 나만의 코스를 만드는 서비스를 담은 이름입니다. 서비스 도메인은 `trazo.kro.kr`입니다.
 
 카카오 지도에서 자전거 코스를 만들고, 고도와 경사도를 확인하며, 내 코스를 저장하거나 TCX 파일로 내려받는 서비스입니다. 경로 계산은 GraphHopper, 구글 로그인은 Firebase Authentication, 코스 저장은 PostgreSQL을 사용합니다.
 
@@ -27,7 +29,7 @@ VITE_FIREBASE_APP_ID=웹_앱의_appId
 ```
 
 3. Firebase 콘솔의 인증(Authentication) → 로그인 방법(Sign-in method)에서 Google 제공업체를 활성화하고 지원 이메일을 설정합니다.
-4. 인증 → 설정 → 승인된 도메인(Authorized domains)에 `toporider.kro.kr`과 개발용 `localhost`를 추가합니다. 도메인은 프로토콜이나 경로 없이 입력합니다.
+4. 인증 → 설정 → 승인된 도메인(Authorized domains)에 `trazo.kro.kr`과 개발용 `localhost`를 추가합니다. 도메인은 프로토콜이나 경로 없이 입력합니다.
 5. 설정한 후 프론트엔드를 다시 빌드합니다. 운영 접속에는 HTTPS를 사용하세요.
 
 ```bash
@@ -65,7 +67,13 @@ Firebase 웹 앱 구성값은 브라우저에 포함되는 공개 설정입니�
 
 개발 DB는 별도 볼륨에 저장하므로 운영 DB와 분리됩니다. 운영의 기존 `toporider` 프로젝트 이름은 유지해야 기존 DB 볼륨을 계속 사용할 수 있습니다. 개발 화면은 로컬 주소에만 연결되며, DB·백엔드·GraphHopper도 로컬 주소에만 포트를 공개합니다. 운영 프론트엔드는 기본적으로 외부 접속을 허용합니다. 배포 스크립트는 빌드 전에 서비스를 종료하거나 다른 Docker 이미지를 정리하지 않습니다.
 
+서비스명은 Trazo로 변경했지만 기존 데이터 연결을 유지하기 위해 Compose 프로젝트 이름(`toporider`, `toporider-dev`), DB 이름(`toporider_db`), Docker 네트워크 이름(`toporider_net`)은 유지합니다. 이 이름을 서비스명과 함께 바꾸면 기존 DB 볼륨 대신 새 볼륨을 사용할 수 있으므로 별도 데이터 이전 없이 변경하지 마세요.
+
 개발·운영은 같은 Firebase 프로젝트 설정을 사용합니다. 카카오 지도 JavaScript 키에도 운영 도메인과 개발 주소 `http://localhost:3001`을 등록하세요.
+
+## 도메인 변경 시 확인 사항
+
+운영 도메인은 `trazo.kro.kr`입니다. DNS가 운영 서버를 가리키고 리버스 프록시가 이 도메인의 요청을 프론트엔드 3000번 포트로 전달하는지 확인하세요. HTTPS 인증서도 새 도메인에 맞게 발급하거나 갱신해야 합니다. Firebase 인증의 승인된 도메인과 카카오 지도 JavaScript SDK의 허용 도메인에도 새 도메인을 등록하세요. 카카오 지도에는 실제 접속 주소의 프로토콜까지 맞춰 등록합니다. Firebase의 `authDomain`은 웹 앱 구성에 있는 값을 사용하며, 서비스 도메인이 바뀌었다고 임의로 바꾸지 않습니다.
 
 ## 로그인 버튼이 보이지 않을 때
 

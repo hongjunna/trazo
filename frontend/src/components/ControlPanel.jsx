@@ -77,10 +77,10 @@ const ControlPanel = ({
                 <div onClick={() => setIsOpen(!isOpen)} style={headerStyle}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px' }}>
-                            TopoRider
+                            Trazo
                         </span>
                         <span style={{ fontSize: '11px', opacity: 0.8, fontWeight: '400' }}>
-                            지형을 따라 즐기는 라이딩
+                            지도 위에 그리는 나만의 라이딩
                         </span>
                     </div>
                     <span style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: '0.3s' }}>

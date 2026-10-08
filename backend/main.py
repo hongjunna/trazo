@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
             connection.execute(text("ALTER TABLE course ADD COLUMN firebase_uid VARCHAR(128)"))
     yield
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title="Trazo API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -392,7 +392,7 @@ async def export_tcx(request: TCXExportRequest):
 <TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
   <Courses>
     <Course>
-      <Name>TopoRider Course</Name>
+      <Name>Trazo Course</Name>
       <Lap>
         <TotalTimeSeconds>{(total_dist / AVG_SPEED_MPS):.1f}</TotalTimeSeconds>
         <DistanceMeters>{total_dist:.1f}</DistanceMeters>
@@ -416,5 +416,5 @@ async def export_tcx(request: TCXExportRequest):
     return Response(
         content=final_xml,
         media_type="application/vnd.garmin.tcx+xml",
-        headers={"Content-Disposition": "attachment; filename=toporider_course.tcx"}
+        headers={"Content-Disposition": "attachment; filename=trazo_course.tcx"}
     )

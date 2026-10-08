@@ -35,7 +35,7 @@ if [ "$mode" = live ]; then
   echo "main 브랜치의 최신 코드를 가져옵니다…"
   git pull --ff-only origin main
 fi
-echo "TopoRider를 시작합니다 ($mode)…"
+echo "Trazo를 시작합니다 ($mode)…"
 "${compose[@]}" up -d --build
 if [ "$mode" = dev ]; then
   echo "개발 주소: http://localhost:3001 (코드 수정 자동 반영)"

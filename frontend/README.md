@@ -1,4 +1,4 @@
-# TopoRider 프론트엔드
+# Trazo 프론트엔드
 
 React와 Vite로 만든 자전거 코스 편집 화면입니다. 지도는 카카오 지도 SDK, 로그인은 Firebase Authentication을 사용합니다. 배포와 Firebase 설정의 전체 절차는 [프로젝트 README](../README.md)를 참고하세요.
 
