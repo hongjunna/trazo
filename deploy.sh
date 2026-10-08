@@ -2,6 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# GraphHopper 설정이 바뀌면 컨테이너를 다시 만들도록 체크섬을 전달합니다 (docker-compose.yml의 labels 참고).
+export GRAPHHOPPER_CONFIG_SUM="$(cksum graphhopper/config-gh.yml | cut -d' ' -f1)"
+
 mode="${1:-live}"
 action="${2:-up}"
 case "$mode" in

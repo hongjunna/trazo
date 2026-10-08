@@ -131,6 +131,8 @@ docker compose -p toporider -f docker-compose.yml logs --tail=100 frontend
 
 자전거·러닝 프로필을 추가하면서 그래프 위치를 `graph-cache-v2`로 바꿨습니다. 업데이트 후 처음 실행하면 기존 `graph-cache`를 그대로 둔 채 새 그래프를 다시 가공하므로, 그동안 경로 찾기를 사용할 수 없습니다. 새 그래프로 길찾기가 잘 되는지 확인한 뒤 운영의 `data/graph-cache`와 개발의 `data/dev/graph-cache`를 삭제해 저장 공간을 확보할 수 있습니다. 고도 캐시(`srtm`)는 그대로 재사용합니다.
 
+`graphhopper/config-gh.yml`은 볼륨으로 연결되므로, `./deploy.sh`가 설정 파일 체크섬을 컨테이너 라벨로 넘겨 설정이 바뀐 경우에만 GraphHopper를 다시 만듭니다. `docker compose`를 직접 실행해 GraphHopper를 띄우면 이 체크섬이 빠져 불필요하게 재시작될 수 있으니 배포 스크립트를 사용하세요.
+
 지도 파일을 교체해도 이미 만들어진 그래프는 자동 갱신되지 않습니다. 지도 갱신이나 호환되지 않는 경로 설정 변경 시에는 관련 그래프 캐시를 별도로 재생성해야 합니다. 전국 OSM 원본을 자동 다운로드하는 기능은 없습니다.
 
 ## 기존 코스 소유권
