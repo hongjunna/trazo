@@ -217,6 +217,7 @@ function App() {
   const [mapMenu, setMapMenu] = useState(null); // 우클릭 메뉴: { point, x, y, width, height }
   const closeMapMenu = useCallback(() => setMapMenu(null), []);
   const suppressClickUntilRef = useRef(0);
+  const lastPointerTypeRef = useRef('mouse'); // 마지막으로 지도를 누른 입력 장치
   const editRef = useRef(null);
 
   // 고도 차트를 훑을 때 지도에 위치를 보여주는 점
@@ -408,8 +409,9 @@ function App() {
     // 모바일에서 시트를 펼친 상태로 지도를 누르면 먼저 시트만 접습니다.
     if (isMobile && sheetExpanded) { setSheetExpanded(false); return; }
     const point = { lat: event.latLng.getLat(), lng: event.latLng.getLng() };
-    // 찍은 점이 아닌 경로 위를 누르면 그 자리에 웨이포인트를 추가합니다.
-    const near = courseHitAt(point, event.point);
+    // 마우스로 찍은 점이 아닌 경로 위를 누르면 그 자리에 웨이포인트를 추가합니다.
+    // 터치는 경로 근처를 눌러 다음 점을 찍는 일이 많아, 꾹 눌렀다 떼야 추가합니다.
+    const near = lastPointerTypeRef.current === 'touch' ? null : courseHitAt(point, event.point);
     if (near) { openNewWaypoint(near); return; }
     addPoint(point);
   };
@@ -891,6 +893,7 @@ function App() {
       enabled: !isSportPickerOpen && !isBusy,
       moveMarker,
       insertPoint,
+      openNewWaypoint,
     };
   });
 
@@ -905,6 +908,7 @@ function App() {
     let hoverFrame = 0;
     let dragFrame = 0;
     let lastHoverEvent = null;
+    let blockTouchEnd = false;
     let hoverShown = false;
 
     const localPoint = (event) => {
@@ -988,20 +992,28 @@ function App() {
       dragFrame = 0;
       setDragPreview(null);
       suppressClickUntilRef.current = Date.now() + 500;
+      // 터치를 뗀 뒤 브라우저가 흉내 내는 마우스 클릭이 방금 연 창의 바깥을 눌러 닫지 않게 막습니다.
+      if (done.pointerType !== 'mouse') blockTouchEnd = true;
       if (!commit) return;
+      // 터치로 경로를 꾹 눌렀다가 끌지 않고 떼면 그 자리에 웨이포인트를 추가합니다.
+      if (done.pointerType !== 'mouse' && !done.moved) {
+        if (done.hit.type === 'line') editRef.current.openNewWaypoint(done.hit.origin);
+        return;
+      }
       const point = { lat: done.point.lat, lng: done.point.lng };
       if (done.hit.type === 'marker') editRef.current.moveMarker(done.hit.index, point);
       else editRef.current.insertPoint(done.hit.segmentIndex, point);
     };
 
     const onPointerDown = (event) => {
+      lastPointerTypeRef.current = event.pointerType;
       // 두 번째 손가락이 닿으면(확대·축소) 잡기를 그만둡니다.
       if (gesture) { finish(false); return; }
       if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
       if (!editRef.current.enabled || !event.target.closest('.map-canvas') || event.target.closest('.wpt-pin')) return;
       const hit = hitTest(localPoint(event), event.pointerType);
       if (!hit) return;
-      gesture = { pointerId: event.pointerId, pointerType: event.pointerType, hit, startX: event.clientX, startY: event.clientY, dragging: false, timer: 0 };
+      gesture = { pointerId: event.pointerId, pointerType: event.pointerType, hit, startX: event.clientX, startY: event.clientY, dragging: false, moved: false, timer: 0 };
       if (event.pointerType === 'mouse') {
         // 지도가 함께 끌려가지 않게 합니다. 끌지 않고 떼면 평소처럼 지도 클릭으로 점이 찍힙니다.
         map.setDraggable(false);
@@ -1023,6 +1035,7 @@ function App() {
         if (moved <= 4) return;
         beginDrag();
       }
+      if (!gesture.moved && Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > 8) gesture.moved = true;
       gesture.point = toLatLng(localPoint(event));
       if (!dragFrame) dragFrame = requestAnimationFrame(renderDrag);
     };
@@ -1045,6 +1058,11 @@ function App() {
     };
 
     // 끄는 동안에는 카카오 지도가 터치 움직임을 받지 않게 해 지도가 따라 움직이지 않습니다.
+    const onTouchEnd = (event) => {
+      if (!blockTouchEnd) return;
+      blockTouchEnd = false;
+      if (event.cancelable) event.preventDefault();
+    };
     const onTouchMove = (event) => {
       if (!gesture?.dragging) return;
       event.preventDefault();
@@ -1058,6 +1076,7 @@ function App() {
     node.addEventListener('pointermove', onHoverMove);
     node.addEventListener('pointerleave', onPointerLeave);
     node.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
+    window.addEventListener('touchend', onTouchEnd, { capture: true, passive: false });
     node.addEventListener('contextmenu', onContextMenu, true);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
@@ -1070,6 +1089,7 @@ function App() {
       node.removeEventListener('pointermove', onHoverMove);
       node.removeEventListener('pointerleave', onPointerLeave);
       node.removeEventListener('touchmove', onTouchMove, { capture: true });
+      window.removeEventListener('touchend', onTouchEnd, { capture: true });
       node.removeEventListener('contextmenu', onContextMenu, true);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
@@ -1095,6 +1115,9 @@ function App() {
       onExport={handleExport}
       isExporting={isExporting}
       onOpenImage={handleOpenImage}
+      onNewCourse={handleNewCourse}
+      onImportFile={handleImportFile}
+      isBusy={isBusy}
     />
   );
 
@@ -1103,12 +1126,10 @@ function App() {
       sport={sport}
       markerCount={currentMarkers.length}
       waypointCount={currentWaypoints.length}
-      onImportFile={handleImportFile}
       isLoop={isLoop}
       isBusy={isBusy}
       onCloseLoop={handleCloseLoop}
       onOutAndBack={handleOutAndBack}
-      onNewCourse={handleNewCourse}
       isAutoRouting={isAutoRouting}
       onToggleAutoRouting={setIsAutoRouting}
       routeOptions={routeOptionsBySport[sport]}

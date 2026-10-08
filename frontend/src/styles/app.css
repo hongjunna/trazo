@@ -2460,12 +2460,26 @@
   color: var(--c-text-3);
 }
 
-/* ───────── 파일 불러오기 ───────── */
-.section__actions {
+/* ───────── 새 코스 · 파일 불러오기 (요약 카드 위쪽) ───────── */
+.summary__toolbar {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  justify-content: space-between;
+  padding: 10px 12px 0;
+}
+
+.summary__toolbar .btn {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 배경 없이 테두리만 있는 버튼 */
+.btn--outline {
+  border-color: var(--c-border-strong);
+  color: var(--c-text);
+}
+
+.btn--outline:hover:not(:disabled) {
+  border-color: var(--c-primary);
 }
 
 .file-btn {

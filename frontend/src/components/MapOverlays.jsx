@@ -104,7 +104,7 @@ export const MapHint = ({ sport, markerCount }) => {
                 <ol className="map-hint__steps">
                     <li><span className="map-hint__num">1</span>지도를 눌러 출발점을 찍어요.</li>
                     <li><span className="map-hint__num">2</span>다음 지점을 찍으면 {current.label}에 맞는 길로 이어져요.</li>
-                    <li><span className="map-hint__num">3</span>경로 위를 누르면 정상·급수 같은 웨이포인트를 표시해요.</li>
+                    <li><span className="map-hint__num">3</span>경로 위를 누르면(휴대폰은 꾹 눌렀다 떼면) 웨이포인트를 표시해요.</li>
                     <li><span className="map-hint__num">4</span>완성되면 저장하거나 GPX·FIT 파일, 이미지로 내려받으세요.</li>
                 </ol>
                 <p className="map-hint__foot"><Icon name="upload" size={14} />가지고 있는 GPX·TCX·FIT 파일은 지도에 끌어다 놓아 불러올 수 있어요.</p>
