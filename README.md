@@ -32,7 +32,7 @@ cp .env.example .env
 
 `.env`에 DB 비밀번호와 Firebase 웹 앱 설정을 입력하세요. `.env.example`은 작성 예시이며, 그 파일만 수정해도 실제 실행 설정에 반영되지는 않습니다. `DATABASE_URL`의 비밀번호는 `POSTGRES_PASSWORD`와 일치해야 하고, 특수 문자가 있으면 URL 인코딩이 필요합니다. 실제 설정 파일인 `.env`는 Git에 올리지 않습니다.
 
-경로 서버에 필요한 대한민국 OSM 파일을 `data/south-korea-260101.osm.pbf`에 넣어주세요. 이 이름은 설정된 로컬 파일명이며 자동 다운로드 주소가 아닙니다. 파일이 없으면 배포 스크립트가 중단됩니다.
+경로 서버에 필요한 대한민국 OSM 파일은 `data/south-korea-YYMMDD.osm.pbf` 형식으로 보관하고, GraphHopper는 현재 적용된 파일을 가리키는 링크 `data/south-korea-latest.osm.pbf`를 읽습니다. 링크가 없으면 배포 스크립트가 가장 최근 날짜 파일에 자동으로 연결합니다. 파일이 하나도 없으면 `./update-osm.sh`로 최신 파일을 내려받거나 직접 넣어주세요. 파일이 없으면 배포 스크립트가 중단됩니다.
 
 ## 구글 로그인 설정
 
@@ -128,6 +128,26 @@ docker compose -p toporider -f docker-compose.yml logs --tail=100 frontend
 화면에 보이는 지도는 카카오맵이고, 경로 계산은 전국 OSM 데이터를 가공한 GraphHopper 그래프를 사용합니다. 개발 모드는 운영과 같은 OSM 원본 파일을 읽기 전용으로 사용하지만, 경로·고도 캐시는 별도로 생성합니다. 따라서 처음 개발 모드를 실행할 때도 지도 가공 시간과 저장 공간이 필요합니다.
 
 캐시가 없는 최초 빌드에는 Docker 기본 이미지, GraphHopper 9.1 실행 파일, 프론트엔드 npm 패키지와 백엔드 Python 패키지를 다운로드합니다. 최초 지도 가공 중에는 CGIAR 고도 제공업체에서 고도 타일을 내려받을 수 있습니다. 운영 고도 캐시는 `data/srtm`, 개발 고도 캐시는 `data/dev/srtm`에 저장됩니다. 이후 실행은 기존 캐시를 재사용합니다.
+
+## 지도 데이터 자동 업데이트
+
+`./update-osm.sh`는 Geofabrik의 대한민국 지도 파일이 새로 올라왔는지 확인하고, 있으면 운영 길찾기에 적용합니다.
+
+1. 업로드 날짜로 `data/south-korea-YYMMDD.osm.pbf`를 내려받고 체크섬을 확인합니다.
+2. 운영 GraphHopper가 계속 동작하는 동안 별도 컨테이너에서 새 그래프를 만듭니다.
+3. GraphHopper를 잠깐 멈추고 그래프를 교체한 뒤, 실제 러닝 경로 요청으로 동작을 확인합니다. 교체 중 몇 초에서 수십 초 동안 길찾기가 응답하지 않을 수 있습니다.
+4. 확인에 성공하면 `south-korea-latest.osm.pbf` 링크를 새 파일로 바꾸고 지도 파일을 최근 5개만 남깁니다. 실패하면 이전 그래프로 되돌립니다.
+
+이미 최신 파일을 사용 중이면 아무것도 하지 않습니다. 그래프를 만드는 동안 운영 GraphHopper와 별도로 약 2GB 메모리를 더 쓰므로, 여유 메모리가 3GB 미만이면 그 회차는 건너뜁니다. 이 스크립트는 운영 그래프만 갱신합니다. 개발 그래프를 갱신하려면 개발 서비스를 종료하고 `data/dev/graph-cache-v2`를 삭제한 뒤 다시 실행합니다.
+
+서버에서 매일 새벽 4시에 실행하도록 등록합니다. 실행 기록은 `data/update-osm.log`에 남습니다.
+
+```bash
+(crontab -l 2>/dev/null; echo "0 4 * * * $(pwd)/update-osm.sh >> $(pwd)/data/update-osm.log 2>&1") | crontab -
+crontab -l   # 등록 확인
+```
+
+수동으로 바로 확인하려면 `./update-osm.sh`를 실행합니다. 보존 개수(`OSM_KEEP_FILES`), 그래프 생성 메모리(`OSM_IMPORT_HEAP`), 최소 여유 메모리(`OSM_MIN_FREE_MB`)는 환경 변수로 바꿀 수 있습니다.
 
 자전거·러닝 프로필을 추가하면서 그래프 위치를 `graph-cache-v2`로 바꿨습니다. 업데이트 후 처음 실행하면 기존 `graph-cache`를 그대로 둔 채 새 그래프를 다시 가공하므로, 그동안 경로 찾기를 사용할 수 없습니다. 새 그래프로 길찾기가 잘 되는지 확인한 뒤 운영의 `data/graph-cache`와 개발의 `data/dev/graph-cache`를 삭제해 저장 공간을 확보할 수 있습니다. 고도 캐시(`srtm`)는 그대로 재사용합니다.
 

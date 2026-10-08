@@ -7,8 +7,8 @@ services:
     volumes:
       - ./data/dev:/data
       - type: bind
-        source: ./data/south-korea-260101.osm.pbf
-        target: /data/south-korea-260101.osm.pbf
+        source: ./data/south-korea-latest.osm.pbf
+        target: /data/south-korea-latest.osm.pbf
         read_only: true
         bind:
           create_host_path: false

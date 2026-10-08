@@ -28,9 +28,17 @@ case "$action" in
   logs) "${compose[@]}" logs -f --tail=100; exit ;;
   status) "${compose[@]}" ps; exit ;;
 esac
-if [ ! -s data/south-korea-260101.osm.pbf ]; then
-  echo "OSM 지도 파일이 없습니다: data/south-korea-260101.osm.pbf" >&2
-  echo "대한민국 .osm.pbf 파일을 해당 경로에 넣어주세요. 이 스크립트는 지도 데이터를 자동 다운로드하지 않습니다." >&2
+# GraphHopper는 data/south-korea-latest.osm.pbf 링크를 읽습니다. 링크가 없으면 가장 최근 날짜 파일에 연결합니다.
+if [ ! -e data/south-korea-latest.osm.pbf ]; then
+  newest="$(ls -1 data 2>/dev/null | grep -E '^south-korea-[0-9]{6}\.osm\.pbf$' | sort | tail -n 1 || true)"
+  if [ -n "$newest" ]; then
+    ln -sfn "$newest" data/south-korea-latest.osm.pbf
+    echo "지도 파일 링크를 만들었습니다: data/south-korea-latest.osm.pbf -> $newest"
+  fi
+fi
+if [ ! -s data/south-korea-latest.osm.pbf ]; then
+  echo "OSM 지도 파일이 없습니다: data/south-korea-latest.osm.pbf" >&2
+  echo "./update-osm.sh로 최신 파일을 내려받거나, 대한민국 .osm.pbf 파일을 data/south-korea-YYMMDD.osm.pbf로 넣어주세요." >&2
   exit 1
 fi
 "${compose[@]}" config --quiet
