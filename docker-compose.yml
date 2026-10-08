@@ -63,6 +63,27 @@ services:
     networks:
       - toporider_net
 
+  # 지도 자동 업데이트 (운영 전용, deploy.sh live에서만 실행)
+  # Docker를 제어해야 하므로 docker.sock을 연결합니다. 외부 포트를 열지 않는 별도 컨테이너로 둡니다.
+  osm-updater:
+    build: ./osm-updater
+    profiles: ['osm-updater']
+    restart: unless-stopped
+    working_dir: ${TRAZO_DIR:-$PWD}
+    environment:
+      - TRAZO_DIR=${TRAZO_DIR:-$PWD}
+      - OSM_CHECK_URL=http://graphhopper:8989
+      - OSM_UPDATE_TIME=${OSM_UPDATE_TIME:-04:00}
+      - TZ=Asia/Seoul
+    volumes:
+      # 컨테이너 안에서 실행하는 docker run -v 경로를 호스트가 해석하므로 같은 경로로 연결합니다.
+      - ${TRAZO_DIR:-$PWD}:${TRAZO_DIR:-$PWD}
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - graphhopper
+    networks:
+      - toporider_net
+
 volumes: # 맨 아래에 추가
   postgres_data:
 

@@ -5,6 +5,9 @@ cd "$(dirname "$0")"
 # GraphHopper 설정이 바뀌면 컨테이너를 다시 만들도록 체크섬을 전달합니다 (docker-compose.yml의 labels 참고).
 export GRAPHHOPPER_CONFIG_SUM="$(cksum graphhopper/config-gh.yml | cut -d' ' -f1)"
 
+# osm-updater 컨테이너가 호스트와 같은 경로로 저장소를 연결할 때 사용합니다.
+export TRAZO_DIR="$(pwd)"
+
 mode="${1:-live}"
 action="${2:-up}"
 case "$mode" in
@@ -14,7 +17,8 @@ case "$mode" in
     compose=(docker compose -p toporider-dev -f docker-compose.yml -f docker-compose.dev.yml)
     ;;
   live)
-    compose=(docker compose -p toporider -f docker-compose.yml)
+    # 운영에서만 지도 자동 업데이트 컨테이너(osm-updater)를 함께 실행합니다.
+    compose=(docker compose -p toporider --profile osm-updater -f docker-compose.yml)
     ;;
   *) echo "사용법: ./deploy.sh [dev|live] [up|down|logs|status]" >&2; exit 1 ;;
 esac

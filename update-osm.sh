@@ -6,7 +6,7 @@
 # - 새 그래프는 운영 GraphHopper가 계속 동작하는 동안 별도 컨테이너에서 만들고,
 #   완성되면 잠깐 재시작해 교체합니다. 확인에 실패하면 이전 그래프로 되돌립니다.
 #
-# 사용법: ./update-osm.sh           (cron으로 하루 한 번 실행)
+# 운영에서는 osm-updater 컨테이너가 매일 자동 실행합니다. 수동 실행: ./update-osm.sh
 set -euo pipefail
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 cd "$(dirname "$0")"
@@ -20,7 +20,8 @@ MIN_FREE_MB="${OSM_MIN_FREE_MB:-3072}"
 # 교체 후 길찾기가 실제로 되는지 확인할 두 지점 (서울)
 CHECK_POINTS="${OSM_CHECK_POINTS:-37.5203,126.9969 37.5309,127.0117}"
 PROJECT="${COMPOSE_PROJECT:-toporider}"
-GRAPHHOPPER_PORT="${GRAPHHOPPER_PORT:-8989}"
+# 호스트에서 실행하면 공개 포트로, osm-updater 컨테이너에서 실행하면 내부 네트워크로 확인합니다.
+CHECK_URL="${OSM_CHECK_URL:-http://127.0.0.1:${GRAPHHOPPER_PORT:-8989}}"
 compose=(docker compose -p "$PROJECT" -f docker-compose.yml)
 IMAGE="${PROJECT}-graphhopper"
 LATEST="data/${OSM_PREFIX}-latest.osm.pbf"
@@ -74,6 +75,8 @@ sed -E \
   -e "s#^([[:space:]]*datareader\.file:).*#\1 '/data/$file'#" \
   -e "s#^([[:space:]]*graph\.location:).*#\1 '/data/$next'#" \
   graphhopper/config-gh.yml > data/.import-config.yml
+# 이전 회차가 중단돼 남은 생성 컨테이너와 폴더를 정리합니다.
+docker rm -f "${PROJECT}-osm-import" >/dev/null 2>&1 || true
 in_data "rm -rf /data/$next"
 log "새 그래프를 만듭니다 (운영 길찾기는 계속 동작합니다)…"
 if ! docker run --rm --name "${PROJECT}-osm-import" \
@@ -89,7 +92,7 @@ wait_ready() {
   local query="" p
   for p in $CHECK_POINTS; do query="${query}point=${p}&"; done
   for _ in $(seq 1 90); do
-    if curl -fs "http://127.0.0.1:${GRAPHHOPPER_PORT}/route?${query}profile=run&points_encoded=false" >/dev/null 2>&1; then return 0; fi
+    if curl -fs "${CHECK_URL}/route?${query}profile=run&points_encoded=false" >/dev/null 2>&1; then return 0; fi
     sleep 2
   done
   return 1

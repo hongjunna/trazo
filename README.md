@@ -131,23 +131,24 @@ docker compose -p toporider -f docker-compose.yml logs --tail=100 frontend
 
 ## 지도 데이터 자동 업데이트
 
-`./update-osm.sh`는 Geofabrik의 대한민국 지도 파일이 새로 올라왔는지 확인하고, 있으면 운영 길찾기에 적용합니다.
+운영 서비스에는 지도 자동 업데이트 컨테이너(`osm-updater`)가 함께 실행됩니다. 서버에 crontab을 따로 등록할 필요 없이 `./deploy.sh live`만으로 시작되며, 매일 새벽 4시(한국 시간)에 `update-osm.sh`를 실행해 Geofabrik의 대한민국 지도 파일이 새로 올라왔는지 확인합니다.
 
 1. 업로드 날짜로 `data/south-korea-YYMMDD.osm.pbf`를 내려받고 체크섬을 확인합니다.
 2. 운영 GraphHopper가 계속 동작하는 동안 별도 컨테이너에서 새 그래프를 만듭니다.
 3. GraphHopper를 잠깐 멈추고 그래프를 교체한 뒤, 실제 러닝 경로 요청으로 동작을 확인합니다. 교체 중 몇 초에서 수십 초 동안 길찾기가 응답하지 않을 수 있습니다.
 4. 확인에 성공하면 `south-korea-latest.osm.pbf` 링크를 새 파일로 바꾸고 지도 파일을 최근 5개만 남깁니다. 실패하면 이전 그래프로 되돌립니다.
 
-이미 최신 파일을 사용 중이면 아무것도 하지 않습니다. 그래프를 만드는 동안 운영 GraphHopper와 별도로 약 2GB 메모리를 더 쓰므로, 여유 메모리가 3GB 미만이면 그 회차는 건너뜁니다. 이 스크립트는 운영 그래프만 갱신합니다. 개발 그래프를 갱신하려면 개발 서비스를 종료하고 `data/dev/graph-cache-v2`를 삭제한 뒤 다시 실행합니다.
+이미 최신 파일을 사용 중이면 아무것도 하지 않습니다. 그래프를 만드는 동안 운영 GraphHopper와 별도로 약 2GB 메모리를 더 쓰므로, 서버의 여유 메모리가 3GB 미만이면 그 회차는 건너뜁니다. 실행 기록은 `./deploy.sh live logs`에서 `osm-updater-1`로 표시됩니다.
 
-서버에서 매일 새벽 4시에 실행하도록 등록합니다. 실행 기록은 `data/update-osm.log`에 남습니다.
+`osm-updater`는 그래프 생성 컨테이너 실행과 GraphHopper 재시작을 위해 Docker 소켓(`/var/run/docker.sock`)을 사용합니다. 이 권한은 서버 관리자 권한과 같으므로 외부 포트를 열지 않는 별도 컨테이너로만 실행합니다. 백엔드 등 다른 서비스에 Docker 소켓을 연결하지 마세요.
+
+바로 업데이트를 확인하려면 다음 명령을 실행합니다.
 
 ```bash
-(crontab -l 2>/dev/null; echo "0 4 * * * $(pwd)/update-osm.sh >> $(pwd)/data/update-osm.log 2>&1") | crontab -
-crontab -l   # 등록 확인
+docker compose -p toporider --profile osm-updater -f docker-compose.yml exec osm-updater ./update-osm.sh
 ```
 
-수동으로 바로 확인하려면 `./update-osm.sh`를 실행합니다. 보존 개수(`OSM_KEEP_FILES`), 그래프 생성 메모리(`OSM_IMPORT_HEAP`), 최소 여유 메모리(`OSM_MIN_FREE_MB`)는 환경 변수로 바꿀 수 있습니다.
+확인 시각(`OSM_UPDATE_TIME`, 기본 `04:00`)은 `.env`에서 바꿀 수 있습니다. 보존 개수(`OSM_KEEP_FILES`), 그래프 생성 메모리(`OSM_IMPORT_HEAP`), 최소 여유 메모리(`OSM_MIN_FREE_MB`)는 스크립트 환경 변수로 바꿀 수 있습니다. 개발 모드에서는 자동 업데이트를 실행하지 않습니다. 개발 그래프를 갱신하려면 개발 서비스를 종료하고 `data/dev/graph-cache-v2`를 삭제한 뒤 다시 실행합니다.
 
 자전거·러닝 프로필을 추가하면서 그래프 위치를 `graph-cache-v2`로 바꿨습니다. 업데이트 후 처음 실행하면 기존 `graph-cache`를 그대로 둔 채 새 그래프를 다시 가공하므로, 그동안 경로 찾기를 사용할 수 없습니다. 새 그래프로 길찾기가 잘 되는지 확인한 뒤 운영의 `data/graph-cache`와 개발의 `data/dev/graph-cache`를 삭제해 저장 공간을 확보할 수 있습니다. 고도 캐시(`srtm`)는 그대로 재사용합니다.
 
