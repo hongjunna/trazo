@@ -9,7 +9,7 @@ from google.auth.exceptions import GoogleAuthError, TransportError
 from cachecontrol import CacheControl
 import requests
 from sqlalchemy import inspect, text
-from typing import List, Optional, Any
+from typing import List, Literal, Optional, Any
 from fastapi import FastAPI, Query, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -18,6 +18,7 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 import datetime
+from xml.sax.saxutils import escape
 
 # --- 1. 데이터베이스 설정 ---
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -59,6 +60,7 @@ class Course(SQLModel, table=True):
     markers_json: str 
     polylines_json: str 
     firebase_uid: Optional[str] = Field(default=None)
+    sport: str = Field(default="bike")
     user_id: int = Field(default=1) 
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
     is_deleted: bool = Field(default=False)
@@ -68,8 +70,12 @@ async def lifespan(app: FastAPI):
     SQLModel.metadata.create_all(engine)
     # create_all does not add columns to an existing table. Preserve legacy ownership.
     with engine.begin() as connection:
-        if "firebase_uid" not in {column["name"] for column in inspect(connection).get_columns("course")}:
+        columns = {column["name"] for column in inspect(connection).get_columns("course")}
+        if "firebase_uid" not in columns:
             connection.execute(text("ALTER TABLE course ADD COLUMN firebase_uid VARCHAR(128)"))
+        # 서비스가 러닝을 지원하기 전에 저장된 코스는 모두 자전거 코스입니다.
+        if "sport" not in columns:
+            connection.execute(text("ALTER TABLE course ADD COLUMN sport VARCHAR(16) NOT NULL DEFAULT 'bike'"))
     yield
 
 app = FastAPI(title="Trazo API", lifespan=lifespan)
@@ -84,10 +90,13 @@ app.add_middleware(
 GRAPHHOPPER_URL = os.getenv("GRAPHHOPPER_URL", "http://graphhopper:8989")
 
 # --- 3. Pydantic 모델 ---
+Sport = Literal["bike", "run"]
+
 class CreateCourseRequest(BaseModel):
     title: str
     markers: List[dict]
     polylines: List[List[dict]]
+    sport: Sport = "bike"
 
 # ⚡ [수정] 코스 수정 요청 모델 (경로 데이터 추가)
 class UpdateCourseRequest(BaseModel):
@@ -95,6 +104,7 @@ class UpdateCourseRequest(BaseModel):
     description: Optional[str] = None
     markers: Optional[List[dict]] = None          # ⚡ 추가됨
     polylines: Optional[List[List[dict]]] = None  # ⚡ 추가됨
+    sport: Optional[Sport] = None
 
 class TCXPoint(BaseModel):
     lat: float
@@ -103,6 +113,9 @@ class TCXPoint(BaseModel):
 
 class TCXExportRequest(BaseModel):
     trackPoints: List[TCXPoint]
+    name: Optional[str] = None
+    # 코스 파일의 예상 시간 계산에 쓰는 평균 속도 (m/s)
+    speedMps: Optional[float] = None
 
 class Instruction(BaseModel):
     distance: float
@@ -132,7 +145,72 @@ class RouteResponse(BaseModel):
     info: dict
     paths: List[Path]
 
-# --- 4. 헬퍼 함수들 ---
+# --- 4. 경로 프로필과 옵션 ---
+
+# 화면의 종목은 GraphHopper 프로필 이름과 같습니다.
+ROUTE_PROFILES = {"bike", "run"}
+
+UNPAVED = " || ".join(f"surface == {s}" for s in ("UNPAVED", "COMPACTED", "FINE_GRAVEL", "GRAVEL", "GROUND", "DIRT", "GRASS", "SAND"))
+
+# 클라이언트가 임의 규칙을 보낼 수 없도록, 허용된 옵션 이름만 GraphHopper 규칙으로 바꿉니다.
+ROUTE_OPTIONS = {
+    "bike": {
+        "prefer_bikeway": [{"if": "road_class == CYCLEWAY || bike_network != MISSING", "multiply_by": "1.6"}],
+        "avoid_big_roads": [
+            {"if": "road_class == PRIMARY || road_class == TRUNK", "multiply_by": "0.3"},
+            {"else_if": "road_class == SECONDARY", "multiply_by": "0.6"},
+        ],
+        "avoid_unpaved": [{"if": f"{UNPAVED} || road_class == TRACK", "multiply_by": "0.2"}],
+        "avoid_hills": [{"if": "average_slope >= 6", "multiply_by": "0.4"}],
+    },
+    "run": {
+        "prefer_trails": [{
+            "if": "road_class == FOOTWAY || road_class == PATH || road_class == PEDESTRIAN || road_class == CYCLEWAY"
+                  " || road_class == LIVING_STREET || foot_network != MISSING",
+            "multiply_by": "1.5",
+        }],
+        "avoid_big_roads": [
+            {"if": "road_class == PRIMARY || road_class == TRUNK", "multiply_by": "0.4"},
+            {"else_if": "road_class == SECONDARY", "multiply_by": "0.7"},
+        ],
+        "avoid_stairs": [{"if": "road_class == STEPS", "multiply_by": "0.05"}],
+        "avoid_unpaved": [{"if": UNPAVED, "multiply_by": "0.3"}],
+        "avoid_hills": [{"if": "average_slope >= 5", "multiply_by": "0.4"}],
+    },
+}
+
+def build_route_request(points: List[str], profile: str, options: List[str]) -> dict:
+    if profile not in ROUTE_PROFILES:
+        raise HTTPException(status_code=400, detail="Unknown route profile")
+    if not 2 <= len(points) <= 50:
+        raise HTTPException(status_code=400, detail="Between 2 and 50 points are required")
+    coordinates = []
+    for p in points:
+        try:
+            lat, lng = (float(v) for v in p.split(","))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid point")
+        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            raise HTTPException(status_code=400, detail="Invalid point")
+        coordinates.append([lng, lat])
+    priority = []
+    for option in dict.fromkeys(options):
+        rules = ROUTE_OPTIONS[profile].get(option)
+        if rules is None:
+            raise HTTPException(status_code=400, detail=f"Unknown route option for {profile}: {option}")
+        priority.extend(rules)
+    body = {
+        "points": coordinates,
+        "profile": profile,
+        "elevation": True,
+        "points_encoded": False,
+        "instructions": False,
+    }
+    if priority:
+        body["custom_model"] = {"priority": priority}
+    return body
+
+# --- 5. 헬퍼 함수들 ---
 
 def smooth_elevation(elevations: List[float], window_size: int = 3, iterations: int = 3) -> List[float]:
     if not elevations:
@@ -176,7 +254,7 @@ async def get_elevation_for_path(start_lat, start_lng, end_lat, end_lng, client)
             params = [
                 ("point", f"{lat},{lng}"),
                 ("point", f"{lat},{lng}"),
-                ("profile", "foot"), 
+                ("profile", "run"), 
                 ("elevation", "true"),
                 ("points_encoded", "false")
             ]
@@ -191,7 +269,7 @@ async def get_elevation_for_path(start_lat, start_lng, end_lat, end_lng, client)
             
     return points
 
-# --- 5. API 엔드포인트 ---
+# --- 6. API 엔드포인트 ---
 
 def get_session():
     with Session(engine) as session:
@@ -205,6 +283,7 @@ def create_course(course_data: CreateCourseRequest, session: Session = Depends(g
         polylines_json=json.dumps(course_data.polylines),
         user_id=user_id if isinstance(user_id, int) else 0,
         firebase_uid=user_id if isinstance(user_id, str) else None,
+        sport=course_data.sport,
         is_deleted=False
     )
     session.add(new_course)
@@ -236,6 +315,8 @@ def update_course(course_id: int, course_data: UpdateCourseRequest, session: Ses
         course.markers_json = json.dumps(course_data.markers)
     if course_data.polylines is not None:
         course.polylines_json = json.dumps(course_data.polylines)
+    if course_data.sport is not None:
+        course.sport = course_data.sport
         
     session.add(course)
     session.commit()
@@ -257,8 +338,11 @@ def delete_course(course_id: int, session: Session = Depends(get_session), user_
 async def get_route(
     point: List[str] = Query(...), 
     profile: str = "bike",
-    mode: str = "turn-by-turn"
+    mode: str = "turn-by-turn",
+    option: List[str] = Query(default=[]),
 ):
+    if mode != 'straight':
+        route_request = build_route_request(point, profile, option)
     async with httpx.AsyncClient() as client:
         if mode == 'straight':
             start_parts = point[0].split(',')
@@ -301,16 +385,9 @@ async def get_route(
                 }]
             }
 
-        params = [("point", p) for p in point]
-        params.extend([
-            ("type", "json"),
-            ("elevation", "true"),
-            ("profile", profile),
-            ("points_encoded", "false")
-        ])
-
         try:
-            response = await client.get(f"{GRAPHHOPPER_URL}/route", params=params, timeout=30.0)
+            # 요청별 경로 옵션(custom_model)은 POST 요청에서만 전달할 수 있습니다.
+            response = await client.post(f"{GRAPHHOPPER_URL}/route", json=route_request, timeout=30.0)
             if response.status_code != 200:
                 return {"info": {"errors": [{"message": "GraphHopper Error"}]}, "paths": []}
             
@@ -361,7 +438,8 @@ async def export_tcx(request: TCXExportRequest):
         <DistanceMeters>0.0</DistanceMeters>
     </Trackpoint>"""
 
-    AVG_SPEED_MPS = 5.5 
+    AVG_SPEED_MPS = request.speedMps if request.speedMps and 0.5 <= request.speedMps <= 20 else 5.5
+    course_name = escape((request.name or "Trazo Course").strip()[:80] or "Trazo Course")
 
     for i in range(1, len(points)):
         curr_pt = points[i]
@@ -392,7 +470,7 @@ async def export_tcx(request: TCXExportRequest):
 <TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
   <Courses>
     <Course>
-      <Name>Trazo Course</Name>
+      <Name>{course_name}</Name>
       <Lap>
         <TotalTimeSeconds>{(total_dist / AVG_SPEED_MPS):.1f}</TotalTimeSeconds>
         <DistanceMeters>{total_dist:.1f}</DistanceMeters>

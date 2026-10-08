@@ -7,6 +7,10 @@ export const COLORS = {
     accent: '#8FCE3A',    // Contour Lime (강조, 데이터, 활성)
     danger: '#C0392B',    // Threshold Red (경고, 삭제, 급경사)
 
+    // Sport Colors (지도 위 경로선과 종목 강조색)
+    bike: '#8FCE3A',      // Contour Lime
+    run: '#FF7A45',       // Pace Orange
+
     // Neutrals
     white: '#FFFFFF',
     background: '#F8F9FA',

@@ -2,17 +2,10 @@
 import React from 'react';
 import { COLORS } from '../styles/theme';
 
-const LEGEND_ITEMS = [
-    { label: 'Warm Up (0~2%)', color: '#4A90E2', desc: '몸을 푸는 구간' },
-    { label: 'Tempo (2~7%)', color: COLORS.accent, desc: '지형을 느끼는 구간' }, // Lime
-    { label: 'Threshold (7~12%)', color: COLORS.secondary, desc: '지구력 싸움' }, // Brown
-    { label: 'VO2 Max (12%+)', color: COLORS.danger, desc: '한계 돌파' },   // Red
-];
-
-const GradientLegend = () => {
+const GradientLegend = ({ zones }) => {
     return (
         <div style={{
-            width: '180px',
+            width: '190px',
             padding: '16px',
             backgroundColor: COLORS.white,
             borderLeft: `1px solid ${COLORS.border}`,
@@ -25,13 +18,12 @@ const GradientLegend = () => {
                 margin: '0 0 12px 0',
                 fontSize: '13px',
                 color: COLORS.primary,
-                textTransform: 'uppercase',
-                letterSpacing: '1px'
+                letterSpacing: '0.5px'
             }}>
-                Training Zones
+                경사 구간
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {LEGEND_ITEMS.map((item, index) => (
+                {zones.map((item, index) => (
                     <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
                             width: '14px',

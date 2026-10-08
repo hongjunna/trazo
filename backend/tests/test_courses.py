@@ -81,9 +81,41 @@ class FirebaseAccessTests(CourseAccessTests):
             connection.execute(text('DROP TABLE course'))
             connection.execute(text('CREATE TABLE course (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL, description VARCHAR, markers_json VARCHAR NOT NULL, polylines_json VARCHAR NOT NULL, user_id INTEGER NOT NULL, created_at VARCHAR NOT NULL, is_deleted BOOLEAN NOT NULL)'))
         with TestClient(api.app):
-            self.assertIn('firebase_uid', {column['name'] for column in inspect(api.engine).get_columns('course')})
+            columns = {column['name'] for column in inspect(api.engine).get_columns('course')}
+            self.assertIn('firebase_uid', columns)
+            self.assertIn('sport', columns)
         with TestClient(api.app):
             self.assertEqual(self.client.get('/courses', headers=self.owner).status_code, 200)
+
+    def test_course_sport(self):
+        data = {'title': 'run', 'markers': [], 'polylines': [], 'sport': 'run'}
+        course_id = self.client.post('/courses', json=data, headers=self.owner).json()['course_id']
+        self.assertEqual(self.client.get('/courses', headers=self.owner).json()[0]['sport'], 'run')
+        self.assertEqual(self.client.put(f'/courses/{course_id}', headers=self.owner, json={'sport': 'bike'}).status_code, 200)
+        self.assertEqual(self.client.get('/courses', headers=self.owner).json()[0]['sport'], 'bike')
+        self.assertEqual(self.client.post('/courses', json={**data, 'sport': 'swim'}, headers=self.owner).status_code, 422)
+        legacy = self.client.post('/courses', json={'title': 'legacy', 'markers': [], 'polylines': []}, headers=self.owner).json()['course_id']
+        self.assertEqual({c['id']: c['sport'] for c in self.client.get('/courses', headers=self.owner).json()}[legacy], 'bike')
+
+
+class RouteRequestTests(unittest.TestCase):
+    def test_options_are_mapped_per_profile(self):
+        body = api.build_route_request(['37.5,127.0', '37.6,127.1'], 'run', ['avoid_stairs', 'avoid_stairs', 'prefer_trails'])
+        self.assertEqual(body['points'], [[127.0, 37.5], [127.1, 37.6]])
+        self.assertEqual(body['profile'], 'run')
+        self.assertEqual(len(body['custom_model']['priority']), 2)
+        self.assertNotIn('custom_model', api.build_route_request(['37.5,127.0', '37.6,127.1'], 'bike', []))
+
+    def test_rejects_unknown_profile_option_and_points(self):
+        from fastapi import HTTPException
+        for args in ((['37.5,127.0', '37.6,127.1'], 'car', []),
+                     (['37.5,127.0', '37.6,127.1'], 'bike', ['avoid_stairs']),
+                     (['37.5,127.0', '37.6,127.1'], 'run', ['road_class == STEPS']),
+                     (['37.5,127.0'], 'bike', []),
+                     (['37.5,127.0', '91,127.1'], 'bike', []),
+                     (['37.5,127.0', 'abc'], 'bike', [])):
+            with self.assertRaises(HTTPException):
+                api.build_route_request(*args)
 
 
 if __name__ == '__main__':

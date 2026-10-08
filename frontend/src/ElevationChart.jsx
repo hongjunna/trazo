@@ -65,20 +65,12 @@ const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
     return R * c;
 };
 
-const getSlopeColor = (slope) => {
-    const absSlope = Math.abs(slope);
-    if (absSlope < 2) return 'rgba(54, 162, 235, 0.2)';
-    if (absSlope < 5) return 'rgba(75, 192, 192, 0.4)';
-    if (absSlope < 10) return 'rgba(255, 206, 86, 0.5)';
-    return 'rgba(255, 99, 132, 0.6)';
-};
+// 경사 구간 색 (범례와 같은 구간 정의 사용)
+const zoneFor = (zones, slope) => zones.find(zone => Math.abs(slope) < zone.max) || zones[zones.length - 1];
 
-const getSlopeBorderColor = (slope) => {
-    const absSlope = Math.abs(slope);
-    if (absSlope < 2) return 'rgb(54, 162, 235)';
-    if (absSlope < 5) return 'rgb(75, 192, 192)';
-    if (absSlope < 10) return 'rgb(255, 206, 86)';
-    return 'rgb(255, 99, 132)';
+const withAlpha = (hex, alpha) => {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 };
 
 const crosshairPlugin = {
@@ -103,7 +95,7 @@ const crosshairPlugin = {
     }
 };
 
-const ElevationChart = ({ polylines, onHoverPoint }) => {
+const ElevationChart = ({ polylines, zones, onHoverPoint }) => {
     const [hudData, setHudData] = useState(null);
     const chartContainerRef = useRef(null);
     const scrollbarThumbRef = useRef(null);
@@ -204,14 +196,14 @@ const ElevationChart = ({ polylines, onHoverPoint }) => {
                         pointHitRadius: 0,
                         pointHoverRadius: 0,
                         segment: {
-                            backgroundColor: (ctx) => getSlopeColor(finalSlopes[ctx.p0DataIndex]),
-                            borderColor: (ctx) => getSlopeBorderColor(finalSlopes[ctx.p0DataIndex])
+                            backgroundColor: (ctx) => withAlpha(zoneFor(zones, finalSlopes[ctx.p0DataIndex]).color, 0.35),
+                            borderColor: (ctx) => zoneFor(zones, finalSlopes[ctx.p0DataIndex]).color
                         }
                     },
                 ],
             }
         };
-    }, [polylines]);
+    }, [polylines, zones]);
 
     const updateScrollbar = (chart) => {
         if (!scrollbarThumbRef.current) return;
@@ -337,7 +329,7 @@ const ElevationChart = ({ polylines, onHoverPoint }) => {
             }}>
                 <div style={{ color: '#ddd' }}>📏 거리: {hudData.dist.toFixed(2)} km</div>
                 <div style={{ color: '#fff' }}>⛰️ 고도: {Math.round(hudData.ele)} m</div>
-                <div style={{ color: hudData.slope >= 10 ? '#FF5A5A' : (hudData.slope <= -10 ? '#5ABEFF' : '#fff') }}>
+                <div style={{ color: hudData.slope >= zones[zones.length - 2].max ? '#FF5A5A' : (hudData.slope <= -zones[zones.length - 2].max ? '#5ABEFF' : '#fff') }}>
                     📈 경사: {hudData.slope.toFixed(1)} %
                 </div>
             </div>

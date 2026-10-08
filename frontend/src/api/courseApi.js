@@ -15,12 +15,14 @@ courseClient.interceptors.request.use(async (config) => {
     return config;
 });
 
-export const fetchRoutePath = async (start, end, mode = 'turn-by-turn', signal) => {
+// sport: 'bike' | 'run' (백엔드 경로 프로필), options: 켜진 경로 옵션 이름 목록
+export const fetchRoutePath = async (start, end, { mode = 'turn-by-turn', sport = 'bike', options = [] } = {}, signal) => {
     const params = new URLSearchParams();
     params.append('point', `${start.lat},${start.lng}`);
     params.append('point', `${end.lat},${end.lng}`);
-    params.append('profile', 'bike');
+    params.append('profile', sport);
     params.append('mode', mode);
+    options.forEach(option => params.append('option', option));
     const response = await axios.get(`${BASE_URL}/route`, { params, signal });
     const points = response.data.paths?.[0]?.decoded_points;
     if (!Array.isArray(points) || points.length < 2 || points.some(pt => !Array.isArray(pt) || pt.length < 3 || !pt.every(Number.isFinite))) {
@@ -29,22 +31,17 @@ export const fetchRoutePath = async (start, end, mode = 'turn-by-turn', signal) 
     return points.map(pt => ({ lat: pt[0], lng: pt[1], ele: pt[2] }));
 };
 
-export const saveCourse = async (title, markers, polylines) => {
-    return await courseClient.post(`/courses`, { title, markers, polylines });
+export const saveCourse = async (title, markers, polylines, sport) => {
+    return await courseClient.post(`/courses`, { title, markers, polylines, sport });
 };
 
 export const getCourseList = async () => {
     return await courseClient.get(`/courses`);
 };
 
-export const downloadTCX = async (polylines) => {
-    let flatPoints = [];
-    polylines.forEach(segment => {
-        flatPoints = [...flatPoints, ...segment];
-    });
-
+export const downloadTCX = async (trackPoints, { name, speedKmh }) => {
     return await axios.post(`${BASE_URL}/export/tcx`,
-        { trackPoints: flatPoints },
+        { trackPoints, name, speedMps: speedKmh / 3.6 },
         { responseType: 'blob' }
     );
 };
@@ -54,10 +51,11 @@ export const deleteCourse = async (courseId) => {
 };
 
 // ⚡ [수정] 제목뿐만 아니라 경로 데이터도 함께 업데이트 가능하도록 변경
-export const updateCourse = async (courseId, title, markers, polylines) => {
+export const updateCourse = async (courseId, title, markers, polylines, sport) => {
     return await courseClient.put(`/courses/${courseId}`, {
         title,
         markers,
-        polylines
+        polylines,
+        sport
     });
 };
