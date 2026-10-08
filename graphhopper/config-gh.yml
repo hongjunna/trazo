@@ -2,9 +2,9 @@ graphhopper:
   # 현재 적용된 지도 파일(south-korea-YYMMDD.osm.pbf)을 가리키는 링크입니다. update-osm.sh가 갱신합니다.
   # 그래프가 이미 있으면 이 파일은 읽지 않으므로, 링크가 바뀌어도 재가공되지 않습니다.
   datareader.file: '/data/south-korea-latest.osm.pbf'
-  # 자전거·러닝 프로필에 필요한 속성이 바뀌어 새 그래프를 만듭니다.
+  # 길찾기 규칙(프로필)이 바뀌어 새 그래프를 만듭니다.
   # 새 위치를 사용하면 기존 graph-cache를 지우지 않아도 처음 실행 때 자동으로 다시 가공합니다.
-  graph.location: '/data/graph-cache-v2'
+  graph.location: '/data/graph-cache-v4'
   import.osm.ignored_highways: motorway
 
   # 고도 설정 (CGIAR가 더 안정적입니다)
@@ -19,31 +19,41 @@ graphhopper:
   # 기본 규칙만 프로필에 둡니다. 화면의 경로 옵션은 백엔드가 요청마다 규칙을 덧붙입니다.
   # CH/LM을 쓰지 않아야 요청별 규칙(custom_model)을 적용할 수 있습니다.
   profiles:
-    # 자전거: 자전거 통행 가능 도로, 자전거도로·자전거 노선 선호, 자동차 위주 간선도로 회피
+    # 자전거: 자전거 통행 가능 도로, 자동차 전용급 간선도로(TRUNK) 회피
+    # - GraphHopper 기본 자전거 선호도(bike_priority)는 큰길 0.5 ~ 골목 1.2로 차이가 커서, 곧게 갈 수 있는 큰길을 두고
+    #   골목으로 빠졌다 돌아오는 경로가 생깁니다. 1 / 0.9 / 0.8 세 단계로 묶어 차이를 줄이고, 아주 나쁜 길(0.4 미만)만 그대로 감점합니다.
+    # - 분리된 일방통행 차로에서 반대편 차로에 점이 붙어도 크게 돌아가지 않도록 역방향은 감점(0.7)만 합니다.
+    #   코스 선이 몇 m 옆 차로를 지나도 GPX 코스로 쓰는 데는 문제없습니다.
+    # - 자전거길 선호와 큰길 회피는 화면의 경로 옵션으로 백엔드가 요청마다 덧붙입니다.
     - name: bike
       weighting: custom
       custom_model:
-        distance_influence: 70
+        distance_influence: 150
         priority:
           - { if: '!bike_access && (!backward_bike_access || roundabout)', multiply_by: '0' }
-          - { else_if: '!bike_access && backward_bike_access', multiply_by: '0.2' }
+          - { else_if: '!bike_access && backward_bike_access', multiply_by: '0.7' }
+          - { else_if: 'bike_priority >= 1', multiply_by: '1' }
+          - { else_if: 'bike_priority >= 0.7', multiply_by: '0.9' }
+          - { else_if: 'bike_priority >= 0.4', multiply_by: '0.8' }
           - { else: '', multiply_by: 'bike_priority' }
-          - { if: 'road_class == TRUNK', multiply_by: '0.3' }
-          - { if: 'road_class == CYCLEWAY || bike_network != MISSING', multiply_by: '1.3' }
+          - { if: 'road_class == TRUNK', multiply_by: '0.5' }
         speed:
           - { if: 'true', limit_to: 'bike_average_speed' }
-          - { if: '!bike_access && backward_bike_access', limit_to: '5' }
 
-    # 러닝: 보행 가능한 길, 산책로·공원길·걷기 노선 선호, 위험한 산악 구간과 큰 차도 회피
+    # 러닝: 보행 가능한 길, 위험한 산악 구간 제외
+    # - GraphHopper는 보도 정보가 없는 큰길을 걷기 싫은 길(0.8)로 보지만, 국내 도심 간선도로는 대부분 보도가 있어
+    #   이 감점을 상쇄합니다. 선호도는 1로 맞춰 곧게 갈 수 있는 길을 돌아가지 않게 합니다.
+    # - 공원·산책로 선호와 큰 차도 회피는 화면의 경로 옵션으로 백엔드가 요청마다 덧붙입니다.
     - name: run
       weighting: custom
       custom_model:
-        distance_influence: 70
+        distance_influence: 200
         priority:
           - { if: '!foot_access || hike_rating >= 3', multiply_by: '0' }
           - { else: '', multiply_by: 'foot_priority' }
-          - { if: 'road_class == TRUNK || road_class == PRIMARY', multiply_by: '0.5' }
-          - { if: 'foot_network != MISSING', multiply_by: '1.3' }
+          - { if: 'road_class == PRIMARY || road_class == SECONDARY || road_class == TERTIARY', multiply_by: '1.25' }
+          - { if: 'true', limit_to: '1' }
+          - { if: 'road_class == TRUNK', multiply_by: '0.5' }
         speed:
           - { if: 'true', limit_to: 'foot_average_speed' }
 
