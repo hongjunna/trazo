@@ -4,6 +4,7 @@ import { COLORS, SHADOWS } from '../styles/theme';
 import { SPORTS, SPORT_IDS, formatDuration, formatPace, parsePace, speedFromPace } from '../sports';
 import Button from './ui/Button';
 import SmartRoutingHelpModal from './SmartRoutingHelpModal';
+import trazoMark from '../assets/trazo-mark.svg';
 
 const sectionTitleStyle = { fontSize: '12px', fontWeight: 700, color: COLORS.textSub, marginBottom: '8px' };
 
@@ -140,11 +141,14 @@ const ControlPanel = ({
             <div style={containerStyle}>
                 {/* Header */}
                 <div onClick={() => setIsOpen(!isOpen)} style={headerStyle}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px' }}>Trazo</span>
-                        <span style={{ fontSize: '11px', opacity: 0.8, fontWeight: '400' }}>
-                            지도 위에 그리는 나만의 자전거·러닝 코스
-                        </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <img src={trazoMark} alt="" width={34} height={34} style={{ flexShrink: 0 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px' }}>Trazo</span>
+                            <span style={{ fontSize: '11px', opacity: 0.8, fontWeight: '400' }}>
+                                지도 위에 점을 찍어 그리는 나만의 코스
+                            </span>
+                        </div>
                     </div>
                     <span style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: '0.3s' }}>▲</span>
                 </div>

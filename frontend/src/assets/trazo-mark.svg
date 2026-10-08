@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Trazo</title>
+  <!-- 출발점(링) · 경유점 · 도착점을 하나의 획으로 잇는 Trazo 심볼. 짙은 배경 위에서 사용합니다. -->
+  <path d="M10 50C34 50 30 14 54 14" fill="none" stroke="#8FCE3A" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="3.6" fill="#FFFFFF"/>
+  <circle cx="10" cy="50" r="7" fill="#0B4F57" stroke="#FFFFFF" stroke-width="4"/>
+  <circle cx="54" cy="14" r="7.5" fill="#FFFFFF"/>
+</svg>

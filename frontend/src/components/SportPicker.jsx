@@ -17,7 +17,10 @@ const SportPicker = ({ isOpen, onSelect }) => {
                 backgroundColor: COLORS.white, borderRadius: '16px', boxShadow: SHADOWS.modal,
                 width: 'min(560px, 100%)', padding: '28px', color: COLORS.textMain,
             }}>
-                <div style={{ fontSize: '22px', fontWeight: 800, color: COLORS.primary, letterSpacing: '-0.5px' }}>Trazo</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '22px', fontWeight: 800, color: COLORS.primary, letterSpacing: '-0.5px' }}>
+                    <img src="/favicon.svg" alt="" width={36} height={36} />
+                    Trazo
+                </div>
                 <h2 id="sport-picker-title" style={{ margin: '6px 0 4px', fontSize: '18px' }}>어떤 코스를 만들까요?</h2>
                 <p style={{ margin: '0 0 20px', fontSize: '13px', color: COLORS.textSub }}>
                     종목에 맞춰 길을 찾아드려요. 만드는 중에도 패널 위쪽에서 언제든 바꿀 수 있어요.
