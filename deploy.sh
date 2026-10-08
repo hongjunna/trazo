@@ -27,6 +27,14 @@ if [ ! -f .env ]; then
   echo ".env 파일이 없습니다. .env.example을 .env로 복사하고 DB와 Firebase 설정을 입력해주세요." >&2
   exit 1
 fi
+if ! command -v docker >/dev/null; then
+  echo "docker 명령을 찾을 수 없습니다. Docker를 설치한 뒤 다시 실행해주세요." >&2
+  exit 1
+fi
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker가 실행 중이 아닙니다. Docker(Docker Desktop)를 켠 뒤 다시 실행해주세요." >&2
+  exit 1
+fi
 case "$action" in
   down) "${compose[@]}" down; exit ;;
   logs) "${compose[@]}" logs -f --tail=100; exit ;;
@@ -45,7 +53,10 @@ if [ ! -s data/south-korea-latest.osm.pbf ]; then
   echo "./update-osm.sh로 최신 파일을 내려받거나, 대한민국 .osm.pbf 파일을 data/south-korea-YYMMDD.osm.pbf로 넣어주세요." >&2
   exit 1
 fi
-"${compose[@]}" config --quiet
+if ! "${compose[@]}" config --quiet; then
+  echo "Docker Compose 설정을 확인하지 못했습니다. 위 메시지와 .env 값을 확인해주세요." >&2
+  exit 1
+fi
 if [ "$mode" = live ]; then
   echo "main 브랜치의 최신 코드를 가져옵니다…"
   git pull --ff-only origin main

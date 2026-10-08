@@ -27,6 +27,9 @@ IMAGE="${PROJECT}-graphhopper"
 LATEST="data/${OSM_PREFIX}-latest.osm.pbf"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+fail() { log "오류: $*" >&2; exit 1; }
+# 예상하지 못한 명령이 실패해도 어느 단계에서 멈췄는지 한국어로 알려줍니다.
+trap 'log "오류: ${LINENO}번 줄의 명령이 실패해 업데이트를 중단했습니다. 바로 위의 메시지를 확인하세요." >&2' ERR
 # data 안의 그래프 폴더는 컨테이너(root)가 만들었으므로 이동·삭제도 컨테이너에서 합니다.
 in_data() { docker run --rm -v "$PWD/data:/data" --entrypoint sh "$IMAGE" -c "$1"; }
 
@@ -45,8 +48,11 @@ if [ "$current" = "$file" ]; then log "이미 최신 지도($file)를 사용 중
 # 2. 다운로드와 무결성 확인
 if [ ! -s "data/$file" ]; then
   log "새 지도 파일을 내려받습니다: $file"
-  curl -fsSL -o "data/$file.part" "$OSM_URL"
-  expected="$(curl -fsSL "$OSM_URL.md5" | awk '{print $1}')"
+  if ! curl -fsL -o "data/$file.part" "$OSM_URL"; then
+    rm -f "data/$file.part"
+    fail "지도 파일을 내려받지 못했습니다. 인터넷 연결과 디스크 여유 공간을 확인하세요."
+  fi
+  expected="$( { curl -fsL "$OSM_URL.md5" || true; } | awk '{print $1}')"
   actual="$( (md5sum "data/$file.part" 2>/dev/null || md5 -r "data/$file.part") | awk '{print $1}')"
   if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
     rm -f "data/$file.part"
@@ -57,8 +63,10 @@ if [ ! -s "data/$file" ]; then
 fi
 
 # 3. 메모리 확인
-if [ -r /proc/meminfo ]; then
-  free_mb=$(( $(awk '/MemAvailable/{print $2}' /proc/meminfo) / 1024 ))
+# Windows(Git Bash)처럼 MemAvailable 항목이 없는 환경에서는 확인을 건너뜁니다.
+free_kb="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo 2>/dev/null || true)"
+if [ -n "$free_kb" ]; then
+  free_mb=$(( free_kb / 1024 ))
   if [ "$free_mb" -lt "$MIN_FREE_MB" ]; then
     log "여유 메모리(${free_mb}MB)가 ${MIN_FREE_MB}MB보다 적어 이번 업데이트를 건너뜁니다."
     exit 0
@@ -66,7 +74,11 @@ if [ -r /proc/meminfo ]; then
 fi
 
 # 4. 운영과 같은 설정으로 새 그래프를 별도 위치에 생성
-docker image inspect "$IMAGE" >/dev/null
+command -v docker >/dev/null || fail "docker 명령을 찾을 수 없습니다. Docker를 설치한 뒤 다시 실행하세요."
+docker info >/dev/null 2>&1 || fail "Docker가 실행 중이 아닙니다. Docker(Docker Desktop)를 켠 뒤 다시 실행하세요. 지도 파일은 data/$file에 받아 두었습니다."
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  fail "길찾기 이미지($IMAGE)가 없습니다. 먼저 ./deploy.sh live로 서비스를 한 번 실행한 뒤 다시 시도하세요. 지도 파일은 data/$file에 받아 두었습니다."
+fi
 graph="$(sed -nE "s/^[[:space:]]*graph\.location:[[:space:]]*'?([^' ]+)'?.*/\1/p" graphhopper/config-gh.yml)"
 graph="${graph#/data/}"
 next="${graph}-next"
@@ -98,9 +110,12 @@ wait_ready() {
   return 1
 }
 log "그래프를 교체합니다."
-"${compose[@]}" stop graphhopper
-in_data "rm -rf /data/$prev && mv /data/$graph /data/$prev && mv /data/$next /data/$graph"
-"${compose[@]}" start graphhopper
+"${compose[@]}" stop graphhopper || fail "GraphHopper 컨테이너를 멈추지 못했습니다. ./deploy.sh live status로 상태를 확인하세요."
+if ! in_data "rm -rf /data/$prev && mv /data/$graph /data/$prev && mv /data/$next /data/$graph"; then
+  "${compose[@]}" start graphhopper || true
+  fail "그래프 폴더를 교체하지 못했습니다. 기존 그래프로 다시 시작합니다."
+fi
+"${compose[@]}" start graphhopper || fail "GraphHopper 컨테이너를 시작하지 못했습니다. ./deploy.sh live logs를 확인하세요."
 if ! wait_ready; then
   log "새 그래프로 길찾기 확인에 실패했습니다. 이전 그래프로 되돌립니다."
   "${compose[@]}" stop graphhopper
