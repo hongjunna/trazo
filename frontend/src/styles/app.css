@@ -2619,3 +2619,14 @@
 .section__note svg {
   vertical-align: -2px;
 }
+
+/* 코스 위 현재 위치 점 (고도 차트·마우스와 연동). 클릭은 아래 지도로 통과합니다. */
+.hover-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #15262C;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(16, 40, 46, 0.35);
+  pointer-events: none;
+}

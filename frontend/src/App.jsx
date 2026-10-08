@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { onAuthStateChanged } from 'firebase/auth';
 
-import { markerIcons, HOVER_MARKER_ICON } from './constants';
+import { markerIcons } from './constants';
 import { useHistoryState } from './hooks/useHistoryState';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useNickname } from './hooks/useNickname';
@@ -220,15 +220,15 @@ function App() {
   const lastPointerTypeRef = useRef('mouse'); // 마지막으로 지도를 누른 입력 장치
   const editRef = useRef(null);
 
-  // 고도 차트를 훑을 때 지도에 위치를 보여주는 점
+  // 고도 차트를 훑거나 코스 근처에 마우스를 올렸을 때 지도에 위치를 보여주는 점.
+  // 커서 바로 아래에 생기므로, 카카오 마커 대신 마우스 이벤트를 통과시키는 오버레이로 그려
+  // 경로 위 클릭(웨이포인트 추가)과 우클릭(로드뷰 메뉴)이 지도에 그대로 전달되게 합니다.
   useEffect(() => {
     if (!map) return;
-    const markerImage = new window.kakao.maps.MarkerImage(
-      HOVER_MARKER_ICON,
-      new window.kakao.maps.Size(24, 24),
-      { offset: new window.kakao.maps.Point(12, 12) }
-    );
-    const marker = new window.kakao.maps.Marker({ position: map.getCenter(), image: markerImage, zIndex: 100 });
+    const content = document.createElement('div');
+    content.className = 'hover-dot';
+    content.setAttribute('aria-hidden', 'true');
+    const marker = new window.kakao.maps.CustomOverlay({ position: map.getCenter(), content, zIndex: 100, clickable: false });
     marker.setMap(map);
     marker.setVisible(false);
     hoverMarkerRef.current = marker;

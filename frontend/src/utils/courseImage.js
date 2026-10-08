@@ -540,7 +540,7 @@ export const renderCourseImage = async ({ paper = 'A4', orientation = 'portrait'
         `예상 ${formatDuration(stats.distanceKm / speedKmh)}`,
     ].join('  ·  ');
     const footerLeft = '지도 © Kakao  ·  경로 데이터 © OpenStreetMap 기여자';
-    const footerRight = `trazo.kro.kr  ·  ${today()}`;
+    const footerRight = `${window.location.host}  ·  ${today()}`;
 
     // 웹 글꼴은 쓰는 글자만 받아 오므로, 그리기 전에 필요한 글자를 모두 불러 둡니다.
     const allText = [title, statsLine, footerLeft, footerRight, 'Trazo 고도 외개km0123456789m·…', ...waypoints.flatMap(w => [waypointLabel(w), w.note || ''])].join('');

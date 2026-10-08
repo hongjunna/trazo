@@ -14,6 +14,7 @@ from sqlalchemy import func, inspect, or_, text, update
 from sqlalchemy.exc import IntegrityError
 from typing import List, Literal, Optional, Any
 from fastapi import FastAPI, Query, HTTPException, Depends
+from fastapi import Request as HTTPRequest
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field as PydanticField
 from contextlib import asynccontextmanager
@@ -708,6 +709,69 @@ def read_shared_course(token: str, session: Session = Depends(get_session), user
         "created_at": course.created_at,
         "published_at": course.published_at,
     }
+
+# --- 링크 미리보기 (카카오톡·페이스북 등) ---
+# 미리보기를 만드는 서비스는 자바스크립트를 실행하지 않으므로, 공유 링크(/c/<토큰>)의 index.html에
+# nginx SSI가 이 태그 조각을 끼워 넣습니다(frontend/nginx.conf). 코스 이름이 제목, 서비스 소개가 부제목이 됩니다.
+SITE_NAME = "Trazo"
+SITE_TAGLINE = "점을 찍어 그리는 나만의 코스"
+SPORT_LABELS = {"bike": "자전거", "run": "러닝"}
+
+def preview_base_url(request: HTTPRequest) -> str:
+    # 앞단 리버스 프록시가 넘겨준 주소를 우선 쓰고, 프로토콜을 모르면 HTTPS로 봅니다.
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip()
+    if not re.fullmatch(r"[A-Za-z0-9.-]+(:\d+)?", host):
+        return ""
+    return f"{proto if proto in ('http', 'https') else 'https'}://{host}"
+
+def html_attr(value: str) -> str:
+    return escape(value, {'"': "&quot;"})
+
+def preview_tags(base: str, path: str, title: str, description: str) -> str:
+    image = f"{base}/og-image.png"
+    meta = [
+        ("name", "description", description),
+        ("property", "og:type", "website"),
+        ("property", "og:site_name", SITE_NAME),
+        ("property", "og:locale", "ko_KR"),
+        ("property", "og:url", base + path),
+        ("property", "og:title", title),
+        ("property", "og:description", description),
+        ("property", "og:image", image),
+        ("property", "og:image:width", "1200"),
+        ("property", "og:image:height", "900"),
+        ("name", "twitter:card", "summary_large_image"),
+        ("name", "twitter:title", title),
+        ("name", "twitter:description", description),
+        ("name", "twitter:image", image),
+    ]
+    lines = [f"<title>{escape(title)}</title>"]
+    lines += [f'<meta {kind}="{key}" content="{html_attr(value)}" />' for kind, key, value in meta]
+    return "\n  ".join(lines) + "\n"
+
+@app.get("/og/c/{token}")
+def shared_course_preview(token: str, request: HTTPRequest, session: Session = Depends(get_session)):
+    base = preview_base_url(request)
+    path = f"/c/{token}"
+    title = f"{SITE_NAME} (트라소) | {SITE_TAGLINE}"
+    description = f"{SITE_NAME} · {SITE_TAGLINE}"
+    # 비공개로 바꿨거나 지운 코스는 코스 이름을 드러내지 않고 서비스 기본 미리보기를 보여줍니다.
+    try:
+        course = get_shared_course(session, token)
+    except HTTPException:
+        course = None
+    if course:
+        summary = course_summary(course)
+        title = course.title.strip()[:80] or title
+        facts = f"{SPORT_LABELS.get(course.sport, '자전거')} 코스 {summary['distance_km']:,.1f}km · 상승 {summary['ascent_m']:,}m"
+        description = f"{SITE_NAME} · {SITE_TAGLINE} | {facts}"
+    return Response(
+        content=preview_tags(base, path, title, description),
+        media_type="text/html; charset=utf-8",
+        # 공개 범위를 바꾸면 바로 반영되도록 오래 저장하지 않습니다.
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 @app.post("/shared/{token}/copy")
 def copy_shared_course(token: str, data: CopyCourseRequest, session: Session = Depends(get_session), user_id: str = Depends(get_google_user)):

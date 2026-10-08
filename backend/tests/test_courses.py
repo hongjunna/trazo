@@ -206,6 +206,24 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(len(courses), 1)
         self.assertIsNone(courses[0]['folder_id'])
 
+    def test_shared_link_preview_tags(self):
+        course = self.create(title='2025 춘천 "그란폰도" <122km>')
+        token = self.client.put(f"/courses/{course['id']}", headers=self.owner, json={'visibility': 'link'}).json()['course']['share_token']
+        headers = {'Host': 'trazo.runvia.app'}
+        html = self.client.get(f'/og/c/{token}', headers=headers).text
+        # 코스 이름이 제목, 서비스 소개가 부제목이 되고, 주소는 접속한 도메인을 따릅니다.
+        self.assertIn('<title>2025 춘천 "그란폰도" &lt;122km&gt;</title>', html)
+        self.assertIn('<meta property="og:title" content="2025 춘천 &quot;그란폰도&quot; &lt;122km&gt;" />', html)
+        self.assertIn('content="Trazo · 점을 찍어 그리는 나만의 코스 | 자전거 코스', html)
+        self.assertIn(f'<meta property="og:url" content="https://trazo.runvia.app/c/{token}" />', html)
+        self.assertIn('<meta property="og:image" content="https://trazo.runvia.app/og-image.png" />', html)
+        # 비공개로 바꾸거나 없는 코스는 코스 이름을 드러내지 않습니다.
+        self.client.put(f"/courses/{course['id']}", headers=self.owner, json={'visibility': 'private'})
+        for path in (f'/og/c/{token}', '/og/c/unknown12345'):
+            html = self.client.get(path, headers=headers).text
+            self.assertNotIn('그란폰도', html)
+            self.assertIn('<meta property="og:title" content="Trazo (트라소) | 점을 찍어 그리는 나만의 코스" />', html)
+
     def test_visibility_and_shared_access(self):
         private = self.create()
         self.assertEqual(private['visibility'], 'private')
