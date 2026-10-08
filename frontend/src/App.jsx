@@ -10,7 +10,7 @@ import { useIsMobile } from './hooks/useMediaQuery';
 import { fetchRoutePath, saveCourse, downloadTCX, updateCourse } from './api/courseApi';
 import { auth, loginWithGoogle, logout, authErrorMessage } from './firebase';
 import { SPORTS, SPORT_IDS, isSport, defaultRouteOptions } from './sports';
-import { buildGpx, courseStats, distanceMarkers, flattenCourse, safeFileName } from './utils/course';
+import { buildGpx, buildTrackIndex, courseStats, distanceKm, distanceMarkers, flattenCourse, nearestOnTrack, safeFileName } from './utils/course';
 import { readStored, writeStored } from './utils/storage';
 import { COLORS } from './styles/theme';
 
@@ -19,7 +19,7 @@ import BottomSheet from './components/BottomSheet';
 import { CourseSummary, CourseSettings } from './components/CoursePanel';
 import CourseLibrary from './components/CourseLibrary';
 import ElevationPanel from './components/ElevationPanel';
-import { MapControls, MapHint, RouteStatus } from './components/MapOverlays';
+import { MapContextMenu, MapControls, MapHint, RouteStatus } from './components/MapOverlays';
 import RoutingHelpDialog from './components/RoutingHelpDialog';
 import SaveCourseDialog from './components/SaveCourseDialog';
 import SportPicker from './components/SportPicker';
@@ -45,6 +45,31 @@ const initialSpeeds = () => {
 
 const EMPTY_COURSE = { markers: [], polylines: [] };
 const SPORT_OPTIONS = SPORT_IDS.map(id => ({ value: id, label: SPORTS[id].label, icon: SPORTS[id].icon }));
+
+// 지도에서 코스를 훑을 때 고도 차트에 위치(km)를 알려주는 작은 통로. 차트만 다시 그리고 App은 다시 그리지 않습니다.
+const createHoverBus = () => {
+  const listeners = new Set();
+  return {
+    subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
+    emit: (km) => listeners.forEach(listener => listener(km)),
+  };
+};
+
+// index번 점의 앞뒤 점. 순환 코스의 출발·도착점은 같은 점이라 함께 움직이고, 반대쪽 구간과 이어집니다.
+const markerNeighbors = (markers, index, isLoop) => {
+  const n = markers.length;
+  const loopEnd = isLoop && n > 2 && (index === 0 || index === n - 1);
+  return {
+    loopEnd,
+    prev: index > 0 ? index - 1 : loopEnd ? n - 2 : null,
+    next: index < n - 1 ? index + 1 : loopEnd ? 1 : null,
+  };
+};
+
+// 지도 위 코스 편집 손잡이: 마우스는 바로 끌고, 터치는 꾹 누른 뒤 끕니다.
+const GRAB_PX = { mouse: 14, touch: 24 };
+const HOVER_PX = 40;
+const LONG_PRESS_MS = 450;
 
 const downloadBlob = (blob, fileName) => {
   const url = window.URL.createObjectURL(blob);
@@ -83,6 +108,8 @@ function App() {
   const [map, setMap] = useState(null);
   const mapAreaRef = useRef(null);
   const hoverMarkerRef = useRef(null);
+  const [hoverBus] = useState(createHoverBus);
+  const [isSatellite, setIsSatellite] = useState(() => readStored('trazo:satellite', false) === true);
   const [myLocation, setMyLocation] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
 
@@ -128,6 +155,17 @@ function App() {
   const kmMarkers = useMemo(() => distanceMarkers(currentPolylines, currentSport.distanceMarkerKm), [currentPolylines, currentSport.distanceMarkerKm]);
   const icons = useMemo(() => markerIcons(currentSport.color), [currentSport.color]);
   const isBusy = isRouting || isSaving;
+  const trackIndex = useMemo(() => buildTrackIndex(currentPolylines), [currentPolylines]);
+  const first = currentMarkers[0];
+  const last = currentMarkers.at(-1);
+  const isLoop = hasCourse && first.lat === last.lat && first.lng === last.lng;
+
+  // --- 지도 위 코스 편집 ---
+  const [dragPreview, setDragPreview] = useState(null);
+  const [mapMenu, setMapMenu] = useState(null); // 우클릭 메뉴: { point, x, y, width, height }
+  const closeMapMenu = useCallback(() => setMapMenu(null), []);
+  const suppressClickUntilRef = useRef(0);
+  const editRef = useRef(null);
 
   // 고도 차트를 훑을 때 지도에 위치를 보여주는 점
   useEffect(() => {
@@ -153,15 +191,22 @@ function App() {
     return () => observer.disconnect();
   }, [map, isMobile]);
 
+  // 일반 지도와 위성 지도(지명·도로 이름 포함)를 바꿔 보여주고,
   // 자전거 코스에서만 카카오 자전거 지도(자전거도로 표시)를 겹쳐 보여줍니다.
-  const bicycleOverlayRef = useRef(false);
   useEffect(() => {
-    if (!map || bicycleOverlayRef.current === currentSport.showBicycleOverlay) return;
-    const bicycle = window.kakao.maps.MapTypeId.BICYCLE;
-    if (currentSport.showBicycleOverlay) map.addOverlayMapTypeId(bicycle);
-    else map.removeOverlayMapTypeId(bicycle);
-    bicycleOverlayRef.current = currentSport.showBicycleOverlay;
-  }, [map, currentSport.showBicycleOverlay]);
+    if (!map) return;
+    const { MapTypeId } = window.kakao.maps;
+    map.setMapTypeId(isSatellite ? MapTypeId.HYBRID : MapTypeId.ROADMAP);
+    map.removeOverlayMapTypeId(MapTypeId.BICYCLE);
+    if (currentSport.showBicycleOverlay) map.addOverlayMapTypeId(MapTypeId.BICYCLE);
+  }, [map, isSatellite, currentSport.showBicycleOverlay]);
+
+  const handleToggleSatellite = () => {
+    setIsSatellite(on => {
+      writeStored('trazo:satellite', !on);
+      return !on;
+    });
+  };
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -200,36 +245,23 @@ function App() {
 
   const enabledRouteOptions = Object.entries(routeOptionsBySport[sport]).filter(([, on]) => on).map(([id]) => id);
 
-  const addPoint = async (newPoint, mode = isAutoRouting ? 'turn-by-turn' : 'straight') => {
+  const routeMode = isAutoRouting ? 'turn-by-turn' : 'straight';
+  // 점 표시를 실제 길 위(경로의 시작·끝)로 옮겨, 찍은 점이 어느 길에 붙었는지 바로 보이게 합니다.
+  const onRoad = (point) => ({ lat: point.lat, lng: point.lng });
+
+  // 길찾기를 한 번에 하나만 진행하고, 끝나면 build가 돌려준 코스를 기록합니다. 취소되면 아무것도 바꾸지 않습니다.
+  const runRouting = async (build, onError) => {
     if (routeRequestRef.current || savingRef.current) return;
     setRouteError(null);
-    if (!currentMarkers.length) {
-      pushState({ markers: [newPoint], polylines: [] });
-      return;
-    }
     const controller = new AbortController();
     routeRequestRef.current = controller;
     setIsRouting(true);
     try {
-      const segment = await fetchRoutePath(currentMarkers.at(-1), newPoint, { mode, sport, options: enabledRouteOptions }, controller.signal);
+      const next = await build(controller.signal);
       if (routeRequestRef.current !== controller || controller.signal.aborted) return;
-      // 점 표시를 실제 길 위(경로의 시작·끝)로 옮겨, 찍은 점이 어느 길에 붙었는지 바로 보이게 합니다.
-      // 출발점으로 복귀할 때는 순환 코스로 인식되도록 출발점 좌표를 그대로 씁니다.
-      const onRoad = (point) => ({ lat: point.lat, lng: point.lng });
-      const closesLoop = newPoint.lat === currentMarkers[0].lat && newPoint.lng === currentMarkers[0].lng;
-      const markers = currentMarkers.length === 1 ? [onRoad(segment[0])] : [...currentMarkers];
-      markers.push(closesLoop ? markers[0] : onRoad(segment.at(-1)));
-      pushState({ markers, polylines: [...currentPolylines, segment] });
+      pushState(next);
     } catch {
-      if (routeRequestRef.current === controller && !controller.signal.aborted) {
-        setRouteError({
-          point: newPoint,
-          mode,
-          message: mode === 'straight'
-            ? '고도 정보를 가져오지 못했어요. 인터넷 연결을 확인하고 다시 시도하세요.'
-            : `${currentSport.label} 길을 찾지 못했어요. 다시 시도하거나 직선으로 이어보세요.`,
-        });
-      }
+      if (routeRequestRef.current === controller && !controller.signal.aborted) onError();
     } finally {
       if (routeRequestRef.current === controller) {
         routeRequestRef.current = null;
@@ -238,21 +270,103 @@ function App() {
     }
   };
 
+  const findRoute = (from, to, mode, signal) => fetchRoutePath(from, to, { mode, sport, options: enabledRouteOptions }, signal);
+
+  const addPoint = (newPoint, mode = routeMode) => {
+    if (routeRequestRef.current || savingRef.current) return;
+    if (!currentMarkers.length) {
+      setRouteError(null);
+      pushState({ markers: [newPoint], polylines: [] });
+      return;
+    }
+    runRouting(async (signal) => {
+      const segment = await findRoute(currentMarkers.at(-1), newPoint, mode, signal);
+      // 출발점으로 복귀할 때는 순환 코스로 인식되도록 출발점 좌표를 그대로 씁니다.
+      const closesLoop = newPoint.lat === currentMarkers[0].lat && newPoint.lng === currentMarkers[0].lng;
+      const markers = currentMarkers.length === 1 ? [onRoad(segment[0])] : [...currentMarkers];
+      markers.push(closesLoop ? markers[0] : onRoad(segment.at(-1)));
+      return { markers, polylines: [...currentPolylines, segment] };
+    }, () => setRouteError({
+      point: newPoint,
+      mode,
+      message: mode === 'straight'
+        ? '고도 정보를 가져오지 못했어요. 인터넷 연결을 확인하고 다시 시도하세요.'
+        : `${currentSport.label} 길을 찾지 못했어요. 다시 시도하거나 직선으로 이어보세요.`,
+    }));
+  };
+
+  const editFailed = () => toast(routeMode === 'straight'
+    ? '고도 정보를 가져오지 못해 코스를 고치지 못했어요. 인터넷 연결을 확인하세요.'
+    : `${currentSport.label} 길을 찾지 못해 코스를 고치지 못했어요. 조금 다른 곳으로 옮겨보세요.`, { tone: 'error' });
+
+  // 이미 찍은 점을 옮기고, 그 점에 이어진 앞뒤 길을 다시 찾습니다.
+  const moveMarker = (index, point) => {
+    if (currentMarkers.length === 1) {
+      pushState({ markers: [point], polylines: [] });
+      return;
+    }
+    const n = currentMarkers.length;
+    const { loopEnd, prev, next } = markerNeighbors(currentMarkers, index, isLoop);
+    const mode = routeMode;
+    runRouting(async (signal) => {
+      const [incoming, outgoing] = await Promise.all([
+        prev != null ? findRoute(currentMarkers[prev], point, mode, signal) : null,
+        next != null ? findRoute(point, currentMarkers[next], mode, signal) : null,
+      ]);
+      const moved = onRoad(incoming ? incoming.at(-1) : outgoing[0]);
+      const markers = [...currentMarkers];
+      markers[index] = moved;
+      if (loopEnd) { markers[0] = moved; markers[n - 1] = moved; }
+      const polylines = [...currentPolylines];
+      if (incoming) polylines[index > 0 ? index - 1 : n - 2] = incoming;
+      if (outgoing) polylines[index < n - 1 ? index : 0] = outgoing;
+      return { markers, polylines };
+    }, editFailed);
+  };
+
+  // 길 중간을 잡아 끌면 그 자리에 새 경유점을 넣고, 그 구간을 둘로 나눠 다시 찾습니다.
+  const insertPoint = (segmentIndex, point) => {
+    const from = currentMarkers[segmentIndex];
+    const to = currentMarkers[segmentIndex + 1];
+    if (!from || !to) return;
+    const mode = routeMode;
+    runRouting(async (signal) => {
+      const [before, after] = await Promise.all([findRoute(from, point, mode, signal), findRoute(point, to, mode, signal)]);
+      const markers = [...currentMarkers];
+      markers.splice(segmentIndex + 1, 0, onRoad(before.at(-1)));
+      const polylines = [...currentPolylines];
+      polylines.splice(segmentIndex, 1, before, after);
+      return { markers, polylines };
+    }, editFailed);
+  };
+
   const handleMapClick = (_target, event) => {
-    if (isSportPickerOpen) return;
+    // 코스를 끌어 고친 직후 따라오는 클릭은 점을 찍지 않습니다.
+    if (isSportPickerOpen || Date.now() < suppressClickUntilRef.current) return;
+    // 우클릭 메뉴가 열려 있으면 지도를 눌러도 메뉴만 닫습니다.
+    if (mapMenu) { setMapMenu(null); return; }
     // 모바일에서 시트를 펼친 상태로 지도를 누르면 먼저 시트만 접습니다.
     if (isMobile && sheetExpanded) { setSheetExpanded(false); return; }
     addPoint({ lat: event.latLng.getLat(), lng: event.latLng.getLng() });
+  };
+
+  // 데스크톱에서 지도를 우클릭하면 그 위치의 로드뷰를 여는 메뉴를 보여줍니다.
+  const handleMapRightClick = (_target, event) => {
+    const node = mapAreaRef.current;
+    if (isMobile || isSportPickerOpen || !node) return;
+    setMapMenu({
+      point: { lat: event.latLng.getLat(), lng: event.latLng.getLng() },
+      x: event.point.x,
+      y: event.point.y,
+      width: node.clientWidth,
+      height: node.clientHeight,
+    });
   };
 
   const handleMapIdle = (target) => {
     const center = target.getCenter();
     writeStored('trazo:view', { lat: center.getLat(), lng: center.getLng(), level: target.getLevel() });
   };
-
-  const first = currentMarkers[0];
-  const last = currentMarkers.at(-1);
-  const isLoop = hasCourse && first.lat === last.lat && first.lng === last.lng;
 
   // 마지막 점에서 출발점까지 길을 찾아 순환 코스를 만듭니다.
   const handleCloseLoop = () => {
@@ -519,6 +633,202 @@ function App() {
     }
   }, []);
 
+  // 지도 이벤트 처리기는 한 번만 등록하므로, 최신 코스와 편집 함수는 ref로 넘겨줍니다.
+  useEffect(() => {
+    editRef.current = {
+      markers: currentMarkers,
+      trackIndex,
+      isLoop,
+      enabled: !isSportPickerOpen && !isBusy,
+      moveMarker,
+      insertPoint,
+    };
+  });
+
+  // 데스크톱: 코스 근처에 마우스를 올리면 가장 가까운 코스 위치에 점이 달라붙고 고도 차트에도 표시합니다.
+  //           점이나 길을 잡고 끌면 코스를 고칩니다.
+  // 모바일:   점이나 길을 꾹 누르면 잡히고, 그대로 끌어 코스를 고칩니다.
+  useEffect(() => {
+    const node = mapAreaRef.current;
+    if (!map || !node) return;
+    const { kakao } = window;
+    let gesture = null;
+    let hoverFrame = 0;
+    let dragFrame = 0;
+    let lastHoverEvent = null;
+    let hoverShown = false;
+
+    const localPoint = (event) => {
+      const rect = node.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
+    const toLatLng = ({ x, y }) => {
+      const coords = map.getProjection().coordsFromContainerPoint(new kakao.maps.Point(x, y));
+      return { lat: coords.getLat(), lng: coords.getLng() };
+    };
+    const metersPerPixel = () => (distanceKm(toLatLng({ x: 0, y: 0 }), toLatLng({ x: 0, y: 100 })) * 1000) / 100;
+
+    // 화면에서 pos 가까이에 잡을 수 있는 점이나 길이 있는지 찾습니다. 점을 길보다 먼저 잡습니다.
+    const hitTest = (pos, pointerType) => {
+      const { markers, trackIndex: index } = editRef.current;
+      const radius = GRAB_PX[pointerType === 'mouse' ? 'mouse' : 'touch'];
+      const projection = map.getProjection();
+      let best = null;
+      markers.forEach((marker, i) => {
+        const p = projection.containerPointFromCoords(new kakao.maps.LatLng(marker.lat, marker.lng));
+        const d = Math.hypot(p.x - pos.x, p.y - pos.y);
+        if (d <= radius && (!best || d <= best.d)) best = { d, index: i };
+      });
+      if (best) return { type: 'marker', index: best.index, origin: markers[best.index] };
+      const near = nearestOnTrack(index, toLatLng(pos), radius * metersPerPixel());
+      return near ? { type: 'line', segmentIndex: near.segmentIndex, origin: near } : null;
+    };
+
+    const anchorsFor = (hit) => {
+      const { markers, isLoop: loop } = editRef.current;
+      if (hit.type === 'line') return [markers[hit.segmentIndex], markers[hit.segmentIndex + 1]];
+      const { prev, next } = markerNeighbors(markers, hit.index, loop);
+      return [prev != null ? markers[prev] : null, next != null ? markers[next] : null].filter(Boolean);
+    };
+
+    const showHover = (near) => {
+      updateHoverMarker(near);
+      hoverBus.emit(near ? near.km : null);
+      hoverShown = Boolean(near);
+    };
+    const clearHover = () => {
+      if (hoverShown) showHover(null);
+      node.classList.remove('is-grabbable');
+    };
+
+    const runHover = () => {
+      hoverFrame = 0;
+      const event = lastHoverEvent;
+      if (gesture || !event?.target.closest?.('.map-canvas')) { clearHover(); return; }
+      const { trackIndex: index, enabled } = editRef.current;
+      const pos = localPoint(event);
+      const near = index ? nearestOnTrack(index, toLatLng(pos), HOVER_PX * metersPerPixel()) : null;
+      if (near || hoverShown) showHover(near);
+      node.classList.toggle('is-grabbable', enabled && Boolean(hitTest(pos, 'mouse')));
+    };
+
+    const renderDrag = () => {
+      dragFrame = 0;
+      if (gesture?.dragging) setDragPreview({ point: gesture.point, anchors: gesture.anchors });
+    };
+
+    const beginDrag = () => {
+      gesture.dragging = true;
+      gesture.point = gesture.hit.origin;
+      gesture.anchors = anchorsFor(gesture.hit);
+      map.setDraggable(false);
+      clearHover();
+      node.classList.add('is-dragging');
+      renderDrag();
+    };
+
+    const finish = (commit) => {
+      const done = gesture;
+      gesture = null;
+      if (!done) return;
+      clearTimeout(done.timer);
+      map.setDraggable(true);
+      node.classList.remove('is-dragging');
+      if (!done.dragging) return;
+      cancelAnimationFrame(dragFrame);
+      dragFrame = 0;
+      setDragPreview(null);
+      suppressClickUntilRef.current = Date.now() + 500;
+      if (!commit) return;
+      const point = { lat: done.point.lat, lng: done.point.lng };
+      if (done.hit.type === 'marker') editRef.current.moveMarker(done.hit.index, point);
+      else editRef.current.insertPoint(done.hit.segmentIndex, point);
+    };
+
+    const onPointerDown = (event) => {
+      // 두 번째 손가락이 닿으면(확대·축소) 잡기를 그만둡니다.
+      if (gesture) { finish(false); return; }
+      if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      if (!editRef.current.enabled || !event.target.closest('.map-canvas')) return;
+      const hit = hitTest(localPoint(event), event.pointerType);
+      if (!hit) return;
+      gesture = { pointerId: event.pointerId, pointerType: event.pointerType, hit, startX: event.clientX, startY: event.clientY, dragging: false, timer: 0 };
+      if (event.pointerType === 'mouse') {
+        // 지도가 함께 끌려가지 않게 합니다. 끌지 않고 떼면 평소처럼 지도 클릭으로 점이 찍힙니다.
+        map.setDraggable(false);
+      } else {
+        gesture.timer = setTimeout(() => {
+          if (!gesture || gesture.dragging) return;
+          navigator.vibrate?.(15);
+          beginDrag();
+        }, LONG_PRESS_MS);
+      }
+    };
+
+    const onPointerMove = (event) => {
+      if (!gesture || event.pointerId !== gesture.pointerId) return;
+      if (!gesture.dragging) {
+        const moved = Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY);
+        // 터치는 꾹 누르기 전에 움직이면 지도를 움직이려는 것으로 봅니다.
+        if (gesture.pointerType !== 'mouse') { if (moved > 10) finish(false); return; }
+        if (moved <= 4) return;
+        beginDrag();
+      }
+      gesture.point = toLatLng(localPoint(event));
+      if (!dragFrame) dragFrame = requestAnimationFrame(renderDrag);
+    };
+
+    const onPointerUp = (event) => {
+      if (gesture && event.pointerId === gesture.pointerId) finish(event.type === 'pointerup');
+    };
+
+    const onHoverMove = (event) => {
+      if (event.pointerType !== 'mouse' || event.buttons !== 0) return;
+      lastHoverEvent = event;
+      if (!hoverFrame) hoverFrame = requestAnimationFrame(runHover);
+    };
+
+    const onPointerLeave = (event) => {
+      if (event.pointerType !== 'mouse' || gesture) return;
+      cancelAnimationFrame(hoverFrame);
+      hoverFrame = 0;
+      clearHover();
+    };
+
+    // 끄는 동안에는 카카오 지도가 터치 움직임을 받지 않게 해 지도가 따라 움직이지 않습니다.
+    const onTouchMove = (event) => {
+      if (!gesture?.dragging) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    // 지도 위에서는 브라우저 기본 메뉴 대신 지도 우클릭 메뉴를 씁니다.
+    const onContextMenu = (event) => { if (gesture || event.target.closest?.('.map-canvas')) event.preventDefault(); };
+    const onKeyDown = (event) => { if (event.key === 'Escape') finish(false); };
+
+    node.addEventListener('pointerdown', onPointerDown, true);
+    node.addEventListener('pointermove', onHoverMove);
+    node.addEventListener('pointerleave', onPointerLeave);
+    node.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
+    node.addEventListener('contextmenu', onContextMenu, true);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      finish(false);
+      cancelAnimationFrame(hoverFrame);
+      node.removeEventListener('pointerdown', onPointerDown, true);
+      node.removeEventListener('pointermove', onHoverMove);
+      node.removeEventListener('pointerleave', onPointerLeave);
+      node.removeEventListener('touchmove', onTouchMove, { capture: true });
+      node.removeEventListener('contextmenu', onContextMenu, true);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [map, isMobile, hoverBus, updateHoverMarker]);
+
   // --- 화면 조각 ---
   const summary = (
     <CourseSummary
@@ -592,6 +902,9 @@ function App() {
         onClick={handleMapClick}
         onCreate={setMap}
         onIdle={handleMapIdle}
+        onRightClick={handleMapRightClick}
+        onDragStart={closeMapMenu}
+        onZoomStart={closeMapMenu}
       >
         {currentPolylines.map((path, idx) => (
           // 밝은 종목 색이 지도 위에서도 잘 보이도록 짙은 테두리 선을 먼저 그립니다.
@@ -611,6 +924,14 @@ function App() {
           const image = isStart ? icons.start : isEnd ? icons.end : icons.waypoint;
           return <MapMarker key={`m-${idx}`} position={pos} zIndex={isStart ? 6 : isEnd ? 5 : 4} image={image} />;
         })}
+        {dragPreview && dragPreview.anchors.map((anchor, idx) => (
+          <Polyline key={`drag-${idx}`} path={[anchor, dragPreview.point]} strokeWeight={4} strokeColor={COLORS.primary} strokeOpacity={0.9} strokeStyle="shortdash" />
+        ))}
+        {dragPreview && (
+          <CustomOverlayMap position={dragPreview.point} zIndex={10}>
+            <div className="drag-handle" aria-hidden="true" />
+          </CustomOverlayMap>
+        )}
         {myLocation && (
           <CustomOverlayMap position={myLocation} zIndex={2}>
             <div className="my-location" aria-label="내 위치" />
@@ -619,6 +940,7 @@ function App() {
       </Map>
 
       {!isSportPickerOpen && !isRouting && !routeError && <MapHint sport={sport} markerCount={currentMarkers.length} />}
+      <MapContextMenu menu={mapMenu} onClose={closeMapMenu} />
       <RouteStatus
         sport={sport}
         isRouting={isRouting}
@@ -637,6 +959,8 @@ function App() {
         isLocating={isLocating}
         onFit={handleFit}
         canFit={hasMarkers}
+        isSatellite={isSatellite}
+        onToggleSatellite={handleToggleSatellite}
       />
     </div>
   );
@@ -662,7 +986,7 @@ function App() {
             onPeekHeightChange={setSheetPeek}
           >
             {hasPolylines && (
-              <ElevationPanel variant="inline" polylines={currentPolylines} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} />
+              <ElevationPanel variant="inline" polylines={currentPolylines} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} hoverSource={hoverBus} />
             )}
             {settings}
             <div className="tool-grid">
@@ -699,6 +1023,7 @@ function App() {
                 polylines={currentPolylines}
                 zones={currentSport.gradeZones}
                 onHoverPoint={updateHoverMarker}
+                hoverSource={hoverBus}
               />
             )}
           </main>

@@ -40,6 +40,8 @@ const PATHS = {
     map: <><path d="M14.1 5.9 9.9 3.8a2 2 0 0 0-1.8 0L3.6 6.1A1 1 0 0 0 3 7v12.4a1 1 0 0 0 1.4.9l3.7-1.9a2 2 0 0 1 1.8 0l4.2 2.1a2 2 0 0 0 1.8 0l4.5-2.3a1 1 0 0 0 .6-.9V4.6a1 1 0 0 0-1.4-.9l-3.7 1.9a2 2 0 0 1-1.8 0Z" /><path d="M15 5.8v15M9 3.2v15" /></>,
     file: <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /></>,
     pointer: <><path d="M12.6 21.6 5 5l16.6 7.6-7 2Z" /></>,
+    street: <><circle cx="12" cy="5" r="2.5" /><path d="M12 7.5v7" /><path d="M9 11h6" /><path d="m10 21 2-6.5 2 6.5" /><ellipse cx="12" cy="20" rx="8" ry="2" /></>,
+    layers: <><path d="m12 2 10 5-10 5L2 7l10-5Z" /><path d="m2 12 10 5 10-5" /><path d="m2 17 10 5 10-5" /></>,
 };
 
 const Icon = ({ name, size = 18, strokeWidth = 2, className, ...rest }) => (

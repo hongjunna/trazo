@@ -7,7 +7,7 @@ import Button from './ui/Button';
 import Icon from './ui/Icon';
 import { flattenCourse } from '../utils/course';
 
-const ElevationPanel = ({ polylines, zones, onHoverPoint, variant = 'dock', open = true, onToggle }) => {
+const ElevationPanel = ({ polylines, zones, onHoverPoint, hoverSource, variant = 'dock', open = true, onToggle }) => {
     const range = useMemo(() => {
         const elevations = flattenCourse(polylines).map(point => point.ele ?? 0);
         if (!elevations.length) return null;
@@ -51,7 +51,7 @@ const ElevationPanel = ({ polylines, zones, onHoverPoint, variant = 'dock', open
                 )}
             </div>
             <div className="elevation__chart">
-                {!collapsed && <ElevationChart polylines={polylines} zones={zones} onHoverPoint={onHoverPoint} />}
+                {!collapsed && <ElevationChart polylines={polylines} zones={zones} onHoverPoint={onHoverPoint} hoverSource={hoverSource} />}
             </div>
         </section>
     );

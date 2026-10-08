@@ -34,10 +34,11 @@ const RoutingHelpDialog = ({ open, onClose, sport }) => {
             <div className="help-block">
                 <h3><Icon name="sliders" size={16} />편집 도구</h3>
                 <ul>
+                    <li><b>코스 고치기</b> — 찍은 점이나 길을 잡고 끌어 옮기면 그 부분의 길을 다시 찾아요. 휴대폰에서는 꾹 누른 뒤 끌어요.</li>
                     <li><b>출발점으로 복귀</b> — 마지막 점에서 출발점까지 길을 찾아 순환 코스를 만들어요.</li>
                     <li><b>왕복 코스</b> — 지금까지의 길을 그대로 되돌아와요.</li>
                     <li><b>되돌리기·다시 실행</b> — 지도 오른쪽 버튼이나 <span className="kbd">Ctrl</span>+<span className="kbd">Z</span>, <span className="kbd">Ctrl</span>+<span className="kbd">Shift</span>+<span className="kbd">Z</span></li>
-                    <li><b>고도 차트</b> — 차트 위를 훑으면 지도에 해당 위치가 표시돼요. 휠·두 손가락으로 확대할 수 있어요.</li>
+                    <li><b>고도 차트</b> — 차트 위를 훑으면 지도에, 지도의 코스 근처에 마우스를 올리면 차트에 해당 위치가 표시돼요. 휠·두 손가락으로 확대할 수 있어요.</li>
                 </ul>
             </div>
         </Dialog>

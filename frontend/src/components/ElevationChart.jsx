@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import Button from './ui/Button';
 import {
     Chart as ChartJS,
@@ -96,7 +96,7 @@ const crosshairPlugin = {
     }
 };
 
-const ElevationChart = ({ polylines, zones, onHoverPoint }) => {
+const ElevationChart = ({ polylines, zones, onHoverPoint, hoverSource }) => {
     const [hudData, setHudData] = useState(null);
     const [isZoomed, setIsZoomed] = useState(false);
     const chartRef = useRef(null);
@@ -230,6 +230,32 @@ const ElevationChart = ({ polylines, zones, onHoverPoint }) => {
         return { min: Math.floor(mid - half), max: Math.ceil(mid + half) };
     }, [elevations]);
 
+    // 거리(km)에 해당하는 위치에 십자선과 정보 상자를 그리고, 그 표본 번호를 돌려줍니다.
+    const showMarker = (chart, km) => {
+        const index = Math.max(0, Math.min(distances.length - 1, Math.round(km / 0.01)));
+        const { left, right } = chart.chartArea;
+        const x = Math.max(left, Math.min(right, chart.scales.x.getPixelForValue(distances[index])));
+        const ele = elevations[index];
+        chart.activeMouseX = x;
+        chart.activeMouseY = chart.scales.y.getPixelForValue(ele);
+        chart.draw();
+        const halfWidth = 62;
+        setHudData({
+            x: Math.max(left + halfWidth, Math.min(right - halfWidth, x)),
+            dist: distances[index],
+            ele,
+            slope: slopes[index],
+        });
+        return index;
+    };
+
+    const clearMarker = (chart) => {
+        chart.activeMouseX = null;
+        chart.activeMouseY = null;
+        chart.draw();
+        setHudData(null);
+    };
+
     // 터치 화면에서는 끌면 고도 위치를 훑고, 두 손가락으로 확대합니다. 마우스는 끌어서 이동, 휠로 확대합니다.
     const isTouch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
@@ -285,37 +311,28 @@ const ElevationChart = ({ polylines, zones, onHoverPoint }) => {
             const chartArea = chart.chartArea;
             const mouseX = event.x;
             if (event.type === 'mouseout' || mouseX < chartArea.left || mouseX > chartArea.right || event.y < chartArea.top || event.y > chartArea.bottom) {
-                chart.activeMouseX = null;
-                chart.activeMouseY = null;
-                chart.draw();
-                setHudData(null);
+                clearMarker(chart);
                 onHoverPoint(null);
                 return;
             }
-            const targetDist = chart.scales.x.getValueForPixel(mouseX);
-            let index = Math.round(targetDist / 0.01);
-            if (index < 0) index = 0;
-            if (index >= distances.length) index = distances.length - 1;
-
-            const ele = elevations[index];
-            const targetYPixel = chart.scales.y.getPixelForValue(ele);
-
-            chart.activeMouseX = mouseX;
-            chart.activeMouseY = targetYPixel;
-            chart.draw();
-
-            const halfWidth = 62;
-            setHudData({
-                x: Math.max(chartArea.left + halfWidth, Math.min(chartArea.right - halfWidth, mouseX)),
-                dist: distances[index],
-                ele,
-                slope: slopes[index],
-            });
+            const index = showMarker(chart, chart.scales.x.getValueForPixel(mouseX));
             const coord = rawCoords[index];
             if (coord) onHoverPoint({ lat: coord.lat, lng: coord.lng });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [rawCoords, elevations, slopes, distances, totalDistance, onHoverPoint, isTouch, yRange]);
+
+    // 지도에서 코스 근처에 마우스를 올리면 그 위치를 차트에도 표시합니다.
+    useEffect(() => {
+        if (!hoverSource) return;
+        return hoverSource.subscribe((km) => {
+            const chart = chartRef.current;
+            if (!chart?.chartArea) return;
+            if (km == null) clearMarker(chart);
+            else showMarker(chart, km);
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hoverSource, elevations, slopes, distances]);
 
     const resetZoom = () => {
         chartRef.current?.resetZoom();
