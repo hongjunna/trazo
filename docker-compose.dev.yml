@@ -1,0 +1,29 @@
+services:
+  backend:
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+  graphhopper:
+    volumes:
+      - ./data/dev:/data
+      - type: bind
+        source: ./data/south-korea-260101.osm.pbf
+        target: /data/south-korea-260101.osm.pbf
+        read_only: true
+        bind:
+          create_host_path: false
+  frontend:
+    build:
+      target: development
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 80"
+    environment:
+      VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:?Set VITE_FIREBASE_API_KEY}
+      VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:?Set VITE_FIREBASE_AUTH_DOMAIN}
+      VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:?Set VITE_FIREBASE_PROJECT_ID}
+      VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:?Set VITE_FIREBASE_APP_ID}
+      DEV_API_PROXY: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+volumes:
+  frontend_node_modules:

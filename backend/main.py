@@ -2,8 +2,16 @@ import httpx
 import json
 import os
 import math
+import secrets
+from google.oauth2 import id_token
+from google.auth.transport.requests import Request
+from google.auth.exceptions import GoogleAuthError, TransportError
+from cachecontrol import CacheControl
+import requests
+from sqlalchemy import inspect, text
 from typing import List, Optional, Any
 from fastapi import FastAPI, Query, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from sqlmodel import Field, Session, SQLModel, create_engine, select
@@ -12,7 +20,35 @@ from fastapi.responses import Response
 import datetime
 
 # --- 1. 데이터베이스 설정 ---
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:wnsfoq1!@db:5432/toporider_db")
+DATABASE_URL = os.environ["DATABASE_URL"]
+# Mapping of server-issued secret tokens to positive user IDs. Never accept a client user_id.
+COURSE_API_TOKENS = json.loads(os.getenv("COURSE_API_TOKENS", "{}"))
+if not isinstance(COURSE_API_TOKENS, dict) or any(not isinstance(token, str) or len(token) < 32 or type(user_id) is not int or user_id <= 0 for token, user_id in COURSE_API_TOKENS.items()):
+    raise ValueError("COURSE_API_TOKENS must map tokens of at least 32 characters to positive user IDs")
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+# Public signing keys are cached; token verification does not require a service-account key.
+firebase_request = Request(session=CacheControl(requests.Session()))
+bearer = HTTPBearer(auto_error=False)
+
+def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
+    if credentials and credentials.scheme.lower() == "bearer":
+        if FIREBASE_PROJECT_ID:
+            try:
+                claims = id_token.verify_firebase_token(credentials.credentials, firebase_request, audience=FIREBASE_PROJECT_ID)
+                uid = claims.get("sub")
+                if (claims.get("iss") != f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}"
+                        or not isinstance(uid, str) or not 0 < len(uid) <= 128
+                        or claims.get("firebase", {}).get("sign_in_provider") != "google.com"):
+                    raise ValueError("Invalid Firebase identity")
+                return uid
+            except TransportError:
+                raise HTTPException(status_code=503, detail="Authentication service unavailable")
+            except (ValueError, GoogleAuthError):
+                raise HTTPException(status_code=401, detail="Invalid Firebase ID token", headers={"WWW-Authenticate": "Bearer"})
+        for token, user_id in COURSE_API_TOKENS.items():
+            if secrets.compare_digest(credentials.credentials.encode(), token.encode()):
+                return user_id
+    raise HTTPException(status_code=401, detail="Valid access token required", headers={"WWW-Authenticate": "Bearer"})
 engine = create_engine(DATABASE_URL)
 
 # --- 2. DB 모델 정의 ---
@@ -22,6 +58,7 @@ class Course(SQLModel, table=True):
     description: Optional[str] = None
     markers_json: str 
     polylines_json: str 
+    firebase_uid: Optional[str] = Field(default=None)
     user_id: int = Field(default=1) 
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
     is_deleted: bool = Field(default=False)
@@ -29,6 +66,10 @@ class Course(SQLModel, table=True):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     SQLModel.metadata.create_all(engine)
+    # create_all does not add columns to an existing table. Preserve legacy ownership.
+    with engine.begin() as connection:
+        if "firebase_uid" not in {column["name"] for column in inspect(connection).get_columns("course")}:
+            connection.execute(text("ALTER TABLE course ADD COLUMN firebase_uid VARCHAR(128)"))
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -157,12 +198,13 @@ def get_session():
         yield session
 
 @app.post("/courses")
-def create_course(course_data: CreateCourseRequest, session: Session = Depends(get_session)):
+def create_course(course_data: CreateCourseRequest, session: Session = Depends(get_session), user_id: str | int = Depends(get_current_user)):
     new_course = Course(
         title=course_data.title,
         markers_json=json.dumps(course_data.markers),
         polylines_json=json.dumps(course_data.polylines),
-        user_id=1,
+        user_id=user_id if isinstance(user_id, int) else 0,
+        firebase_uid=user_id if isinstance(user_id, str) else None,
         is_deleted=False
     )
     session.add(new_course)
@@ -171,15 +213,16 @@ def create_course(course_data: CreateCourseRequest, session: Session = Depends(g
     return {"status": "success", "course_id": new_course.id, "title": new_course.title}
 
 @app.get("/courses")
-def read_courses(session: Session = Depends(get_session)):
-    courses = session.exec(select(Course).where(Course.is_deleted == False)).all()
+def read_courses(session: Session = Depends(get_session), user_id: str | int = Depends(get_current_user)):
+    owner_filter = Course.firebase_uid == user_id if isinstance(user_id, str) else (Course.user_id == user_id) & Course.firebase_uid.is_(None)
+    courses = session.exec(select(Course).where(Course.is_deleted == False, owner_filter)).all()
     return courses
 
 # ⚡ [수정] 코스 업데이트 (제목 + 경로 데이터)
 @app.put("/courses/{course_id}")
-def update_course(course_id: int, course_data: UpdateCourseRequest, session: Session = Depends(get_session)):
+def update_course(course_id: int, course_data: UpdateCourseRequest, session: Session = Depends(get_session), user_id: str | int = Depends(get_current_user)):
     course = session.get(Course, course_id)
-    if not course:
+    if not course or course.is_deleted or (course.firebase_uid != user_id if isinstance(user_id, str) else course.firebase_uid is not None or course.user_id != user_id):
         raise HTTPException(status_code=404, detail="Course not found")
     
     # 제목/설명 수정
@@ -200,9 +243,9 @@ def update_course(course_id: int, course_data: UpdateCourseRequest, session: Ses
     return {"status": "success", "course": course}
 
 @app.delete("/courses/{course_id}")
-def delete_course(course_id: int, session: Session = Depends(get_session)):
+def delete_course(course_id: int, session: Session = Depends(get_session), user_id: str | int = Depends(get_current_user)):
     course = session.get(Course, course_id)
-    if not course:
+    if not course or course.is_deleted or (course.firebase_uid != user_id if isinstance(user_id, str) else course.firebase_uid is not None or course.user_id != user_id):
         raise HTTPException(status_code=404, detail="Course not found")
     
     course.is_deleted = True

@@ -2,40 +2,36 @@ services:
   # 👇 새로 추가할 DB 서비스
   db:
     image: postgres:15
-    container_name: postgres_db
     restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=wnsfoq1!
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       - POSTGRES_DB=toporider_db
     ports:
       # [수정] 왼쪽(5401)은 내 컴퓨터용, 오른쪽(5432)은 컨테이너 내부용
-      - '5401:5432'
+      - '127.0.0.1:${DB_PORT:-5401}:5432'
     networks:
       - toporider_net
 
   backend:
     build: ./backend
-    container_name: fastapi_backend
     restart: unless-stopped
     ports:
-      - '8001:8000'
+      - '127.0.0.1:${BACKEND_PORT:-8001}:8000'
     depends_on:
       - graphhopper
       - db
     environment:
       - GRAPHHOPPER_URL=http://graphhopper:8989
-      # [중요] 백엔드는 내부망을 쓰므로 포트는 5432여야 합니다!
-      # 비밀번호 오타도 수정했습니다 (wnsfqo1! -> wnsfoq1!)
-      - DATABASE_URL=postgresql://admin:wnsfoq1!@db:5432/toporider_db
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL}
+      - FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID:?Set VITE_FIREBASE_PROJECT_ID}
     networks:
       - toporider_net
 
   graphhopper:
     build: ./graphhopper
-    container_name: graphhopper
     restart: unless-stopped
     volumes:
       - ./data:/data
@@ -43,16 +39,21 @@ services:
     environment:
       - JAVA_OPTS=-Xmx2g -Xms2g
     ports:
-      - '8989:8989'
+      - '127.0.0.1:${GRAPHHOPPER_PORT:-8989}:8989'
     networks:
       - toporider_net
 
   frontend:
-    build: ./frontend
-    container_name: toporider_frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:?Set VITE_FIREBASE_API_KEY}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:?Set VITE_FIREBASE_AUTH_DOMAIN}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:?Set VITE_FIREBASE_PROJECT_ID}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:?Set VITE_FIREBASE_APP_ID}
     restart: unless-stopped
     ports:
-      - '3000:80' # 호스트의 3000번 포트로 연결
+      - '${FRONTEND_BIND:-0.0.0.0}:${FRONTEND_PORT:-3000}:80' # 호스트의 3000번 포트로 연결
     depends_on:
       - backend
     networks:

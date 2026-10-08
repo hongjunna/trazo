@@ -26,3 +26,7 @@ typing_extensions==4.15.0
 urllib3==2.6.3
 uvicorn==0.40.0
 xyzservices==2025.11.0
+
+google-auth[requests]>=2.40,<3
+cryptography>=45,<49
+CacheControl>=0.14,<1

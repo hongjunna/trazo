@@ -1,11 +1,16 @@
 # 1. 빌드 단계
-FROM node:18-alpine as build
+FROM node:22-alpine AS development
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-# .env 파일이 있다면 빌드 시점에 포함 (API 주소 등)
-# RUN echo "VITE_API_URL=/api" > .env
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
+
+FROM development AS build
+ARG VITE_FIREBASE_API_KEY
+ARG VITE_FIREBASE_AUTH_DOMAIN
+ARG VITE_FIREBASE_PROJECT_ID
+ARG VITE_FIREBASE_APP_ID
 RUN npm run build
 
 # 2. 실행 단계 (Nginx)

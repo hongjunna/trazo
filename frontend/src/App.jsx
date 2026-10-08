@@ -6,6 +6,8 @@ import ElevationChart from './ElevationChart';
 import { ICONS } from './constants';
 import { useHistoryState } from './hooks/useHistoryState';
 import { fetchRoutePath, saveCourse, getCourseList, downloadTCX, updateCourse } from './api/courseApi';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, loginWithGoogle, logout, authErrorMessage } from './firebase';
 import ControlPanel from './components/ControlPanel';
 import LoadCourseModal from './components/LoadCourseModal';
 import GradientLegend from './components/GradientLegend';
@@ -14,10 +16,20 @@ import GradientLegend from './components/GradientLegend';
 import { COLORS } from './styles/theme';
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(Boolean(auth));
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const accountRef = useRef(null);
   const [center, setCenter] = useState({ lat: 37.521285, lng: 126.999852 });
   const [map, setMap] = useState(null);
 
-  const { currentState, pushState, undo, redo, reset, canUndo, canRedo } = useHistoryState({ markers: [], polylines: [] });
+  const routeRequestRef = useRef(null);
+  const savingRef = useRef(false);
+  const [isRouting, setIsRouting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [routeError, setRouteError] = useState(null);
+  const { currentState, pushState, undo, redo, reset, canUndo, canRedo } = useHistoryState({ markers: [], polylines: [] }, () => Boolean(routeRequestRef.current || savingRef.current));
   const { markers: currentMarkers, polylines: currentPolylines } = currentState;
 
   const [courseList, setCourseList] = useState([]);
@@ -26,7 +38,8 @@ function App() {
   const [isAutoRouting, setIsAutoRouting] = useState(true);
 
   const [currentTitle, setCurrentTitle] = useState("새 코스");
-  const [isModified, setIsModified] = useState(false);
+  const [savedState, setSavedState] = useState(JSON.stringify({ markers: [], polylines: [] }));
+  const isModified = JSON.stringify(currentState) !== savedState;
   const [currentId, setCurrentId] = useState(null);
 
   const hoverMarkerRef = useRef(null);
@@ -58,78 +71,113 @@ function App() {
     };
   }, [isModified]);
 
-  const handleMapClick = async (_target, mouseEvent) => {
-    const lat = mouseEvent.latLng.getLat();
-    const lng = mouseEvent.latLng.getLng();
-    const newPoint = { lat, lng };
-    let nextMarkers = [...currentMarkers, newPoint];
-    let nextPolylines = [...currentPolylines];
+  const cancelRoute = () => {
+    routeRequestRef.current?.abort();
+    routeRequestRef.current = null;
+    setIsRouting(false);
+    setRouteError(null);
+  };
+  useEffect(() => () => routeRequestRef.current?.abort(), []);
 
-    if (nextMarkers.length > 1) {
-      const lastPoint = nextMarkers[nextMarkers.length - 2];
-      const mode = isAutoRouting ? 'turn-by-turn' : 'straight';
-
-      try {
-        const newPathSegment = await fetchRoutePath(lastPoint, newPoint, mode);
-
-        if (newPathSegment) {
-          nextPolylines.push(newPathSegment);
-        } else {
-          nextPolylines.push([
-            { lat: lastPoint.lat, lng: lastPoint.lng, ele: 0 },
-            { lat: newPoint.lat, lng: newPoint.lng, ele: 0 }
-          ]);
-        }
-      } catch (error) {
-        console.error("경로 생성 에러:", error);
+  const addPoint = async (newPoint, mode = isAutoRouting ? 'turn-by-turn' : 'straight') => {
+    if (routeRequestRef.current || savingRef.current) return;
+    setRouteError(null);
+    if (!currentMarkers.length) {
+      pushState({ markers: [newPoint], polylines: [] });
+      return;
+    }
+    const controller = new AbortController();
+    routeRequestRef.current = controller;
+    setIsRouting(true);
+    try {
+      const segment = await fetchRoutePath(currentMarkers.at(-1), newPoint, mode, controller.signal);
+      if (routeRequestRef.current !== controller || controller.signal.aborted) return;
+      pushState({ markers: [...currentMarkers, newPoint], polylines: [...currentPolylines, segment] });
+      setIsChartOpen(true);
+    } catch {
+      if (routeRequestRef.current === controller && !controller.signal.aborted) {
+        setRouteError({ point: newPoint, mode, message: '경로를 생성하지 못했습니다. 다시 시도하거나 직선 연결을 선택하세요.' });
+      }
+    } finally {
+      if (routeRequestRef.current === controller) {
+        routeRequestRef.current = null;
+        setIsRouting(false);
       }
     }
+  };
+  const handleMapClick = (_target, event) => addPoint({ lat: event.latLng.getLat(), lng: event.latLng.getLng() });
+  useEffect(() => {
+    if (!auth) return;
+    return onAuthStateChanged(auth, (nextUser) => {
+      accountRef.current = nextUser?.uid || null;
+      setUser(nextUser);
+      setAuthLoading(false);
+      setCourseList([]);
+      setIsLoadModalOpen(false);
+      setCurrentId(null);
+    }, (error) => { setAuthError(authErrorMessage(error)); setAuthLoading(false); });
+  }, []);
 
-    pushState({ markers: nextMarkers, polylines: nextPolylines });
-    setIsChartOpen(true);
-    setIsModified(true);
+  const handleAuth = async () => {
+    if (!auth || authBusy || savingRef.current) return;
+    setAuthBusy(true);
+    setAuthError('');
+    try { if (user) await logout(); else await loginWithGoogle(); }
+    catch (error) { setAuthError(authErrorMessage(error)); }
+    finally { setAuthBusy(false); }
   };
 
   const handleSave = async () => {
-    if (currentMarkers.length < 2) return alert("저장할 코스가 없어요!");
+    if (!user) return alert('코스를 저장하려면 구글 로그인이 필요합니다.');
+    if (authBusy || routeRequestRef.current || savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+    const snapshot = JSON.stringify(currentState);
+    try {
+      if (currentMarkers.length < 2) return alert("저장할 코스가 없어요!");
 
-    if (currentId) {
-      if (window.confirm(`수정된 내용이 있습니다.\n기존 코스 [${currentTitle}]에 덮어쓰시겠습니까?\n('취소'를 누르면 새 이름으로 저장합니다.)`)) {
-        try {
-          await updateCourse(currentId, currentTitle, currentMarkers, currentPolylines);
-          alert("✅ 저장 완료!");
-          setIsModified(false);
-          return;
-        } catch (e) {
-          alert("저장 실패");
-          return;
+      if (currentId) {
+        if (window.confirm(`수정된 내용이 있습니다.\n기존 코스 [${currentTitle}]에 덮어쓰시겠습니까?\n('취소'를 누르면 새 이름으로 저장합니다.)`)) {
+          try {
+            await updateCourse(currentId, currentTitle, currentMarkers, currentPolylines);
+            alert("✅ 저장 완료!");
+            setSavedState(snapshot);
+            return;
+          } catch {
+            alert("저장 실패");
+            return;
+          }
         }
       }
-    }
 
-    const title = prompt("새 코스로 저장합니다. 이름을 입력하세요:", currentTitle !== "새 코스" ? currentTitle : "나의 주말 라이딩");
-    if (!title) return;
+      const title = prompt("새 코스로 저장합니다. 이름을 입력하세요:", currentTitle !== "새 코스" ? currentTitle : "나의 주말 라이딩");
+      if (!title) return;
 
-    try {
-      const response = await saveCourse(title, currentMarkers, currentPolylines);
-      if (response.data.status === 'success') {
-        alert(`✅ 저장 완료!`);
-        setCurrentTitle(title);
-        setCurrentId(response.data.course_id);
-        setIsModified(false);
-      }
-    } catch (error) { alert("저장 실패"); }
+      try {
+        const response = await saveCourse(title, currentMarkers, currentPolylines);
+        if (response.data.status === 'success') {
+          alert(`✅ 저장 완료!`);
+          setCurrentTitle(title);
+          setCurrentId(response.data.course_id);
+          setSavedState(snapshot);
+        }
+      } catch { alert("저장 실패: 로그인 상태와 서버 연결을 확인하세요."); }
+    } finally { savingRef.current = false; setIsSaving(false); }
   };
 
   const handleFetchList = async () => {
+    if (!user) return alert('내 코스를 보려면 구글 로그인이 필요합니다.');
+    const account = user.uid;
     try {
       const response = await getCourseList();
+      if (accountRef.current !== account) return;
       setCourseList(response.data);
       setIsLoadModalOpen(true);
-    } catch (e) { alert("목록 로드 실패"); }
+    } catch { alert("목록 로드 실패"); }
   };
 
   const handleLoadCourse = (course) => {
+    if (savingRef.current) return;
     if (isModified) {
       if (!window.confirm("수정 중인 내용이 사라집니다. 불러오시겠습니까?")) return;
     }
@@ -137,6 +185,7 @@ function App() {
     try {
       const loadedMarkers = JSON.parse(course.markers_json);
       const loadedPolylines = JSON.parse(course.polylines_json);
+      cancelRoute();
       reset({ markers: loadedMarkers, polylines: loadedPolylines });
       if (loadedMarkers.length > 0) setCenter(loadedMarkers[0]);
       setIsLoadModalOpen(false);
@@ -144,8 +193,8 @@ function App() {
 
       setCurrentTitle(course.title);
       setCurrentId(course.id);
-      setIsModified(false);
-    } catch (e) { alert("데이터 오류"); }
+      setSavedState(JSON.stringify({ markers: loadedMarkers, polylines: loadedPolylines }));
+    } catch { alert("데이터 오류"); }
   };
 
   const handleDownload = async () => {
@@ -160,19 +209,21 @@ function App() {
       link.click();
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (e) { alert("TCX 생성 실패"); }
+    } catch { alert("TCX 생성 실패"); }
   };
 
   const handleResetApp = () => {
+    if (savingRef.current) return;
     if (isModified && !window.confirm("수정 중인 내용이 사라집니다. 초기화 하시겠습니까?")) return;
 
     if (window.confirm("지도가 초기화됩니다.")) {
+      cancelRoute();
       reset({ markers: [], polylines: [] });
       if (hoverMarkerRef.current) hoverMarkerRef.current.setVisible(false);
 
       setCurrentTitle("새 코스");
       setCurrentId(null);
-      setIsModified(false);
+      setSavedState(JSON.stringify({ markers: [], polylines: [] }));
     }
   };
 
@@ -202,13 +253,23 @@ function App() {
             <Polyline key={`l-${idx}`} path={path} strokeWeight={6} strokeColor={COLORS.accent} strokeOpacity={0.9} strokeStyle={"solid"} />
           ))}
         </Map>
+        {(isRouting || routeError) && (
+          <div role={routeError ? 'alert' : 'status'} style={{ position: 'absolute', bottom: 20, left: 20, zIndex: 15, background: 'white', padding: 16, borderRadius: 8 }}>
+            {isRouting ? <>경로 생성 중… <button onClick={cancelRoute}>취소</button></> : <>
+              <div>{routeError.message}</div>
+              <button onClick={() => addPoint(routeError.point, routeError.mode)}>재시도</button>
+              <button onClick={() => addPoint(routeError.point, 'straight')}>직선 연결 (도로 경로 아님)</button>
+              <button onClick={() => setRouteError(null)}>닫기</button>
+            </>}
+          </div>
+        )}
         <ControlPanel
           markerCount={currentMarkers.length}
           polylineCount={currentPolylines.length}
           onUndo={undo}
           onRedo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
+          canUndo={canUndo && !isRouting && !isSaving}
+          canRedo={canRedo && !isRouting && !isSaving}
           onSave={handleSave}
           onList={handleFetchList}
           onDownload={handleDownload}
@@ -217,6 +278,14 @@ function App() {
           onToggleAutoRouting={setIsAutoRouting}
           currentTitle={currentTitle}
           isModified={isModified}
+          isBusy={isRouting || isSaving}
+          isSaving={isSaving}
+          user={user}
+          authLoading={authLoading}
+          authBusy={authBusy}
+          authError={authError}
+          authConfigured={Boolean(auth)}
+          onAuth={handleAuth}
         />
       </div>
 

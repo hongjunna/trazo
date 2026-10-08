@@ -5,6 +5,9 @@ import Button from './ui/Button';
 import SmartRoutingHelpModal from './SmartRoutingHelpModal'; // ⚡ 모달 임포트
 
 const ControlPanel = ({
+    isBusy = false,
+    isSaving = false,
+    user, authLoading, authBusy, authError, authConfigured, onAuth,
     markerCount,
     polylineCount,
     onUndo,
@@ -167,6 +170,7 @@ const ControlPanel = ({
                         <label style={{ position: 'relative', display: 'inline-block', width: '36px', height: '20px' }}>
                             <input
                                 type="checkbox"
+                                disabled={isBusy}
                                 checked={isAutoRouting}
                                 onChange={(e) => onToggleAutoRouting(e.target.checked)}
                                 style={{ opacity: 0, width: 0, height: 0 }}
@@ -189,11 +193,20 @@ const ControlPanel = ({
                     {/* 4. 메인 액션 버튼 (생략 - 기존 코드 유지) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <Button onClick={onSave} variant="primary" style={{ flex: 1 }}>☁ 저장</Button>
-                            <Button onClick={onList} variant="secondary" style={{ flex: 1 }}>📂 목록</Button>
+                            <Button disabled={isBusy || !user || authLoading || authBusy} onClick={onSave} variant="primary" style={{ flex: 1 }}>☁ 저장</Button>
+                            <Button disabled={!user || authLoading || authBusy} onClick={onList} variant="secondary" style={{ flex: 1 }}>📂 목록</Button>
                         </div>
                         <Button onClick={onDownload} variant="accent" style={{ width: '100%' }}>💾 TCX 다운로드</Button>
-                        <Button onClick={onReset} variant="danger" size="small" style={{ width: '100%', marginTop: '5px' }}>🗑️ 초기화</Button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {user && <span style={{ fontSize: '12px', overflowWrap: 'anywhere' }}>{user.displayName || user.email}님</span>}
+                            <Button disabled={!authConfigured || authLoading || authBusy || isSaving} onClick={onAuth} variant="outline" size="small">
+                                {authLoading ? '로그인 확인 중…' : authBusy ? '처리 중…' : user ? '로그아웃' : 'Google로 로그인'}
+                            </Button>
+                            {!authConfigured && <span role="status" style={{ fontSize: '12px' }}>구글 로그인 설정이 필요합니다.</span>}
+                            {authConfigured && !user && <span style={{ fontSize: '12px' }}>로그인하면 내 코스를 저장하고 불러올 수 있어요.</span>}
+                            {authError && <span role="alert" style={{ fontSize: '12px', color: '#b91c1c' }}>{authError}</span>}
+                        </div>
+                        <Button disabled={isSaving} onClick={onReset} variant="danger" size="small" style={{ width: '100%', marginTop: '5px' }}>🗑️ 초기화</Button>
                     </div>
                 </div>
             </div>

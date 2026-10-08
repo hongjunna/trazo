@@ -1,0 +1,90 @@
+import os
+import unittest
+
+os.environ['DATABASE_URL'] = 'sqlite://'
+os.environ['COURSE_API_TOKENS'] = '{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":1,"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb":2}'
+from fastapi.testclient import TestClient
+from sqlalchemy.pool import StaticPool
+from sqlmodel import SQLModel, create_engine
+import backend.main as api
+
+
+class CourseAccessTests(unittest.TestCase):
+    def setUp(self):
+        api.engine = create_engine('sqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
+        SQLModel.metadata.create_all(api.engine)
+        self.client = TestClient(api.app)
+        self.owner = {'Authorization': 'Bearer ' + 'a' * 32}
+        self.other = {'Authorization': 'Bearer ' + 'b' * 32}
+
+    def test_authentication_and_ownership(self):
+        data = {'title': 'test', 'markers': [], 'polylines': []}
+        self.assertEqual(self.client.get('/courses').status_code, 401)
+        self.assertEqual(self.client.post('/courses', json=data).status_code, 401)
+        self.assertEqual(self.client.get('/courses', headers={'Authorization': 'Bearer invalid'}).status_code, 401)
+        course_id = self.client.post('/courses', json=data, headers=self.owner).json()['course_id']
+        self.assertEqual(len(self.client.get('/courses', headers=self.owner).json()), 1)
+        self.assertEqual(self.client.get('/courses', headers=self.other).json(), [])
+        for method in ('put', 'delete'):
+            kwargs = {'json': {'title': 'stolen'}} if method == 'put' else {}
+            self.assertEqual(getattr(self.client, method)(f'/courses/{course_id}', headers=self.other, **kwargs).status_code, 404)
+        self.assertEqual(self.client.put(f'/courses/{course_id}', headers=self.owner, json={'title': 'updated'}).status_code, 200)
+        self.assertEqual(self.client.delete(f'/courses/{course_id}', headers=self.owner).status_code, 200)
+        self.assertEqual(self.client.get('/courses', headers=self.owner).json(), [])
+        self.assertEqual(self.client.put(f'/courses/{course_id}', headers=self.owner, json={'title': 'restore'}).status_code, 404)
+
+class FirebaseAccessTests(CourseAccessTests):
+    def setUp(self):
+        super().setUp()
+        from unittest.mock import patch
+        self.project = patch.object(api, 'FIREBASE_PROJECT_ID', 'test-project')
+        self.verifier = patch.object(api.id_token, 'verify_firebase_token')
+        self.project.start()
+        self.verify = self.verifier.start()
+        self.addCleanup(self.project.stop)
+        self.addCleanup(self.verifier.stop)
+        self.owner = {'Authorization': 'Bearer owner-token'}
+        self.other = {'Authorization': 'Bearer other-token'}
+        def verify(token, request, audience):
+            if token not in ('owner-token', 'other-token'):
+                raise ValueError('Invalid token')
+            return {'sub': token, 'iss': 'https://securetoken.google.com/test-project',
+                    'firebase': {'sign_in_provider': 'google.com'}}
+        self.verify.side_effect = verify
+
+    def test_rejects_wrong_issuer_provider_and_empty_uid(self):
+        for changes in ({'iss': 'wrong-project'}, {'sub': ''}, {'firebase': {'sign_in_provider': 'password'}}):
+            self.verify.side_effect = None
+            self.verify.return_value = {'sub': 'owner-token', 'iss': 'https://securetoken.google.com/test-project',
+                                        'firebase': {'sign_in_provider': 'google.com'}, **changes}
+            self.assertEqual(self.client.get('/courses', headers=self.owner).status_code, 401)
+
+    def test_legacy_courses_are_not_claimed(self):
+        from sqlmodel import Session
+        with Session(api.engine) as session:
+            course = api.Course(title='legacy', markers_json='[]', polylines_json='[]', user_id=1)
+            session.add(course)
+            session.commit()
+            session.refresh(course)
+            course_id = course.id
+        self.assertEqual(self.client.get('/courses', headers=self.owner).json(), [])
+        self.assertEqual(self.client.delete(f'/courses/{course_id}', headers=self.owner).status_code, 404)
+        self.assertEqual(self.client.get('/courses', headers={'Authorization': 'Bearer ' + 'a' * 32}).status_code, 401)
+
+    def test_verification_service_unavailable(self):
+        self.verify.side_effect = api.TransportError('offline')
+        self.assertEqual(self.client.get('/courses', headers=self.owner).status_code, 503)
+
+    def test_existing_schema_migration(self):
+        from sqlalchemy import text, inspect
+        with api.engine.begin() as connection:
+            connection.execute(text('DROP TABLE course'))
+            connection.execute(text('CREATE TABLE course (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL, description VARCHAR, markers_json VARCHAR NOT NULL, polylines_json VARCHAR NOT NULL, user_id INTEGER NOT NULL, created_at VARCHAR NOT NULL, is_deleted BOOLEAN NOT NULL)'))
+        with TestClient(api.app):
+            self.assertIn('firebase_uid', {column['name'] for column in inspect(api.engine).get_columns('course')})
+        with TestClient(api.app):
+            self.assertEqual(self.client.get('/courses', headers=self.owner).status_code, 200)
+
+
+if __name__ == '__main__':
+    unittest.main()

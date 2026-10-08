@@ -1,7 +1,9 @@
 // src/hooks/useHistoryState.js
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
-export function useHistoryState(initialState) {
+export function useHistoryState(initialState, isLocked = () => false) {
+    const lockRef = useRef(isLocked);
+    lockRef.current = isLocked;
     const [history, setHistory] = useState([initialState]);
     const [step, setStep] = useState(0);
 
@@ -14,10 +16,12 @@ export function useHistoryState(initialState) {
     }, [history, step]);
 
     const undo = useCallback(() => {
+        if (lockRef.current()) return;
         if (step > 0) setStep((prev) => prev - 1);
     }, [step]);
 
     const redo = useCallback(() => {
+        if (lockRef.current()) return;
         if (step < history.length - 1) setStep((prev) => prev + 1);
     }, [step, history.length]);
 

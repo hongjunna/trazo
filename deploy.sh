@@ -1,28 +1,45 @@
 #!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")"
 
-# 에러 발생 시 중단
-set -e
-
-echo "🚀 TopoRider 배포 시작..."
-
-# 1. 최신 코드 받기
-echo "📥 Git Pull..."
-git pull origin main
-
-# 2. 환경 변수 파일 확인 (없으면 생성하라는 경고)
+mode="${1:-live}"
+action="${2:-up}"
+case "$mode" in
+  dev)
+    export FRONTEND_BIND=127.0.0.1 FRONTEND_PORT=3001
+    export DB_PORT=5402 BACKEND_PORT=8002 GRAPHHOPPER_PORT=8991
+    compose=(docker compose -p toporider-dev -f docker-compose.yml -f docker-compose.dev.yml)
+    ;;
+  live)
+    compose=(docker compose -p toporider -f docker-compose.yml)
+    ;;
+  *) echo "Usage: ./deploy.sh [dev|live] [up|down|logs|status]" >&2; exit 1 ;;
+esac
+case "$action" in up|down|logs|status) ;; *) echo "Unknown action: $action" >&2; exit 1 ;; esac
 if [ ! -f .env ]; then
-  echo "⚠️  .env 파일이 없습니다! DB_PASSWORD 등을 설정해주세요."
+  echo "Missing .env. Copy .env.example to .env and fill in DB/Firebase settings." >&2
   exit 1
 fi
-
-# 3. Docker Compose 재실행 (빌드 포함)
-echo "🐳 Docker Compose Build & Up..."
-# 캐시를 사용하되 최신 변경사항 빌드
-docker compose down
-docker compose up -d --build
-
-# 4. 불필요한 이미지 정리 (용량 확보)
-echo "🧹 Pruning unused images..."
-docker image prune -f
-
-echo "✅ 배포 완료! TopoRider가 성공적으로 업데이트되었습니다."
+case "$action" in
+  down) "${compose[@]}" down; exit ;;
+  logs) "${compose[@]}" logs -f --tail=100; exit ;;
+  status) "${compose[@]}" ps; exit ;;
+esac
+if [ ! -s data/south-korea-260101.osm.pbf ]; then
+  echo "Missing OSM input: data/south-korea-260101.osm.pbf" >&2
+  echo "Place your South Korea .osm.pbf file there. This script does not download map data." >&2
+  exit 1
+fi
+"${compose[@]}" config --quiet
+if [ "$mode" = live ]; then
+  echo "Updating main branch..."
+  git pull --ff-only origin main
+fi
+echo "Starting TopoRider ($mode)..."
+"${compose[@]}" up -d --build
+if [ "$mode" = dev ]; then
+  echo "Dev: http://localhost:3001 (source reload enabled)"
+else
+  echo "Live: http://localhost:${FRONTEND_PORT:-3000}"
+fi
+echo "GraphHopper may take time to import the map on its first start. Check ./deploy.sh $mode logs"
