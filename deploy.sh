@@ -13,11 +13,11 @@ case "$mode" in
   live)
     compose=(docker compose -p toporider -f docker-compose.yml)
     ;;
-  *) echo "Usage: ./deploy.sh [dev|live] [up|down|logs|status]" >&2; exit 1 ;;
+  *) echo "사용법: ./deploy.sh [dev|live] [up|down|logs|status]" >&2; exit 1 ;;
 esac
-case "$action" in up|down|logs|status) ;; *) echo "Unknown action: $action" >&2; exit 1 ;; esac
+case "$action" in up|down|logs|status) ;; *) echo "알 수 없는 작업: $action" >&2; exit 1 ;; esac
 if [ ! -f .env ]; then
-  echo "Missing .env. Copy .env.example to .env and fill in DB/Firebase settings." >&2
+  echo ".env 파일이 없습니다. .env.example을 .env로 복사하고 DB와 Firebase 설정을 입력해주세요." >&2
   exit 1
 fi
 case "$action" in
@@ -26,20 +26,20 @@ case "$action" in
   status) "${compose[@]}" ps; exit ;;
 esac
 if [ ! -s data/south-korea-260101.osm.pbf ]; then
-  echo "Missing OSM input: data/south-korea-260101.osm.pbf" >&2
-  echo "Place your South Korea .osm.pbf file there. This script does not download map data." >&2
+  echo "OSM 지도 파일이 없습니다: data/south-korea-260101.osm.pbf" >&2
+  echo "대한민국 .osm.pbf 파일을 해당 경로에 넣어주세요. 이 스크립트는 지도 데이터를 자동 다운로드하지 않습니다." >&2
   exit 1
 fi
 "${compose[@]}" config --quiet
 if [ "$mode" = live ]; then
-  echo "Updating main branch..."
+  echo "main 브랜치의 최신 코드를 가져옵니다…"
   git pull --ff-only origin main
 fi
-echo "Starting TopoRider ($mode)..."
+echo "TopoRider를 시작합니다 ($mode)…"
 "${compose[@]}" up -d --build
 if [ "$mode" = dev ]; then
-  echo "Dev: http://localhost:3001 (source reload enabled)"
+  echo "개발 주소: http://localhost:3001 (코드 수정 자동 반영)"
 else
-  echo "Live: http://localhost:${FRONTEND_PORT:-3000}"
+  echo "운영 주소: http://localhost:${FRONTEND_PORT:-3000}"
 fi
-echo "GraphHopper may take time to import the map on its first start. Check ./deploy.sh $mode logs"
+echo "GraphHopper 최초 실행에는 지도 가공 시간이 필요합니다. 로그 확인: ./deploy.sh $mode logs"

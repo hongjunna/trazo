@@ -50,14 +50,14 @@ const SmartRoutingHelpModal = ({ isOpen, onClose }) => {
                 {/* Header */}
                 <div style={{ padding: '20px', borderBottom: `1px solid ${COLORS.border}`, backgroundColor: COLORS.primary }}>
                     <h2 style={{ margin: 0, fontSize: '18px', color: COLORS.white, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        ⚡ Smart Routing 가이드
+                        ⚡ 자동 경로 연결 가이드
                     </h2>
                 </div>
 
-                {/* Content 1: ON (Auto) */}
+                {/* Content 1: ON (자동) */}
                 <div style={sectionStyle(COLORS.white)}>
                     <div style={badgeStyle(COLORS.primary, COLORS.accent)}>
-                        ON : 자동 경로 완성
+                        켜짐 : 자동 경로 완성
                     </div>
                     <p style={{ margin: 0, fontSize: '14px', color: COLORS.textMain, lineHeight: '1.5' }}>
                         자전거 도로와 공도를 따라 <strong>길을 자동으로 찾아줍니다.</strong><br />
@@ -68,7 +68,7 @@ const SmartRoutingHelpModal = ({ isOpen, onClose }) => {
                 {/* Content 2: OFF (Straight) */}
                 <div style={sectionStyle('#FAF5F0')}> {/* 아주 연한 갈색 배경 */}
                     <div style={badgeStyle(COLORS.white, COLORS.secondary)}>
-                        OFF : 직선 연결 (Manual)
+                        꺼짐 : 직선 연결 (수동)
                     </div>
                     <p style={{ margin: 0, fontSize: '14px', color: COLORS.textMain, lineHeight: '1.5' }}>
                         점과 점 사이를 <strong>직선으로 연결</strong>합니다.<br />
@@ -80,7 +80,7 @@ const SmartRoutingHelpModal = ({ isOpen, onClose }) => {
 
                 {/* Tip */}
                 <div style={{ padding: '15px 20px', backgroundColor: COLORS.background, fontSize: '13px', color: COLORS.textSub }}>
-                    💡 <strong>Tip:</strong> 직선 모드에서도 TopoRider는 지형 데이터를 분석해 고도를 계산합니다.
+                    💡 <strong>도움말:</strong> 직선 모드에서도 TopoRider는 지형 데이터를 분석해 고도를 계산합니다.
                 </div>
 
                 {/* Footer */}

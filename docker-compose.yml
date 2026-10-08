@@ -7,7 +7,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 값을 .env에 입력해주세요}
       - POSTGRES_DB=toporider_db
     ports:
       # [수정] 왼쪽(5401)은 내 컴퓨터용, 오른쪽(5432)은 컨테이너 내부용
@@ -25,8 +25,8 @@ services:
       - db
     environment:
       - GRAPHHOPPER_URL=http://graphhopper:8989
-      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL}
-      - FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID:?Set VITE_FIREBASE_PROJECT_ID}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL 값을 .env에 입력해주세요}
+      - FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID:?VITE_FIREBASE_PROJECT_ID 값을 .env에 입력해주세요}
     networks:
       - toporider_net
 
@@ -47,10 +47,10 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:?Set VITE_FIREBASE_API_KEY}
-        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:?Set VITE_FIREBASE_AUTH_DOMAIN}
-        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:?Set VITE_FIREBASE_PROJECT_ID}
-        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:?Set VITE_FIREBASE_APP_ID}
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:?VITE_FIREBASE_API_KEY 값을 .env에 입력해주세요}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:?VITE_FIREBASE_AUTH_DOMAIN 값을 .env에 입력해주세요}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:?VITE_FIREBASE_PROJECT_ID 값을 .env에 입력해주세요}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:?VITE_FIREBASE_APP_ID 값을 .env에 입력해주세요}
     restart: unless-stopped
     ports:
       - '${FRONTEND_BIND:-0.0.0.0}:${FRONTEND_PORT:-3000}:80' # 호스트의 3000번 포트로 연결

@@ -33,7 +33,10 @@ const ControlPanel = ({
         top: '20px',
         right: '20px',
         left: 'auto',
-        width: '320px',
+        width: 'min(320px, calc(100vw - 40px))',
+        maxHeight: 'calc(100dvh - 40px)',
+        display: 'flex',
+        flexDirection: 'column',
         backgroundColor: COLORS.white,
         borderRadius: '12px',
         boxShadow: SHADOWS.card,
@@ -53,6 +56,7 @@ const ControlPanel = ({
         alignItems: 'center',
         cursor: 'pointer',
         color: COLORS.white,
+        flexShrink: 0,
         borderTopLeftRadius: '12px',  // 둥근 모서리 명시
         borderTopRightRadius: '12px',
     };
@@ -62,6 +66,8 @@ const ControlPanel = ({
         display: isOpen ? 'flex' : 'none',
         flexDirection: 'column',
         gap: '16px',
+        overflowY: 'auto',
+        minHeight: 0,
     };
 
     return (
@@ -74,12 +80,22 @@ const ControlPanel = ({
                             TopoRider
                         </span>
                         <span style={{ fontSize: '11px', opacity: 0.8, fontWeight: '400' }}>
-                            Ride with the terrain
+                            지형을 따라 즐기는 라이딩
                         </span>
                     </div>
                     <span style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: '0.3s' }}>
                         ▲
                     </span>
+                </div>
+
+                <div aria-label="계정 로그인" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px 20px', borderBottom: `1px solid ${COLORS.border}`, color: COLORS.textMain, flexShrink: 0 }}>
+                    {user && <span style={{ fontSize: '12px', overflowWrap: 'anywhere' }}>{user.displayName || user.email}님</span>}
+                    <Button disabled={!authConfigured || authLoading || authBusy || isSaving} onClick={onAuth} variant="primary">
+                        {authLoading ? '로그인 확인 중…' : authBusy ? '처리 중…' : user ? '로그아웃' : '구글로 로그인'}
+                    </Button>
+                    {!authConfigured && <span role="status" style={{ fontSize: '12px' }}>구글 로그인이 아직 설정되지 않았습니다. 관리자에게 문의해주세요.</span>}
+                    {authConfigured && !user && <span style={{ fontSize: '12px' }}>로그인하면 내 코스를 저장하고 불러올 수 있어요.</span>}
+                    {authError && <span role="alert" style={{ fontSize: '12px', color: '#b91c1c' }}>{authError}</span>}
                 </div>
 
                 {/* Body */}
@@ -91,21 +107,21 @@ const ControlPanel = ({
                             {currentTitle}
                         </div>
                         {isModified ? (
-                            <span style={{ fontSize: '12px', color: COLORS.secondary, fontWeight: '600' }}>● Unsaved Changes</span>
+                            <span style={{ fontSize: '12px', color: COLORS.secondary, fontWeight: '600' }}>● 저장하지 않은 변경 사항</span>
                         ) : (
-                            <span style={{ fontSize: '12px', color: COLORS.textSub }}>All saved</span>
+                            <span style={{ fontSize: '12px', color: COLORS.textSub }}>변경 사항 없음</span>
                         )}
                     </div>
 
                     {/* 2. 통계 및 히스토리 (생략 - 기존 코드 유지) */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ fontSize: '12px', color: COLORS.textSub, lineHeight: '1.4' }}>
-                            <strong style={{ color: COLORS.primary }}>{markerCount}</strong> Waypoints<br />
-                            <strong style={{ color: COLORS.primary }}>{polylineCount}</strong> Segments
+                            <strong style={{ color: COLORS.primary }}>{markerCount}</strong> 경유점<br />
+                            <strong style={{ color: COLORS.primary }}>{polylineCount}</strong> 연결 구간
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <Button size="small" variant="outline" onClick={onUndo} disabled={!canUndo} title="Undo">↩</Button>
-                            <Button size="small" variant="outline" onClick={onRedo} disabled={!canRedo} title="Redo">↪</Button>
+                            <Button size="small" variant="outline" onClick={onUndo} disabled={!canUndo} title="되돌리기">↩</Button>
+                            <Button size="small" variant="outline" onClick={onRedo} disabled={!canRedo} title="다시 실행">↪</Button>
                         </div>
                     </div>
 
@@ -120,7 +136,7 @@ const ControlPanel = ({
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
                             <span style={{ fontSize: '13px', fontWeight: '600', color: COLORS.textMain }}>
-                                ⚡ Smart Routing
+                                ⚡ 자동 경로 연결
                             </span>
 
                             {/* ℹ️ 아이콘 & 툴팁 영역 */}
@@ -197,15 +213,6 @@ const ControlPanel = ({
                             <Button disabled={!user || authLoading || authBusy} onClick={onList} variant="secondary" style={{ flex: 1 }}>📂 목록</Button>
                         </div>
                         <Button onClick={onDownload} variant="accent" style={{ width: '100%' }}>💾 TCX 다운로드</Button>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {user && <span style={{ fontSize: '12px', overflowWrap: 'anywhere' }}>{user.displayName || user.email}님</span>}
-                            <Button disabled={!authConfigured || authLoading || authBusy || isSaving} onClick={onAuth} variant="outline" size="small">
-                                {authLoading ? '로그인 확인 중…' : authBusy ? '처리 중…' : user ? '로그아웃' : 'Google로 로그인'}
-                            </Button>
-                            {!authConfigured && <span role="status" style={{ fontSize: '12px' }}>구글 로그인 설정이 필요합니다.</span>}
-                            {authConfigured && !user && <span style={{ fontSize: '12px' }}>로그인하면 내 코스를 저장하고 불러올 수 있어요.</span>}
-                            {authError && <span role="alert" style={{ fontSize: '12px', color: '#b91c1c' }}>{authError}</span>}
-                        </div>
                         <Button disabled={isSaving} onClick={onReset} variant="danger" size="small" style={{ width: '100%', marginTop: '5px' }}>🗑️ 초기화</Button>
                     </div>
                 </div>
