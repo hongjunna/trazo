@@ -1,5 +1,6 @@
 import httpx
 import json
+import logging
 import os
 import math
 import secrets
@@ -30,12 +31,18 @@ FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
 # Public signing keys are cached; token verification does not require a service-account key.
 firebase_request = Request(session=CacheControl(requests.Session()))
 bearer = HTTPBearer(auto_error=False)
+# 서버 시계가 구글보다 조금 늦으면(Windows Docker 등) 방금 발급된 토큰이 "미래에 발급됨"으로 거부됩니다.
+FIREBASE_CLOCK_SKEW_SECONDS = 60
+logger = logging.getLogger("trazo.auth")
 
 def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
     if credentials and credentials.scheme.lower() == "bearer":
         if FIREBASE_PROJECT_ID:
             try:
-                claims = id_token.verify_firebase_token(credentials.credentials, firebase_request, audience=FIREBASE_PROJECT_ID)
+                claims = id_token.verify_firebase_token(
+                    credentials.credentials, firebase_request, audience=FIREBASE_PROJECT_ID,
+                    clock_skew_in_seconds=FIREBASE_CLOCK_SKEW_SECONDS,
+                )
                 uid = claims.get("sub")
                 if (claims.get("iss") != f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}"
                         or not isinstance(uid, str) or not 0 < len(uid) <= 128
@@ -44,7 +51,9 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
                 return uid
             except TransportError:
                 raise HTTPException(status_code=503, detail="Authentication service unavailable")
-            except (ValueError, GoogleAuthError):
+            except (ValueError, GoogleAuthError) as error:
+                # 원인(만료, 시계 오차, 다른 프로젝트 토큰 등)을 로그로 남겨 확인할 수 있게 합니다.
+                logger.warning("Firebase 토큰 검증 실패: %s", error)
                 raise HTTPException(status_code=401, detail="Invalid Firebase ID token", headers={"WWW-Authenticate": "Bearer"})
         for token, user_id in COURSE_API_TOKENS.items():
             if secrets.compare_digest(credentials.credentials.encode(), token.encode()):

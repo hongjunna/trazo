@@ -11,6 +11,12 @@ import backend.main as api
 
 class CourseAccessTests(unittest.TestCase):
     def setUp(self):
+        # 이 테스트는 Firebase 없이 COURSE_API_TOKENS만 쓰는 기존 배포 방식을 확인합니다.
+        # Docker 컨테이너처럼 FIREBASE_PROJECT_ID가 설정된 환경에서도 같은 조건이 되도록 비워 둡니다.
+        from unittest.mock import patch
+        no_firebase = patch.object(api, 'FIREBASE_PROJECT_ID', '')
+        no_firebase.start()
+        self.addCleanup(no_firebase.stop)
         api.engine = create_engine('sqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
         SQLModel.metadata.create_all(api.engine)
         self.client = TestClient(api.app)
@@ -45,7 +51,9 @@ class FirebaseAccessTests(CourseAccessTests):
         self.addCleanup(self.verifier.stop)
         self.owner = {'Authorization': 'Bearer owner-token'}
         self.other = {'Authorization': 'Bearer other-token'}
-        def verify(token, request, audience):
+        def verify(token, request, audience, clock_skew_in_seconds=0):
+            # 서버 시계가 조금 늦어도 방금 발급된 토큰을 받아들이도록 오차를 허용해야 합니다.
+            assert clock_skew_in_seconds >= 30
             if token not in ('owner-token', 'other-token'):
                 raise ValueError('Invalid token')
             return {'sub': token, 'iss': 'https://securetoken.google.com/test-project',
