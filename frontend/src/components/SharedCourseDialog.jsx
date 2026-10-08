@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiErrorMessage, copySharedCourse, getSharedCourse, setCourseLike } from '../api/courseApi';
 import { SPORTS } from '../sports';
-import { courseStats } from '../utils/course';
+import { courseStats, locateWaypoints } from '../utils/course';
 import { VISIBILITY, copyText, shareUrl, sharePath, timeAgo, visibilityOf } from '../utils/share';
 import Dialog from './ui/Dialog';
 import Button from './ui/Button';
@@ -51,6 +51,7 @@ const SharedCourseDialog = ({ token, userId, ensureMember, onOpenCourse, onChang
     const stale = result?.key !== requestKey;
     const sport = SPORTS[course?.sport] ?? SPORTS.bike;
     const stats = useMemo(() => courseStats(course?.polylines ?? []), [course]);
+    const waypoints = useMemo(() => locateWaypoints(course?.polylines ?? [], course?.waypoints ?? []), [course]);
     const isPublic = course?.visibility === 'public';
 
     const patch = (changes) => {
@@ -117,7 +118,7 @@ const SharedCourseDialog = ({ token, userId, ensureMember, onOpenCourse, onChang
         const visibility = VISIBILITY[visibilityOf(course)];
         content = (
             <div className="viewer" style={{ '--sport': sport.color, '--on-sport': sport.onColor }}>
-                <CourseMap polylines={course.polylines} markers={course.markers} color={sport.color} hoverPoint={hoverPoint} />
+                <CourseMap polylines={course.polylines} markers={course.markers} waypoints={waypoints} color={sport.color} hoverPoint={hoverPoint} />
                 <div className="viewer__byline">
                     <span className="avatar avatar--sm" aria-hidden="true">{(course.nickname ?? '?').slice(0, 1).toUpperCase()}</span>
                     <span className="viewer__author">{course.nickname ?? '알 수 없음'}</span>
@@ -153,7 +154,7 @@ const SharedCourseDialog = ({ token, userId, ensureMember, onOpenCourse, onChang
                     )}
                     <Button variant="secondary" icon="link" onClick={handleCopyLink}>링크 복사</Button>
                 </div>
-                <ElevationPanel variant="inline" polylines={course.polylines} zones={sport.gradeZones} onHoverPoint={setHoverPoint} />
+                <ElevationPanel variant="inline" polylines={course.polylines} waypoints={waypoints} zones={sport.gradeZones} onHoverPoint={setHoverPoint} />
                 {isPublic && (
                     <CommentSection
                         token={token}

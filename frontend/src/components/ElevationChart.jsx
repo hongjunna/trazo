@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
+import { waypointImage, waypointImagesReady, waypointLabel, waypointType } from '../waypoints';
 
 ChartJS.register(
     CategoryScale,
@@ -96,7 +97,53 @@ const crosshairPlugin = {
     }
 };
 
-const ElevationChart = ({ polylines, zones, onHoverPoint, hoverSource }) => {
+// 웨이포인트: 차트 위쪽 여백에 아이콘과 이름을 그리고, 그 위치에 점선을 내립니다.
+// 이름이 서로 겹치면 뒤의 이름은 생략하고 아이콘만 그립니다.
+const WAYPOINT_ICON = 18;
+const WAYPOINT_SPACE = 30;
+const drawWaypoints = (chart, waypoints) => {
+    if (!waypoints?.length || !chart.chartArea) return;
+    const { ctx, chartArea: { top, bottom, left, right }, scales: { x } } = chart;
+    ctx.save();
+    ctx.font = '650 11px Pretendard Variable, Pretendard, sans-serif';
+    ctx.textBaseline = 'middle';
+    let labelEnd = -Infinity;
+    const iconY = top - WAYPOINT_SPACE + 4;
+    waypoints.forEach(waypoint => {
+        const px = x.getPixelForValue(waypoint.km);
+        if (px < left - 1 || px > right + 1) return;
+        const type = waypointType(waypoint.type);
+        ctx.beginPath();
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = withAlpha(type.color, 0.7);
+        ctx.moveTo(px, iconY + WAYPOINT_ICON);
+        ctx.lineTo(px, bottom);
+        ctx.stroke();
+        const image = waypointImage(waypoint.type);
+        if (image) ctx.drawImage(image, px - WAYPOINT_ICON / 2, iconY, WAYPOINT_ICON, WAYPOINT_ICON);
+        const label = waypointLabel(waypoint);
+        const width = ctx.measureText(label).width;
+        const textX = px + WAYPOINT_ICON / 2 + 3;
+        if (textX > labelEnd + 6 && textX + width <= right + 4) {
+            ctx.lineWidth = 3;
+            ctx.setLineDash([]);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.strokeText(label, textX, iconY + WAYPOINT_ICON / 2);
+            ctx.fillStyle = '#15262C';
+            ctx.fillText(label, textX, iconY + WAYPOINT_ICON / 2);
+            labelEnd = textX + width;
+        } else {
+            labelEnd = Math.max(labelEnd, px + WAYPOINT_ICON / 2);
+        }
+    });
+    ctx.restore();
+};
+
+const ElevationChart = ({ polylines, zones, onHoverPoint, hoverSource, waypoints }) => {
+    const waypointsRef = useRef(waypoints);
+    const hasWaypoints = Boolean(waypoints?.length);
+    const [waypointPlugin] = useState(() => ({ id: 'waypoints', afterDatasetsDraw: (chart) => drawWaypoints(chart, waypointsRef.current) }));
     const [hudData, setHudData] = useState(null);
     const [isZoomed, setIsZoomed] = useState(false);
     const chartRef = useRef(null);
@@ -240,11 +287,15 @@ const ElevationChart = ({ polylines, zones, onHoverPoint, hoverSource }) => {
         chart.activeMouseY = chart.scales.y.getPixelForValue(ele);
         chart.draw();
         const halfWidth = 62;
+        // 웨이포인트 가까이(차트 너비의 1.5% 이내)를 훑으면 그 이름도 보여줍니다.
+        const scale = chart.scales.x;
+        const near = (waypointsRef.current ?? []).find(w => Math.abs(w.km - distances[index]) <= (scale.max - scale.min) * 0.015);
         setHudData({
             x: Math.max(left + halfWidth, Math.min(right - halfWidth, x)),
             dist: distances[index],
             ele,
             slope: slopes[index],
+            waypoint: near ? waypointLabel(near) : null,
         });
         return index;
     };
@@ -262,7 +313,7 @@ const ElevationChart = ({ polylines, zones, onHoverPoint, hoverSource }) => {
     const options = useMemo(() => ({
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { top: 8, bottom: 6 } },
+        layout: { padding: { top: hasWaypoints ? WAYPOINT_SPACE : 8, bottom: 6 } },
         plugins: {
             legend: { display: false },
             tooltip: { enabled: false },
@@ -320,7 +371,16 @@ const ElevationChart = ({ polylines, zones, onHoverPoint, hoverSource }) => {
             if (coord) onHoverPoint({ lat: coord.lat, lng: coord.lng });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [rawCoords, elevations, slopes, distances, totalDistance, onHoverPoint, isTouch, yRange]);
+    }), [rawCoords, elevations, slopes, distances, totalDistance, onHoverPoint, isTouch, yRange, hasWaypoints]);
+
+    // 웨이포인트가 바뀌거나 아이콘을 다 읽으면 다시 그립니다.
+    useEffect(() => {
+        waypointsRef.current = waypoints;
+        chartRef.current?.draw();
+        let cancelled = false;
+        waypointImagesReady.then(() => { if (!cancelled) chartRef.current?.draw(); });
+        return () => { cancelled = true; };
+    }, [waypoints]);
 
     // 지도에서 코스 근처에 마우스를 올리면 그 위치를 차트에도 표시합니다.
     useEffect(() => {
@@ -348,6 +408,7 @@ const ElevationChart = ({ polylines, zones, onHoverPoint, hoverSource }) => {
         <div className="chart" onMouseLeave={() => { setHudData(null); onHoverPoint(null); }}>
             {hudData && (
                 <div className="chart__hud" style={{ left: hudData.x }}>
+                    {hudData.waypoint && <div className="chart__hud-wpt">{hudData.waypoint}</div>}
                     <div><span>거리</span><b>{hudData.dist.toFixed(2)} km</b></div>
                     <div><span>고도</span><b>{Math.round(hudData.ele)} m</b></div>
                     <div><span>경사</span><b style={{ color: slopeColor }}>{hudData.slope > 0 ? '+' : ''}{hudData.slope.toFixed(1)}%</b></div>
@@ -359,7 +420,7 @@ const ElevationChart = ({ polylines, zones, onHoverPoint, hoverSource }) => {
             <div className="chart__scroll" style={{ opacity: 0 }}>
                 <div ref={scrollbarThumbRef} />
             </div>
-            <Line ref={chartRef} options={options} data={chartData} plugins={[crosshairPlugin]} />
+            <Line ref={chartRef} options={options} data={chartData} plugins={[crosshairPlugin, waypointPlugin]} />
         </div>
     );
 };

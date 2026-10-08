@@ -7,10 +7,12 @@ import Icon from './Icon';
 
 const MENU_GAP = 6;
 const ITEM_HEIGHT = 38;
+const ITEM_HEIGHT_DESC = 50;
 const MENU_PADDING = 14;
 
-// items: [{ label, icon?, onSelect, danger?, disabled? }]
-const MenuButton = ({ items, label = '더 보기', icon = 'more', size = 'sm', disabled = false }) => {
+// items: [{ label, desc?, icon?, onSelect, danger?, disabled? }]
+// text를 주면 글자가 있는 버튼이 됩니다 (예: 내보내기 ▾).
+const MenuButton = ({ items, label = '더 보기', icon = 'more', size = 'sm', disabled = false, text, variant = 'ghost', loading = false, className }) => {
     const [position, setPosition] = useState(null);
     const triggerRef = useRef(null);
     const menuRef = useRef(null);
@@ -20,7 +22,7 @@ const MenuButton = ({ items, label = '더 보기', icon = 'more', size = 'sm', d
         if (open) { setPosition(null); return; }
         const rect = triggerRef.current.getBoundingClientRect();
         // 화면 아래쪽이라 메뉴가 잘리면 버튼 위로 띄웁니다.
-        const height = items.length * ITEM_HEIGHT + MENU_PADDING;
+        const height = items.reduce((sum, item) => sum + (item.desc ? ITEM_HEIGHT_DESC : ITEM_HEIGHT), MENU_PADDING);
         const below = rect.bottom + MENU_GAP;
         const top = below + height > window.innerHeight - 8 ? Math.max(8, rect.top - MENU_GAP - height) : below;
         setPosition({ top, right: window.innerWidth - rect.right });
@@ -57,15 +59,20 @@ const MenuButton = ({ items, label = '더 보기', icon = 'more', size = 'sm', d
             <Button
                 ref={triggerRef}
                 size={size}
-                variant="ghost"
+                variant={variant}
                 icon={icon}
-                aria-label={label}
+                iconRight={text ? (open ? 'chevron-up' : 'chevron-down') : undefined}
+                aria-label={text ? undefined : label}
                 title={label}
                 aria-haspopup="menu"
                 aria-expanded={open}
                 disabled={disabled}
+                loading={loading}
+                className={className}
                 onClick={toggle}
-            />
+            >
+                {text}
+            </Button>
             {open && createPortal(
                 <div ref={menuRef} className="menu menu--floating" role="menu" style={{ top: position.top, right: position.right }}>
                     {items.map(item => (
@@ -73,12 +80,17 @@ const MenuButton = ({ items, label = '더 보기', icon = 'more', size = 'sm', d
                             key={item.label}
                             type="button"
                             role="menuitem"
-                            className={`menu__item ${item.danger ? 'menu__item--danger' : ''}`}
+                            className={`menu__item ${item.danger ? 'menu__item--danger' : ''} ${item.desc ? 'menu__item--desc' : ''}`}
                             disabled={item.disabled}
                             onClick={() => { setPosition(null); item.onSelect(); }}
                         >
                             {item.icon && <Icon name={item.icon} />}
-                            {item.label}
+                            {item.desc ? (
+                                <span className="menu__text">
+                                    <span>{item.label}</span>
+                                    <span className="menu__desc">{item.desc}</span>
+                                </span>
+                            ) : item.label}
                         </button>
                     ))}
                 </div>,

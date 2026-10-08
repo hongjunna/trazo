@@ -12,6 +12,17 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      // 코스 이미지 저장에 쓰는 카카오 지도 타일 (운영에서는 nginx.conf가 같은 일을 합니다)
+      '/map-tiles/mts': {
+        target: 'https://mts.kakaocdn.net',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/map-tiles\/mts/, ''),
+      },
+      '/map-tiles/map': {
+        target: 'https://map.kakaocdn.net',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/map-tiles\/map/, ''),
+      },
     },
   },
 })

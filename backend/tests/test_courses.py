@@ -1,5 +1,7 @@
+import json
 import os
 import unittest
+from xml.etree import ElementTree
 
 os.environ['DATABASE_URL'] = 'sqlite://'
 os.environ['COURSE_API_TOKENS'] = '{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":1,"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb":2}'
@@ -108,6 +110,41 @@ class FirebaseAccessTests(CourseAccessTests):
         self.assertEqual(self.client.post('/courses', json={**data, 'sport': 'swim'}, headers=self.owner).status_code, 422)
         legacy = self.client.post('/courses', json={'title': 'legacy', 'markers': [], 'polylines': []}, headers=self.owner).json()['course_id']
         self.assertEqual({c['id']: c['sport'] for c in self.client.get('/courses', headers=self.owner).json()}[legacy], 'bike')
+
+    def test_course_waypoints(self):
+        waypoint = {'lat': 37.5, 'lng': 127.0, 'type': 'summit', 'name': '남산', 'note': '전망대'}
+        data = {'title': 'wpt', 'markers': [], 'polylines': [], 'waypoints': [waypoint]}
+        course_id = self.client.post('/courses', json=data, headers=self.owner).json()['course_id']
+        stored = self.client.get('/courses', headers=self.owner).json()[0]
+        self.assertEqual(json.loads(stored['waypoints_json']), [waypoint])
+        # 웨이포인트를 보내지 않으면 그대로 두고, 빈 목록을 보내면 모두 지웁니다.
+        self.client.put(f'/courses/{course_id}', headers=self.owner, json={'title': 'renamed'})
+        self.assertEqual(len(json.loads(self.client.get('/courses', headers=self.owner).json()[0]['waypoints_json'])), 1)
+        self.client.put(f'/courses/{course_id}', headers=self.owner, json={'waypoints': []})
+        self.assertEqual(json.loads(self.client.get('/courses', headers=self.owner).json()[0]['waypoints_json']), [])
+        for bad in ({**waypoint, 'type': 'castle'}, {**waypoint, 'lat': 120}, {**waypoint, 'name': 'x' * 61}):
+            self.assertEqual(self.client.post('/courses', json={**data, 'waypoints': [bad]}, headers=self.owner).status_code, 422)
+
+    def test_tcx_course_points(self):
+        points = [{'lat': 37.5, 'lng': 127.0, 'ele': 10}, {'lat': 37.51, 'lng': 127.0, 'ele': 20}, {'lat': 37.52, 'lng': 127.0, 'ele': 30}]
+        waypoints = [
+            {'lat': 37.52, 'lng': 127.0, 'type': 'water', 'name': '편의점 앞 급수대', 'note': '', 'km': 2.2},
+            {'lat': 37.51, 'lng': 127.0, 'type': 'first_aid', 'name': '', 'note': '', 'km': 1.1},
+        ]
+        response = self.client.post('/export/tcx', json={'trackPoints': points, 'waypoints': waypoints, 'speedMps': 5})
+        self.assertEqual(response.status_code, 200)
+        root = ElementTree.fromstring(response.content)
+        ns = {'t': 'http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2'}
+        course = root.find('t:Courses/t:Course', ns)
+        self.assertIsNotNone(course.find('t:Track', ns))
+        times = [tp.findtext('t:Time', namespaces=ns) for tp in course.findall('t:Track/t:Trackpoint', ns)]
+        course_points = course.findall('t:CoursePoint', ns)
+        # 거리순으로 정렬하고, 이름은 10자로 줄이며 시각은 같은 위치의 트랙 지점과 맞춥니다.
+        self.assertEqual([cp.findtext('t:PointType', namespaces=ns) for cp in course_points], ['First Aid', 'Water'])
+        self.assertEqual(course_points[0].findtext('t:Name', namespaces=ns), 'First Aid')
+        self.assertEqual(course_points[1].findtext('t:Name', namespaces=ns), '편의점 앞 급수대'[:10])
+        self.assertEqual(course_points[1].findtext('t:Notes', namespaces=ns), '편의점 앞 급수대')
+        self.assertEqual([cp.findtext('t:Time', namespaces=ns) for cp in course_points], times[1:])
 
 
 class CommunityTests(unittest.TestCase):

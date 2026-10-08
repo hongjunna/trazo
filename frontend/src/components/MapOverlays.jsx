@@ -29,6 +29,7 @@ export const MapControls = ({ onUndo, onRedo, canUndo, canRedo, onLocate, isLoca
 );
 
 // 지도 위를 우클릭하면 그 위치의 거리 사진(로드뷰·스트리트 뷰)을 새 탭에서 엽니다.
+// 경로 근처를 우클릭하면 그 자리에 웨이포인트를 추가하는 메뉴도 보여줍니다.
 const STREET_VIEWS = [
     { id: 'kakao', label: '다음 지도 로드뷰 열기', url: ({ lat, lng }) => `https://map.kakao.com/link/roadview/${lat},${lng}` },
     { id: 'google', label: '구글 스트리트 뷰 열기', url: ({ lat, lng }) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}` },
@@ -36,7 +37,7 @@ const STREET_VIEWS = [
 const MENU_W = 236;
 const MENU_H = 150;
 
-export const MapContextMenu = ({ menu, onClose }) => {
+export const MapContextMenu = ({ menu, onClose, onAddWaypoint }) => {
     const rootRef = useRef(null);
 
     useEffect(() => {
@@ -61,8 +62,9 @@ export const MapContextMenu = ({ menu, onClose }) => {
     if (!menu) return null;
     const { point, x, y, width, height } = menu;
     // 지도 가장자리에서 열면 메뉴가 화면 밖으로 나가지 않게 반대쪽으로 엽니다.
+    const menuHeight = MENU_H + (menu.near ? 38 : 0);
     const left = x + MENU_W > width ? Math.max(8, x - MENU_W) : x;
-    const top = y + MENU_H > height ? Math.max(8, y - MENU_H) : y;
+    const top = y + menuHeight > height ? Math.max(8, y - menuHeight) : y;
     const coords = `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
 
     return (
@@ -71,6 +73,11 @@ export const MapContextMenu = ({ menu, onClose }) => {
                 <span className="menu__name">이 위치에서</span>
                 <span className="menu__email">{coords}</span>
             </div>
+            {menu.near && (
+                <button type="button" role="menuitem" className="menu__item" onClick={() => onAddWaypoint(menu.near)}>
+                    <Icon name="flag" /> 여기에 웨이포인트 추가
+                </button>
+            )}
             {STREET_VIEWS.map(view => (
                 <a
                     key={view.id}
@@ -97,8 +104,10 @@ export const MapHint = ({ sport, markerCount }) => {
                 <ol className="map-hint__steps">
                     <li><span className="map-hint__num">1</span>지도를 눌러 출발점을 찍어요.</li>
                     <li><span className="map-hint__num">2</span>다음 지점을 찍으면 {current.label}에 맞는 길로 이어져요.</li>
-                    <li><span className="map-hint__num">3</span>완성되면 저장하거나 GPX로 내려받으세요.</li>
+                    <li><span className="map-hint__num">3</span>경로 위를 누르면 정상·급수 같은 웨이포인트를 표시해요.</li>
+                    <li><span className="map-hint__num">4</span>완성되면 저장하거나 GPX·FIT 파일, 이미지로 내려받으세요.</li>
                 </ol>
+                <p className="map-hint__foot"><Icon name="upload" size={14} />가지고 있는 GPX·TCX·FIT 파일은 지도에 끌어다 놓아 불러올 수 있어요.</p>
             </div>
         );
     }

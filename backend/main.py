@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from typing import List, Literal, Optional, Any
 from fastapi import FastAPI, Query, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, Field as PydanticField
 from contextlib import asynccontextmanager
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from fastapi.middleware.cors import CORSMiddleware
@@ -89,6 +89,8 @@ class Course(SQLModel, table=True):
     description: Optional[str] = None
     markers_json: str 
     polylines_json: str 
+    # 경로 위에 표시한 웨이포인트(정상·급수·위험 등). GPX·TCX·FIT로 내보낼 때 기기의 코스 포인트가 됩니다.
+    waypoints_json: Optional[str] = Field(default=None)
     firebase_uid: Optional[str] = Field(default=None)
     sport: str = Field(default="bike")
     user_id: int = Field(default=1)
@@ -155,6 +157,7 @@ COURSE_MIGRATIONS = {
     "folder_id": "INTEGER",
     "source_course_id": "INTEGER",
     "published_at": "VARCHAR",
+    "waypoints_json": "TEXT",
 }
 
 @asynccontextmanager
@@ -183,10 +186,28 @@ GRAPHHOPPER_URL = os.getenv("GRAPHHOPPER_URL", "http://graphhopper:8989")
 Sport = Literal["bike", "run"]
 Visibility = Literal["private", "link", "public"]
 
+# 웨이포인트 유형은 FIT 코스 포인트 이름을 그대로 씁니다. TCX에서는 PointType 이름으로 바꿔 씁니다.
+WAYPOINT_TCX_TYPES = {
+    "generic": "Generic", "summit": "Summit", "valley": "Valley", "water": "Water", "food": "Food",
+    "danger": "Danger", "left": "Left", "right": "Right", "straight": "Straight", "first_aid": "First Aid",
+    "fourth_category": "4th Category", "third_category": "3rd Category", "second_category": "2nd Category",
+    "first_category": "1st Category", "hors_category": "Hors Category", "sprint": "Sprint",
+}
+WaypointType = Literal[tuple(WAYPOINT_TCX_TYPES)]
+WAYPOINT_MAX = 200
+
+class Waypoint(BaseModel):
+    lat: float = PydanticField(ge=-90, le=90)
+    lng: float = PydanticField(ge=-180, le=180)
+    type: WaypointType = "generic"
+    name: str = PydanticField(default="", max_length=60)
+    note: str = PydanticField(default="", max_length=200)
+
 class CreateCourseRequest(BaseModel):
     title: str
     markers: List[dict]
     polylines: List[List[dict]]
+    waypoints: List[Waypoint] = PydanticField(default_factory=list, max_length=WAYPOINT_MAX)
     sport: Sport = "bike"
     visibility: Visibility = "private"
     folder_id: Optional[int] = None
@@ -197,6 +218,7 @@ class UpdateCourseRequest(BaseModel):
     description: Optional[str] = None
     markers: Optional[List[dict]] = None          # ⚡ 추가됨
     polylines: Optional[List[List[dict]]] = None  # ⚡ 추가됨
+    waypoints: Optional[List[Waypoint]] = PydanticField(default=None, max_length=WAYPOINT_MAX)
     sport: Optional[Sport] = None
     visibility: Optional[Visibility] = None
     # null을 보내면 폴더에서 빼고, 보내지 않으면 그대로 둡니다.
@@ -219,8 +241,13 @@ class TCXPoint(BaseModel):
     lng: float
     ele: float
 
+class TCXWaypoint(Waypoint):
+    # 코스 시작점부터의 거리 (km). 코스 포인트의 시각을 이 거리의 트랙 지점에 맞춥니다.
+    km: float = PydanticField(ge=0)
+
 class TCXExportRequest(BaseModel):
     trackPoints: List[TCXPoint]
+    waypoints: List[TCXWaypoint] = PydanticField(default_factory=list, max_length=WAYPOINT_MAX)
     name: Optional[str] = None
     # 코스 파일의 예상 시간 계산에 쓰는 평균 속도 (m/s)
     speedMps: Optional[float] = None
@@ -425,12 +452,23 @@ def apply_visibility(session: Session, course: Course, visibility: str, user_id:
 
 # --- 6-2. 내 코스 ---
 
+def dump_waypoints(waypoints: List[Waypoint]) -> str:
+    return json.dumps([waypoint.model_dump() for waypoint in waypoints], ensure_ascii=False)
+
+def load_waypoints(course: Course) -> list:
+    try:
+        waypoints = json.loads(course.waypoints_json or "[]")
+    except ValueError:
+        return []
+    return waypoints if isinstance(waypoints, list) else []
+
 @app.post("/courses")
 def create_course(course_data: CreateCourseRequest, session: Session = Depends(get_session), user_id: str | int = Depends(get_current_user)):
     new_course = Course(
         title=course_data.title,
         markers_json=json.dumps(course_data.markers),
         polylines_json=json.dumps(course_data.polylines),
+        waypoints_json=dump_waypoints(course_data.waypoints),
         user_id=user_id if isinstance(user_id, int) else 0,
         firebase_uid=user_id if isinstance(user_id, str) else None,
         sport=course_data.sport,
@@ -465,6 +503,8 @@ def update_course(course_id: int, course_data: UpdateCourseRequest, session: Ses
         course.markers_json = json.dumps(course_data.markers)
     if course_data.polylines is not None:
         course.polylines_json = json.dumps(course_data.polylines)
+    if course_data.waypoints is not None:
+        course.waypoints_json = dump_waypoints(course_data.waypoints)
     if course_data.sport is not None:
         course.sport = course_data.sport
     if course_data.visibility is not None:
@@ -657,6 +697,7 @@ def read_shared_course(token: str, session: Session = Depends(get_session), user
         "visibility": course.visibility,
         "markers": json.loads(course.markers_json),
         "polylines": json.loads(course.polylines_json),
+        "waypoints": load_waypoints(course),
         "nickname": nickname_of(session, course.firebase_uid),
         "is_owner": user_id is not None and owns(course, user_id),
         "share_count": course.share_count,
@@ -679,6 +720,7 @@ def copy_shared_course(token: str, data: CopyCourseRequest, session: Session = D
         description=course.description,
         markers_json=course.markers_json,
         polylines_json=course.polylines_json,
+        waypoints_json=course.waypoints_json,
         sport=course.sport,
         firebase_uid=user_id,
         user_id=0,
@@ -947,6 +989,8 @@ async def export_tcx(request: TCXExportRequest):
         <AltitudeMeters>{prev_pt.ele:.2f}</AltitudeMeters>
         <DistanceMeters>0.0</DistanceMeters>
     </Trackpoint>"""
+    # 코스 포인트 시각을 맞출 수 있게 트랙 지점마다 (누적 거리, 시각)을 기록합니다.
+    timeline = [(0.0, current_time)]
 
     AVG_SPEED_MPS = request.speedMps if request.speedMps and 0.5 <= request.speedMps <= 20 else 5.5
     course_name = escape((request.name or "Trazo Course").strip()[:80] or "Trazo Course")
@@ -973,8 +1017,30 @@ async def export_tcx(request: TCXExportRequest):
             <AltitudeMeters>{curr_pt.ele:.2f}</AltitudeMeters>
             <DistanceMeters>{total_dist:.2f}</DistanceMeters>
         </Trackpoint>"""
+        timeline.append((total_dist, current_time))
         
         prev_pt = curr_pt
+
+    # 웨이포인트는 기기에서 코스 포인트(정상·급수·회전 안내 등)로 표시됩니다.
+    # 같은 위치의 트랙 지점과 시각이 같아야 기기가 코스 위의 지점으로 인식합니다.
+    course_points_xml = ""
+    for waypoint in sorted(request.waypoints, key=lambda w: w.km):
+        target = min(waypoint.km * 1000, total_dist)
+        _, at = min(timeline, key=lambda item: abs(item[0] - target))
+        label = waypoint.name.strip() or WAYPOINT_TCX_TYPES[waypoint.type]
+        # TCX의 Name은 10자까지라 전체 이름과 메모는 Notes에 넣습니다.
+        notes = " - ".join(part for part in (waypoint.name.strip(), waypoint.note.strip()) if part)
+        notes_xml = f"\n        <Notes>{escape(notes)}</Notes>" if notes else ""
+        course_points_xml += f"""
+      <CoursePoint>
+        <Name>{escape(label[:10])}</Name>
+        <Time>{at.strftime("%Y-%m-%dT%H:%M:%SZ")}</Time>
+        <Position>
+          <LatitudeDegrees>{waypoint.lat}</LatitudeDegrees>
+          <LongitudeDegrees>{waypoint.lng}</LongitudeDegrees>
+        </Position>
+        <PointType>{WAYPOINT_TCX_TYPES[waypoint.type]}</PointType>{notes_xml}
+      </CoursePoint>"""
 
     final_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
@@ -993,10 +1059,10 @@ async def export_tcx(request: TCXExportRequest):
           <LongitudeDegrees>{prev_pt.lng}</LongitudeDegrees>
         </EndPosition>
         <Intensity>Active</Intensity>
-        <Track>
-          {trackpoints_xml}
-        </Track>
       </Lap>
+      <Track>
+        {trackpoints_xml}
+      </Track>{course_points_xml}
     </Course>
   </Courses>
 </TrainingCenterDatabase>"""

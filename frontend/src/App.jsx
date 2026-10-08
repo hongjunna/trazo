@@ -11,7 +11,10 @@ import { useNickname } from './hooks/useNickname';
 import { fetchRoutePath, saveCourse, downloadTCX, updateCourse, apiErrorMessage } from './api/courseApi';
 import { auth, loginWithGoogle, logout, authErrorMessage } from './firebase';
 import { SPORTS, SPORT_IDS, isSport, defaultRouteOptions } from './sports';
-import { buildGpx, buildTrackIndex, courseStats, distanceKm, distanceMarkers, flattenCourse, nearestOnTrack, safeFileName } from './utils/course';
+import { buildGeoJson, buildGpx, buildKml, buildTrackIndex, courseKey, courseStats, distanceKm, distanceMarkers, flattenCourse, locateWaypoints, nearestOnTrack, safeFileName } from './utils/course';
+import { buildFit } from './utils/fit';
+import { importCourseFile } from './utils/importCourse';
+import { WAYPOINT_MAX, waypointIconUri, waypointLabel } from './waypoints';
 import { readStored, writeStored } from './utils/storage';
 import { shareTokenFromPath, visibilityOf } from './utils/share';
 import { COLORS } from './styles/theme';
@@ -19,6 +22,7 @@ import { COLORS } from './styles/theme';
 import AccountButton from './components/AccountButton';
 import BottomSheet from './components/BottomSheet';
 import { CourseSummary, CourseSettings } from './components/CoursePanel';
+import CourseImageDialog from './components/CourseImageDialog';
 import CourseLibrary from './components/CourseLibrary';
 import ElevationPanel from './components/ElevationPanel';
 import { MapContextMenu, MapControls, MapHint, RouteStatus } from './components/MapOverlays';
@@ -29,7 +33,9 @@ import SharedCourseDialog from './components/SharedCourseDialog';
 import CommunityDialog from './components/CommunityDialog';
 import NicknameDialog from './components/NicknameDialog';
 import SportPicker from './components/SportPicker';
+import WaypointDialog from './components/WaypointDialog';
 import Button from './components/ui/Button';
+import Icon from './components/ui/Icon';
 import SegmentedControl from './components/ui/SegmentedControl';
 import { useFeedback } from './components/ui/feedbackContext';
 import trazoMark from './assets/trazo-mark.svg';
@@ -51,7 +57,8 @@ const initialSpeeds = () => {
   return Object.fromEntries(SPORT_IDS.map(id => [id, Number.isFinite(stored[id]) ? stored[id] : SPORTS[id].defaultSpeedKmh]));
 };
 
-const EMPTY_COURSE = { markers: [], polylines: [] };
+const EMPTY_COURSE = { markers: [], polylines: [], waypoints: [] };
+const EMPTY_KEY = courseKey(EMPTY_COURSE);
 const SPORT_OPTIONS = SPORT_IDS.map(id => ({ value: id, label: SPORTS[id].label, icon: SPORTS[id].icon }));
 
 // 지도에서 코스를 훑을 때 고도 차트에 위치(km)를 알려주는 작은 통로. 차트만 다시 그리고 App은 다시 그리지 않습니다.
@@ -78,6 +85,25 @@ const markerNeighbors = (markers, index, isLoop) => {
 const GRAB_PX = { mouse: 14, touch: 24 };
 const HOVER_PX = 40;
 const LONG_PRESS_MS = 450;
+
+// 지도 화면의 1px이 실제로 몇 m인지
+const metersPerPixelOf = (map) => {
+  const projection = map.getProjection();
+  const at = (y) => {
+    const coords = projection.coordsFromContainerPoint(new window.kakao.maps.Point(0, y));
+    return { lat: coords.getLat(), lng: coords.getLng() };
+  };
+  return (distanceKm(at(0), at(100)) * 1000) / 100;
+};
+
+// 내보내기 형식별 파일 확장자와 종류
+const EXPORT_FILES = {
+  gpx: { ext: 'gpx', mime: 'application/gpx+xml' },
+  tcx: { ext: 'tcx', mime: 'application/vnd.garmin.tcx+xml' },
+  fit: { ext: 'fit', mime: 'application/vnd.ant.fit' },
+  kml: { ext: 'kml', mime: 'application/vnd.google-earth.kml+xml' },
+  geojson: { ext: 'geojson', mime: 'application/geo+json' },
+};
 
 const downloadBlob = (blob, fileName) => {
   const url = window.URL.createObjectURL(blob);
@@ -143,20 +169,23 @@ function App() {
   const savingRef = useRef(false);
   const [isRouting, setIsRouting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isExportingTcx, setIsExportingTcx] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [routeError, setRouteError] = useState(null);
   const { currentState, pushState, undo, redo, reset, canUndo, canRedo } = useHistoryState(EMPTY_COURSE, () => Boolean(routeRequestRef.current || savingRef.current));
   const { markers: currentMarkers, polylines: currentPolylines } = currentState;
+  const currentWaypoints = useMemo(() => currentState.waypoints ?? [], [currentState.waypoints]);
+  // 코스를 바꿀 때 웨이포인트는 그대로 둡니다 (따로 넘기면 그것으로 바꿉니다).
+  const commitCourse = (next) => pushState({ markers: next.markers, polylines: next.polylines, waypoints: next.waypoints ?? currentWaypoints });
 
   const [title, setTitle] = useState(null); // null이면 종목 기본 이름을 보여줍니다.
   const [currentId, setCurrentId] = useState(null);
   // 저장된 코스의 폴더·공개 범위. 다시 저장할 때 기본값으로 씁니다.
   const [currentMeta, setCurrentMeta] = useState(null);
-  const [savedState, setSavedState] = useState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
+  const [savedState, setSavedState] = useState({ course: EMPTY_KEY, sport, title: null });
   const displayTitle = title ?? currentSport.defaultTitle;
   const hasMarkers = currentMarkers.length > 0;
   const hasCourse = currentMarkers.length >= 2;
-  const isModified = JSON.stringify(currentState) !== savedState.course
+  const isModified = courseKey(currentState) !== savedState.course
     || (hasMarkers && sport !== savedState.sport)
     || (Boolean(currentId) && title !== savedState.title);
 
@@ -176,6 +205,12 @@ function App() {
   const first = currentMarkers[0];
   const last = currentMarkers.at(-1);
   const isLoop = hasCourse && first.lat === last.lat && first.lng === last.lng;
+  const locatedWaypoints = useMemo(() => locateWaypoints(currentPolylines, currentWaypoints, trackIndex), [currentPolylines, currentWaypoints, trackIndex]);
+
+  // --- 웨이포인트 · 이미지 · 파일 불러오기 ---
+  const [waypointTarget, setWaypointTarget] = useState(null); // { index?, waypoint?, lat, lng, km, ele }
+  const [imageCourse, setImageCourse] = useState(null); // 이미지로 저장할 코스 (창을 열 때의 모습)
+  const [isDropping, setIsDropping] = useState(false);
 
   // --- 지도 위 코스 편집 ---
   const [dragPreview, setDragPreview] = useState(null);
@@ -244,6 +279,14 @@ function App() {
     map.setBounds(bounds, isMobile ? 90 : 48, isMobile ? 64 : 80, bottom, isMobile ? 24 : 48);
   }, [map, isMobile, sheetPeek]);
 
+  // 코스를 새로 불러오면 고도 패널이 생기며 지도 크기가 바뀌므로, 화면 배치가 끝난 뒤에 코스 전체에 맞춥니다.
+  const fitAfterLayout = useCallback((points) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      map?.relayout();
+      fitToPoints(points);
+    }));
+  }, [map, fitToPoints]);
+
   // --- 길찾기 ---
   const cancelRoute = () => {
     routeRequestRef.current?.abort();
@@ -276,7 +319,7 @@ function App() {
     try {
       const next = await build(controller.signal);
       if (routeRequestRef.current !== controller || controller.signal.aborted) return;
-      pushState(next);
+      commitCourse(next);
     } catch {
       if (routeRequestRef.current === controller && !controller.signal.aborted) onError();
     } finally {
@@ -293,7 +336,7 @@ function App() {
     if (routeRequestRef.current || savingRef.current) return;
     if (!currentMarkers.length) {
       setRouteError(null);
-      pushState({ markers: [newPoint], polylines: [] });
+      commitCourse({ markers: [newPoint], polylines: [] });
       return;
     }
     runRouting(async (signal) => {
@@ -319,7 +362,7 @@ function App() {
   // 이미 찍은 점을 옮기고, 그 점에 이어진 앞뒤 길을 다시 찾습니다.
   const moveMarker = (index, point) => {
     if (currentMarkers.length === 1) {
-      pushState({ markers: [point], polylines: [] });
+      commitCourse({ markers: [point], polylines: [] });
       return;
     }
     const n = currentMarkers.length;
@@ -364,15 +407,68 @@ function App() {
     if (mapMenu) { setMapMenu(null); return; }
     // 모바일에서 시트를 펼친 상태로 지도를 누르면 먼저 시트만 접습니다.
     if (isMobile && sheetExpanded) { setSheetExpanded(false); return; }
-    addPoint({ lat: event.latLng.getLat(), lng: event.latLng.getLng() });
+    const point = { lat: event.latLng.getLat(), lng: event.latLng.getLng() };
+    // 찍은 점이 아닌 경로 위를 누르면 그 자리에 웨이포인트를 추가합니다.
+    const near = courseHitAt(point, event.point);
+    if (near) { openNewWaypoint(near); return; }
+    addPoint(point);
+  };
+
+  // 화면 위치 screenPoint 가까이에 경로가 지나가면 그 경로 위 위치를 돌려줍니다. 찍은 점 위면 null입니다.
+  const courseHitAt = (point, screenPoint) => {
+    if (!map || !trackIndex || !screenPoint) return null;
+    const projection = map.getProjection();
+    const radius = GRAB_PX.mouse;
+    const onMarker = currentMarkers.some(marker => {
+      const p = projection.containerPointFromCoords(new window.kakao.maps.LatLng(marker.lat, marker.lng));
+      return Math.hypot(p.x - screenPoint.x, p.y - screenPoint.y) <= radius;
+    });
+    return onMarker ? null : nearestOnTrack(trackIndex, point, radius * metersPerPixelOf(map));
+  };
+
+  const openNewWaypoint = (near) => {
+    if (isBusy) return;
+    if (currentWaypoints.length >= WAYPOINT_MAX) {
+      toast(`웨이포인트는 ${WAYPOINT_MAX}개까지 추가할 수 있어요.`, { tone: 'error' });
+      return;
+    }
+    setMapMenu(null);
+    setWaypointTarget({ lat: near.lat, lng: near.lng, km: near.km, ele: near.ele });
+  };
+
+  const openEditWaypoint = (located) => {
+    if (isBusy) return;
+    setWaypointTarget({ index: located.index, waypoint: currentWaypoints[located.index], lat: located.lat, lng: located.lng, km: located.km, ele: located.ele });
+  };
+
+  const handleSubmitWaypoint = (fields) => {
+    const target = waypointTarget;
+    setWaypointTarget(null);
+    if (!target || routeRequestRef.current || savingRef.current) return;
+    const waypoints = [...currentWaypoints];
+    if (target.index != null) waypoints[target.index] = { ...waypoints[target.index], ...fields };
+    else waypoints.push({ lat: Number(target.lat.toFixed(7)), lng: Number(target.lng.toFixed(7)), ...fields });
+    commitCourse({ markers: currentMarkers, polylines: currentPolylines, waypoints });
+  };
+
+  const handleDeleteWaypoint = () => {
+    const target = waypointTarget;
+    setWaypointTarget(null);
+    if (target?.index == null || routeRequestRef.current || savingRef.current) return;
+    commitCourse({ markers: currentMarkers, polylines: currentPolylines, waypoints: currentWaypoints.filter((_, i) => i !== target.index) });
+    toast('웨이포인트를 지웠어요.');
   };
 
   // 데스크톱에서 지도를 우클릭하면 그 위치의 로드뷰를 여는 메뉴를 보여줍니다.
   const handleMapRightClick = (_target, event) => {
     const node = mapAreaRef.current;
     if (isMobile || isSportPickerOpen || !node) return;
+    const point = { lat: event.latLng.getLat(), lng: event.latLng.getLng() };
+    // 경로 근처를 우클릭하면 메뉴에서 웨이포인트도 추가할 수 있습니다.
+    const near = trackIndex && !isBusy ? nearestOnTrack(trackIndex, point, HOVER_PX * metersPerPixelOf(map)) : null;
     setMapMenu({
-      point: { lat: event.latLng.getLat(), lng: event.latLng.getLng() },
+      point,
+      near,
       x: event.point.x,
       y: event.point.y,
       width: node.clientWidth,
@@ -395,7 +491,7 @@ function App() {
   const handleOutAndBack = () => {
     if (!hasCourse || routeRequestRef.current || savingRef.current) return;
     setRouteError(null);
-    pushState({
+    commitCourse({
       markers: [...currentMarkers, ...currentMarkers.slice(0, -1).reverse()],
       polylines: [...currentPolylines, ...currentPolylines.slice().reverse().map(segment => segment.slice().reverse())],
     });
@@ -521,8 +617,8 @@ function App() {
     if (savingRef.current || routeRequestRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
-    const snapshot = { course: JSON.stringify(currentState), sport, title: nextTitle };
-    const course = { title: nextTitle, markers: currentMarkers, polylines: currentPolylines, sport, visibility, folder_id: folderId };
+    const snapshot = { course: courseKey(currentState), sport, title: nextTitle };
+    const course = { title: nextTitle, markers: currentMarkers, polylines: currentPolylines, waypoints: currentWaypoints, sport, visibility, folder_id: folderId };
     try {
       const response = mode === 'update' && currentId ? await updateCourse(currentId, course) : await saveCourse(course);
       if (response.data.status !== 'success') throw new Error('save failed');
@@ -564,9 +660,11 @@ function App() {
     try {
       const loadedMarkers = JSON.parse(course.markers_json);
       const loadedPolylines = JSON.parse(course.polylines_json);
+      const loadedWaypoints = JSON.parse(course.waypoints_json || '[]');
+      const loaded = { markers: loadedMarkers, polylines: loadedPolylines, waypoints: Array.isArray(loadedWaypoints) ? loadedWaypoints : [] };
       const loadedSport = isSport(course.sport) ? course.sport : 'bike';
       cancelRoute();
-      reset({ markers: loadedMarkers, polylines: loadedPolylines });
+      reset(loaded);
       setIsLibraryOpen(false);
       setSport(loadedSport);
       writeStored('trazo:sport', loadedSport);
@@ -575,9 +673,9 @@ function App() {
       setTitle(course.title);
       setCurrentId(course.id);
       setCurrentMeta({ folderId: course.folder_id ?? null, visibility: visibilityOf(course) });
-      setSavedState({ course: JSON.stringify({ markers: loadedMarkers, polylines: loadedPolylines }), sport: loadedSport, title: course.title });
+      setSavedState({ course: courseKey(loaded), sport: loadedSport, title: course.title });
       const points = flattenCourse(loadedPolylines);
-      fitToPoints(points.length ? points : loadedMarkers);
+      fitAfterLayout(points.length ? points : loadedMarkers);
       toast(`'${course.title}'을(를) 불러왔어요.`, { tone: 'success' });
       return true;
     } catch {
@@ -608,29 +706,114 @@ function App() {
     // 지도에 남은 코스는 저장되지 않은 새 코스가 됩니다.
     setCurrentId(null);
     setCurrentMeta(null);
-    setSavedState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
+    setSavedState({ course: EMPTY_KEY, sport, title: null });
   };
 
   // --- 내보내기 ---
-  const handleDownloadGpx = () => {
-    if (!currentPolylines.length) return;
-    const gpx = buildGpx(currentPolylines, { name: displayTitle, type: currentSport.gpxType });
-    downloadBlob(new Blob([gpx], { type: 'application/gpx+xml' }), `${safeFileName(displayTitle)}.gpx`);
-    toast('GPX 파일을 내려받았어요.', { tone: 'success' });
+  // 웨이포인트는 모든 형식에 코스 포인트로 함께 넣습니다.
+  const handleExport = async (format) => {
+    if (!currentPolylines.length || isExporting) return;
+    const { ext, mime } = EXPORT_FILES[format];
+    const fileName = `${safeFileName(displayTitle)}.${ext}`;
+    const speedKmh = speedBySport[sport];
+    const label = format === 'geojson' ? 'GeoJSON' : format.toUpperCase();
+    setIsExporting(true);
+    try {
+      let content;
+      if (format === 'gpx') content = buildGpx(currentPolylines, { name: displayTitle, type: currentSport.gpxType, waypoints: locatedWaypoints });
+      else if (format === 'kml') content = buildKml(currentPolylines, { name: displayTitle, color: currentSport.color, waypoints: locatedWaypoints });
+      else if (format === 'geojson') content = buildGeoJson(currentPolylines, { name: displayTitle, sport, waypoints: locatedWaypoints });
+      else if (format === 'fit') content = buildFit(flattenCourse(currentPolylines), { name: displayTitle, sport, speedKmh, waypoints: locatedWaypoints }, distanceKm);
+      else {
+        const waypoints = locatedWaypoints.map(({ lat, lng, type, name, note, km }) => ({ lat, lng, type, name, note, km }));
+        content = (await downloadTCX(flattenCourse(currentPolylines), { name: displayTitle, speedKmh, waypoints })).data;
+      }
+      downloadBlob(new Blob([content], { type: mime }), fileName);
+      toast(`${label} 파일을 내려받았어요.`, { tone: 'success' });
+    } catch {
+      toast(`${label} 파일을 만들지 못했어요. 잠시 후 다시 시도하세요.`, { tone: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  const handleDownloadTcx = async () => {
-    if (!currentPolylines.length || isExportingTcx) return;
-    setIsExportingTcx(true);
-    try {
-      const response = await downloadTCX(flattenCourse(currentPolylines), { name: displayTitle, speedKmh: speedBySport[sport] });
-      downloadBlob(new Blob([response.data]), `${safeFileName(displayTitle)}.tcx`);
-      toast('TCX 파일을 내려받았어요.', { tone: 'success' });
-    } catch {
-      toast('TCX 파일을 만들지 못했어요. 잠시 후 다시 시도하세요.', { tone: 'error' });
-    } finally {
-      setIsExportingTcx(false);
+  const handleOpenImage = () => {
+    if (!hasCourse) return;
+    setSheetExpanded(false);
+    setImageCourse({
+      title: displayTitle,
+      sport: currentSport,
+      polylines: currentPolylines,
+      markers: currentMarkers,
+      waypoints: locatedWaypoints,
+      stats,
+      speedKmh: speedBySport[sport],
+    });
+  };
+
+  const handleDownloadImage = (blob, paper) => {
+    downloadBlob(blob, `${safeFileName(imageCourse?.title ?? displayTitle)}_${paper}.png`);
+    toast('코스 이미지를 내려받았어요.', { tone: 'success' });
+  };
+
+  // --- 파일 불러오기 ---
+  // 불러온 코스는 저장하지 않은 새 코스가 되어, 바로 고치거나 내 코스에 저장·공유할 수 있습니다.
+  const handleImportFile = async (file) => {
+    if (savingRef.current || routeRequestRef.current) return;
+    if (isModified && hasMarkers) {
+      const ok = await confirm({
+        title: '저장하지 않은 코스가 있어요',
+        message: `'${file.name}'을(를) 불러오면 지금 만든 코스의 변경 사항이 사라져요.`,
+        confirmLabel: '불러오기',
+        tone: 'danger',
+      });
+      if (!ok) return;
     }
+    let imported;
+    try {
+      imported = await importCourseFile(file);
+    } catch (error) {
+      toast(error.message || '파일을 불러오지 못했어요.', { tone: 'error' });
+      return;
+    }
+    cancelRoute();
+    reset(imported.course);
+    hoverMarkerRef.current?.setVisible(false);
+    const nextSport = imported.sport ?? sport;
+    setSport(nextSport);
+    writeStored('trazo:sport', nextSport);
+    setHasPickedSport(true);
+    setIsSportPickerOpen(false);
+    setTitle(imported.title);
+    setCurrentId(null);
+    setCurrentMeta(null);
+    setSavedState({ course: EMPTY_KEY, sport: nextSport, title: null });
+    setSheetExpanded(false);
+    fitAfterLayout(flattenCourse(imported.course.polylines));
+    const notes = [];
+    if (imported.course.waypoints.length) notes.push(`웨이포인트 ${imported.course.waypoints.length}개`);
+    if (!imported.hasElevation) notes.push('고도 정보가 없어 0m로 표시');
+    if (imported.skippedWaypoints) notes.push(`웨이포인트 ${imported.skippedWaypoints}개 생략`);
+    toast(`'${imported.title}'을(를) 불러왔어요${notes.length ? ` (${notes.join(', ')})` : ''}. 저장하면 내 코스에 올리고 공유할 수 있어요.`, { tone: 'success', duration: 5200 });
+  };
+
+  // 지도에 파일을 끌어다 놓아도 불러옵니다.
+  const hasFiles = (event) => [...(event.dataTransfer?.types ?? [])].includes('Files');
+  const handleDragOver = (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    if (!isDropping) setIsDropping(true);
+  };
+  const handleDragLeave = (event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setIsDropping(false);
+  };
+  const handleDrop = (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    setIsDropping(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) handleImportFile(file);
   };
 
   const handleNewCourse = async () => {
@@ -650,7 +833,7 @@ function App() {
     setTitle(null);
     setCurrentId(null);
     setCurrentMeta(null);
-    setSavedState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
+    setSavedState({ course: EMPTY_KEY, sport, title: null });
     setSheetExpanded(false);
     // 새 코스는 종목부터 고릅니다.
     setIsSportPickerOpen(true);
@@ -732,7 +915,7 @@ function App() {
       const coords = map.getProjection().coordsFromContainerPoint(new kakao.maps.Point(x, y));
       return { lat: coords.getLat(), lng: coords.getLng() };
     };
-    const metersPerPixel = () => (distanceKm(toLatLng({ x: 0, y: 0 }), toLatLng({ x: 0, y: 100 })) * 1000) / 100;
+    const metersPerPixel = () => metersPerPixelOf(map);
 
     // 화면에서 pos 가까이에 잡을 수 있는 점이나 길이 있는지 찾습니다. 점을 길보다 먼저 잡습니다.
     const hitTest = (pos, pointerType) => {
@@ -775,7 +958,7 @@ function App() {
       const pos = localPoint(event);
       const near = index ? nearestOnTrack(index, toLatLng(pos), HOVER_PX * metersPerPixel()) : null;
       if (near || hoverShown) showHover(near);
-      node.classList.toggle('is-grabbable', enabled && Boolean(hitTest(pos, 'mouse')));
+      node.classList.toggle('is-grabbable', enabled && !event.target.closest('.wpt-pin') && Boolean(hitTest(pos, 'mouse')));
     };
 
     const renderDrag = () => {
@@ -815,7 +998,7 @@ function App() {
       // 두 번째 손가락이 닿으면(확대·축소) 잡기를 그만둡니다.
       if (gesture) { finish(false); return; }
       if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
-      if (!editRef.current.enabled || !event.target.closest('.map-canvas')) return;
+      if (!editRef.current.enabled || !event.target.closest('.map-canvas') || event.target.closest('.wpt-pin')) return;
       const hit = hitTest(localPoint(event), event.pointerType);
       if (!hit) return;
       gesture = { pointerId: event.pointerId, pointerType: event.pointerType, hit, startX: event.clientX, startY: event.clientY, dragging: false, timer: 0 };
@@ -909,9 +1092,9 @@ function App() {
       onSave={handleOpenSave}
       canSave={hasCourse && !isBusy && !authBusy}
       isSaving={isSaving}
-      onDownloadGpx={handleDownloadGpx}
-      onDownloadTcx={handleDownloadTcx}
-      isExportingTcx={isExportingTcx}
+      onExport={handleExport}
+      isExporting={isExporting}
+      onOpenImage={handleOpenImage}
     />
   );
 
@@ -919,6 +1102,8 @@ function App() {
     <CourseSettings
       sport={sport}
       markerCount={currentMarkers.length}
+      waypointCount={currentWaypoints.length}
+      onImportFile={handleImportFile}
       isLoop={isLoop}
       isBusy={isBusy}
       onCloseLoop={handleCloseLoop}
@@ -962,7 +1147,13 @@ function App() {
   );
 
   const mapArea = (
-    <div className="map-area" ref={mapAreaRef}>
+    <div
+      className={`map-area ${isDropping ? 'is-dropping' : ''}`}
+      ref={mapAreaRef}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <Map
         center={INITIAL_VIEW.center}
         level={INITIAL_VIEW.level}
@@ -993,6 +1184,20 @@ function App() {
           const image = isStart ? icons.start : isEnd ? icons.end : icons.waypoint;
           return <MapMarker key={`m-${idx}`} position={pos} zIndex={isStart ? 6 : isEnd ? 5 : 4} image={image} />;
         })}
+        {locatedWaypoints.map(waypoint => (
+          <CustomOverlayMap key={`w-${waypoint.index}`} position={waypoint} zIndex={7} clickable>
+            <button
+              type="button"
+              className="wpt-pin"
+              title={`${waypointLabel(waypoint)} · ${waypoint.km.toFixed(1)}km${waypoint.note ? ` · ${waypoint.note}` : ''} (눌러서 고치기)`}
+              onPointerDown={() => { suppressClickUntilRef.current = Date.now() + 400; }}
+              onClick={() => openEditWaypoint(waypoint)}
+            >
+              <img src={waypointIconUri(waypoint.type, 26)} alt="" width={26} height={26} draggable={false} />
+              <span className="wpt-pin__label">{waypointLabel(waypoint)}</span>
+            </button>
+          </CustomOverlayMap>
+        ))}
         {dragPreview && dragPreview.anchors.map((anchor, idx) => (
           <Polyline key={`drag-${idx}`} path={[anchor, dragPreview.point]} strokeWeight={4} strokeColor={COLORS.primary} strokeOpacity={0.9} strokeStyle="shortdash" />
         ))}
@@ -1009,7 +1214,12 @@ function App() {
       </Map>
 
       {!isSportPickerOpen && !isRouting && !routeError && <MapHint sport={sport} markerCount={currentMarkers.length} />}
-      <MapContextMenu menu={mapMenu} onClose={closeMapMenu} />
+      <MapContextMenu menu={mapMenu} onClose={closeMapMenu} onAddWaypoint={openNewWaypoint} />
+      {isDropping && (
+        <div className="drop-hint" aria-hidden="true">
+          <div className="drop-hint__box"><Icon name="upload" size={20} />GPX·TCX·FIT·KML·GeoJSON 파일을 놓으면 코스를 불러와요</div>
+        </div>
+      )}
       <RouteStatus
         sport={sport}
         isRouting={isRouting}
@@ -1055,7 +1265,7 @@ function App() {
             onPeekHeightChange={setSheetPeek}
           >
             {hasPolylines && (
-              <ElevationPanel variant="inline" polylines={currentPolylines} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} hoverSource={hoverBus} />
+              <ElevationPanel variant="inline" polylines={currentPolylines} waypoints={locatedWaypoints} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} hoverSource={hoverBus} />
             )}
             {settings}
             <div className="tool-grid tool-grid--3">
@@ -1092,6 +1302,7 @@ function App() {
                 open={isElevationOpen}
                 onToggle={handleToggleElevation}
                 polylines={currentPolylines}
+                waypoints={locatedWaypoints}
                 zones={currentSport.gradeZones}
                 onHoverPoint={updateHoverMarker}
                 hoverSource={hoverBus}
@@ -1159,6 +1370,18 @@ function App() {
           onClose={() => setIsNicknameEditOpen(false)}
           onLogout={handleLogout}
         />
+      )}
+      {waypointTarget && (
+        <WaypointDialog
+          key={`${waypointTarget.index ?? 'new'}-${waypointTarget.lat}-${waypointTarget.lng}`}
+          target={waypointTarget}
+          onSubmit={handleSubmitWaypoint}
+          onDelete={handleDeleteWaypoint}
+          onClose={() => setWaypointTarget(null)}
+        />
+      )}
+      {imageCourse && (
+        <CourseImageDialog course={imageCourse} onDownload={handleDownloadImage} onClose={() => setImageCourse(null)} />
       )}
       <RoutingHelpDialog open={isHelpOpen} onClose={() => setIsHelpOpen(false)} sport={sport} />
       <SportPicker

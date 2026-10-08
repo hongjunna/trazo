@@ -2356,3 +2356,252 @@
     width: auto;
   }
 }
+
+/* ───────── 웨이포인트 ───────── */
+/* 지도 위 웨이포인트: 아이콘만 경로 위 지점에 맞추고, 이름은 오른쪽에 띄웁니다. */
+.wpt-pin {
+  position: relative;
+  display: block;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgba(16, 40, 46, 0.35));
+  transition: transform 0.12s var(--ease);
+}
+
+.wpt-pin img {
+  display: block;
+  pointer-events: none;
+}
+
+.wpt-pin:hover,
+.wpt-pin:focus-visible {
+  transform: scale(1.12);
+  outline: none;
+}
+
+.wpt-pin:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.wpt-pin__label {
+  position: absolute;
+  left: calc(100% + 3px);
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--c-text);
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff;
+  pointer-events: none;
+}
+
+.wpt-pin--static {
+  width: 22px;
+  height: 22px;
+  cursor: default;
+}
+
+.waypoint-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.waypoint-type {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.waypoint-type .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.chart__hud-wpt {
+  font-weight: 750;
+  color: #fff;
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ───────── 내보내기 메뉴 ───────── */
+.menu__item--desc {
+  height: auto;
+  min-height: 50px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.menu__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.menu__text > span:first-child {
+  font-weight: 700;
+}
+
+.menu__desc {
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+
+/* ───────── 파일 불러오기 ───────── */
+.section__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.file-btn {
+  cursor: pointer;
+}
+
+.file-btn:focus-within {
+  box-shadow: var(--focus-ring);
+}
+
+.file-btn.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.map-hint__foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--c-border);
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+
+.app--mobile .map-hint__foot {
+  display: none;
+}
+
+.drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(11, 79, 87, 0.18);
+  border: 3px dashed var(--c-primary);
+  pointer-events: none;
+}
+
+.drop-hint__box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-3);
+  font-weight: 700;
+  color: var(--c-primary);
+  text-align: center;
+}
+
+/* ───────── 코스 이미지 저장 ───────── */
+.image-export {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.image-export__options {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.image-export__options .segmented {
+  width: 100%;
+}
+
+.image-export__options .form-hint {
+  margin: 0;
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.image-export__preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+  max-height: min(62vh, 560px);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface-3);
+}
+
+.image-export__preview img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(min(62vh, 560px) - 24px);
+  box-shadow: var(--shadow-2);
+  background: #fff;
+  transition: opacity 0.15s ease;
+}
+
+.image-export__preview img.is-stale {
+  opacity: 0.35;
+}
+
+.image-export__status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 650;
+  color: var(--c-text-2);
+}
+
+.image-export__status--error {
+  position: static;
+  color: var(--c-danger);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .image-export {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .image-export__preview {
+    min-height: 240px;
+    max-height: 46vh;
+  }
+
+  .image-export__preview img {
+    max-height: calc(46vh - 24px);
+  }
+}
+
+.section__note svg {
+  vertical-align: -2px;
+}

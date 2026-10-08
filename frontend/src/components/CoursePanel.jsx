@@ -5,7 +5,9 @@ import { useState } from 'react';
 import { SPORTS, formatDuration, formatPace, parsePace, speedFromPace } from '../sports';
 import Button from './ui/Button';
 import Icon from './ui/Icon';
+import MenuButton from './ui/MenuButton';
 import SegmentedControl from './ui/SegmentedControl';
+import { IMPORT_ACCEPT } from '../utils/importCourse';
 
 const TITLE_MAX = 60;
 
@@ -54,7 +56,7 @@ const Stat = ({ label, value, unit, sub }) => (
 
 export const CourseSummary = ({
     sport, title, onRename, isModified, isSavedCourse, stats, speedKmh, hasCourse,
-    onSave, canSave, isSaving, onDownloadGpx, onDownloadTcx, isExportingTcx,
+    onSave, canSave, isSaving, onExport, isExporting, onOpenImage,
 }) => {
     const current = SPORTS[sport];
     const speedLabel = current.speedInput === 'pace' ? `${formatPace(speedKmh)}/km 기준` : `${Math.round(speedKmh * 10) / 10}km/h 기준`;
@@ -77,12 +79,30 @@ export const CourseSummary = ({
                 <Button variant="primary" icon="save" onClick={onSave} disabled={!canSave} loading={isSaving}>
                     {isSavedCourse ? '저장' : '코스 저장'}
                 </Button>
-                <Button variant="secondary" icon="download" onClick={onDownloadGpx} disabled={!hasCourse} title="GPX 파일 내려받기 (대부분의 앱·기기 지원)">GPX</Button>
-                <Button variant="secondary" icon="download" onClick={onDownloadTcx} disabled={!hasCourse} loading={isExportingTcx} title="TCX 파일 내려받기 (가민 등 코스 시간 포함)">TCX</Button>
+                <MenuButton
+                    variant="secondary"
+                    size="md"
+                    icon="download"
+                    text="파일"
+                    label="코스 파일 내려받기"
+                    disabled={!hasCourse}
+                    loading={isExporting}
+                    items={EXPORT_FORMATS.map(format => ({ label: format.label, desc: format.desc, icon: 'file', onSelect: () => onExport(format.id) }))}
+                />
+                <Button variant="secondary" icon="image" onClick={onOpenImage} disabled={!hasCourse} title="코스 지도·고도 그래프를 A5·A4·A3 이미지로 저장">이미지</Button>
             </div>
         </section>
     );
 };
+
+// 내보내기 형식. 웨이포인트는 모든 형식에 함께 들어갑니다.
+const EXPORT_FORMATS = [
+    { id: 'gpx', label: 'GPX', desc: '대부분의 앱·기기 (가민·와후·스트라바 등)' },
+    { id: 'fit', label: 'FIT', desc: '가민·와후 기기에 바로 넣는 코스 파일' },
+    { id: 'tcx', label: 'TCX', desc: '가민 커넥트 등, 예상 시간 포함' },
+    { id: 'kml', label: 'KML', desc: '구글 어스·구글 내 지도' },
+    { id: 'geojson', label: 'GeoJSON', desc: '개발자·GIS 도구' },
+];
 
 // 종목별 예상 속도 입력 (자전거: km/h, 러닝: 분:초/km)
 const SpeedField = ({ sport, speedKmh, onChange }) => {
@@ -137,9 +157,28 @@ const SpeedField = ({ sport, speedKmh, onChange }) => {
     );
 };
 
+// 컴퓨터의 GPX·TCX·FIT 등 코스 파일을 불러옵니다. 지도에 파일을 끌어다 놓아도 됩니다.
+export const ImportButton = ({ onImportFile, disabled, ...rest }) => (
+    <label className={`btn btn--ghost btn--sm file-btn ${disabled ? 'is-disabled' : ''}`} title="GPX·TCX·FIT·KML·GeoJSON 파일을 불러와 고치거나 저장·공유해요" {...rest}>
+        <Icon name="upload" size={16} />
+        파일 불러오기
+        <input
+            type="file"
+            accept={IMPORT_ACCEPT}
+            disabled={disabled}
+            className="sr-only"
+            onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) onImportFile(file);
+            }}
+        />
+    </label>
+);
+
 export const CourseSettings = ({
-    sport, markerCount, isLoop, isBusy,
-    onCloseLoop, onOutAndBack, onNewCourse,
+    sport, markerCount, isLoop, isBusy, waypointCount,
+    onCloseLoop, onOutAndBack, onNewCourse, onImportFile,
     isAutoRouting, onToggleAutoRouting, routeOptions, onToggleRouteOption, onOpenHelp,
     speedKmh, onChangeSpeed,
 }) => {
@@ -207,9 +246,16 @@ export const CourseSettings = ({
                         <span className="tool-btn__desc">지금까지의 길을 그대로 되돌아오기</span>
                     </button>
                 </div>
-                <Button variant="danger-ghost" size="sm" icon="plus" onClick={onNewCourse} style={{ alignSelf: 'flex-start' }}>
-                    새 코스 시작
-                </Button>
+                <p className="section__note">
+                    <Icon name="flag" size={14} /> 경로 위를 누르면 정상·급수·위험 지점 같은 웨이포인트를 표시해요.
+                    {waypointCount > 0 && <b> 웨이포인트 {waypointCount}개</b>}
+                </p>
+                <div className="section__actions">
+                    <Button variant="danger-ghost" size="sm" icon="plus" onClick={onNewCourse}>
+                        새 코스 시작
+                    </Button>
+                    <ImportButton onImportFile={onImportFile} disabled={isBusy} />
+                </div>
             </div>
 
             <SpeedField key={sport} sport={sport} speedKmh={speedKmh} onChange={onChangeSpeed} />
