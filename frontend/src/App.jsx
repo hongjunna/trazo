@@ -1,36 +1,39 @@
 // src/App.jsx
+// 화면 구성: 데스크톱은 왼쪽 사이드바 + 지도 + 아래 고도 패널, 모바일은 전체 화면 지도 + 위쪽 바 + 아래 시트입니다.
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import ElevationChart from './ElevationChart';
-
-import { ICONS } from './constants';
-import { useHistoryState } from './hooks/useHistoryState';
-import { fetchRoutePath, saveCourse, getCourseList, downloadTCX, updateCourse } from './api/courseApi';
 import { onAuthStateChanged } from 'firebase/auth';
+
+import { markerIcons, HOVER_MARKER_ICON } from './constants';
+import { useHistoryState } from './hooks/useHistoryState';
+import { useIsMobile } from './hooks/useMediaQuery';
+import { fetchRoutePath, saveCourse, downloadTCX, updateCourse } from './api/courseApi';
 import { auth, loginWithGoogle, logout, authErrorMessage } from './firebase';
-import ControlPanel from './components/ControlPanel';
-import LoadCourseModal from './components/LoadCourseModal';
-import GradientLegend from './components/GradientLegend';
-import SportPicker from './components/SportPicker';
-import Button from './components/ui/Button';
 import { SPORTS, SPORT_IDS, isSport, defaultRouteOptions } from './sports';
 import { buildGpx, courseStats, distanceMarkers, flattenCourse, safeFileName } from './utils/course';
+import { readStored, writeStored } from './utils/storage';
+import { COLORS } from './styles/theme';
 
-// ⚡ 테마 색상 가져오기
-import { COLORS, SHADOWS } from './styles/theme';
-
-// 브라우저 저장소를 쓸 수 없어도(사생활 보호 모드 등) 화면은 동작해야 합니다.
-const readStored = (key, fallback) => {
-  try {
-    const value = window.localStorage.getItem(key);
-    return value === null ? fallback : JSON.parse(value);
-  } catch { return fallback; }
-};
-const writeStored = (key, value) => {
-  try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* 저장하지 못해도 무시 */ }
-};
+import AccountButton from './components/AccountButton';
+import BottomSheet from './components/BottomSheet';
+import { CourseSummary, CourseSettings } from './components/CoursePanel';
+import CourseLibrary from './components/CourseLibrary';
+import ElevationPanel from './components/ElevationPanel';
+import { MapControls, MapHint, RouteStatus } from './components/MapOverlays';
+import RoutingHelpDialog from './components/RoutingHelpDialog';
+import SaveCourseDialog from './components/SaveCourseDialog';
+import SportPicker from './components/SportPicker';
+import Button from './components/ui/Button';
+import SegmentedControl from './components/ui/SegmentedControl';
+import { useFeedback } from './components/ui/feedbackContext';
+import trazoMark from './assets/trazo-mark.svg';
 
 const storedSport = readStored('trazo:sport', null);
+const storedView = readStored('trazo:view', null);
+const INITIAL_VIEW = storedView && Number.isFinite(storedView.lat) && Number.isFinite(storedView.lng)
+  ? { center: { lat: storedView.lat, lng: storedView.lng }, level: Number.isInteger(storedView.level) ? storedView.level : 5 }
+  : { center: { lat: 37.521285, lng: 126.999852 }, level: 5 };
+
 const initialRouteOptions = () => {
   const stored = readStored('trazo:routeOptions', {});
   return Object.fromEntries(SPORT_IDS.map(id => [id, { ...defaultRouteOptions(id), ...(stored[id] || {}) }]));
@@ -41,6 +44,7 @@ const initialSpeeds = () => {
 };
 
 const EMPTY_COURSE = { markers: [], polylines: [] };
+const SPORT_OPTIONS = SPORT_IDS.map(id => ({ value: id, label: SPORTS[id].label, icon: SPORTS[id].icon }));
 
 const downloadBlob = (blob, fileName) => {
   const url = window.URL.createObjectURL(blob);
@@ -49,53 +53,87 @@ const downloadBlob = (blob, fileName) => {
   link.setAttribute('download', fileName);
   document.body.appendChild(link);
   link.click();
-  link.parentNode.removeChild(link);
+  link.remove();
   window.URL.revokeObjectURL(url);
 };
 
+const Brand = ({ compact = false }) => (
+  <div className="brand">
+    <span className="brand__mark"><img src={trazoMark} alt="" /></span>
+    {!compact && (
+      <span className="brand__text">
+        <span className="brand__name">Trazo</span>
+        <span className="brand__tagline">점을 찍어 그리는 나만의 코스</span>
+      </span>
+    )}
+    {compact && <span className="sr-only">Trazo</span>}
+  </div>
+);
+
 function App() {
+  const { toast, confirm } = useFeedback();
+  const isMobile = useIsMobile();
+
+  // --- 계정 ---
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(Boolean(auth));
   const [authBusy, setAuthBusy] = useState(false);
-  const [authError, setAuthError] = useState('');
-  const accountRef = useRef(null);
-  const [center, setCenter] = useState({ lat: 37.521285, lng: 126.999852 });
-  const [map, setMap] = useState(null);
 
-  // 종목: 처음 방문하면 종목 선택 화면을 보여줍니다.
+  // --- 지도 ---
+  const [map, setMap] = useState(null);
+  const mapAreaRef = useRef(null);
+  const hoverMarkerRef = useRef(null);
+  const [myLocation, setMyLocation] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
+
+  // --- 종목과 길찾기 설정 ---
   const [sport, setSport] = useState(isSport(storedSport) ? storedSport : 'bike');
+  // 처음 방문하면 종목부터 고르게 합니다. 한 번 고른 뒤에는 종목 선택 화면을 닫을 수 있습니다.
+  const [hasPickedSport, setHasPickedSport] = useState(isSport(storedSport));
   const [isSportPickerOpen, setIsSportPickerOpen] = useState(!isSport(storedSport));
   const [routeOptionsBySport, setRouteOptionsBySport] = useState(initialRouteOptions);
   const [speedBySport, setSpeedBySport] = useState(initialSpeeds);
+  const [isAutoRouting, setIsAutoRouting] = useState(true);
   const currentSport = SPORTS[sport];
 
+  // --- 코스 ---
   const routeRequestRef = useRef(null);
   const savingRef = useRef(false);
   const [isRouting, setIsRouting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExportingTcx, setIsExportingTcx] = useState(false);
   const [routeError, setRouteError] = useState(null);
   const { currentState, pushState, undo, redo, reset, canUndo, canRedo } = useHistoryState(EMPTY_COURSE, () => Boolean(routeRequestRef.current || savingRef.current));
   const { markers: currentMarkers, polylines: currentPolylines } = currentState;
 
-  const [courseList, setCourseList] = useState([]);
-  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
-  const [isChartOpen, setIsChartOpen] = useState(true);
-  const [isAutoRouting, setIsAutoRouting] = useState(true);
-
-  const [currentTitle, setCurrentTitle] = useState("새 코스");
-  const [savedState, setSavedState] = useState({ course: JSON.stringify(EMPTY_COURSE), sport });
-  const isModified = JSON.stringify(currentState) !== savedState.course || (currentMarkers.length > 0 && sport !== savedState.sport);
+  const [title, setTitle] = useState(null); // null이면 종목 기본 이름을 보여줍니다.
   const [currentId, setCurrentId] = useState(null);
+  const [savedState, setSavedState] = useState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
+  const displayTitle = title ?? currentSport.defaultTitle;
+  const hasMarkers = currentMarkers.length > 0;
+  const hasCourse = currentMarkers.length >= 2;
+  const isModified = JSON.stringify(currentState) !== savedState.course
+    || (hasMarkers && sport !== savedState.sport)
+    || (Boolean(currentId) && title !== savedState.title);
 
-  const hoverMarkerRef = useRef(null);
+  // --- 화면 상태 ---
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isSaveOpen, setIsSaveOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isElevationOpen, setIsElevationOpen] = useState(() => readStored('trazo:elevationOpen', true));
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [sheetPeek, setSheetPeek] = useState(180);
 
   const stats = useMemo(() => courseStats(currentPolylines), [currentPolylines]);
   const kmMarkers = useMemo(() => distanceMarkers(currentPolylines, currentSport.distanceMarkerKm), [currentPolylines, currentSport.distanceMarkerKm]);
+  const icons = useMemo(() => markerIcons(currentSport.color), [currentSport.color]);
+  const isBusy = isRouting || isSaving;
 
+  // 고도 차트를 훑을 때 지도에 위치를 보여주는 점
   useEffect(() => {
     if (!map) return;
     const markerImage = new window.kakao.maps.MarkerImage(
-      ICONS.HOVER_TARGET,
+      HOVER_MARKER_ICON,
       new window.kakao.maps.Size(24, 24),
       { offset: new window.kakao.maps.Point(12, 12) }
     );
@@ -103,7 +141,17 @@ function App() {
     marker.setMap(map);
     marker.setVisible(false);
     hoverMarkerRef.current = marker;
+    return () => marker.setMap(null);
   }, [map]);
+
+  // 사이드바·고도 패널·시트 크기가 바뀌면 지도 크기를 다시 계산합니다.
+  useEffect(() => {
+    const node = mapAreaRef.current;
+    if (!map || !node) return;
+    const observer = new ResizeObserver(() => map.relayout());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [map, isMobile]);
 
   // 자전거 코스에서만 카카오 자전거 지도(자전거도로 표시)를 겹쳐 보여줍니다.
   const bicycleOverlayRef = useRef(false);
@@ -123,11 +171,18 @@ function App() {
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isModified]);
 
+  const fitToPoints = useCallback((points) => {
+    if (!map || !points.length) return;
+    const bounds = new window.kakao.maps.LatLngBounds();
+    points.forEach(point => bounds.extend(new window.kakao.maps.LatLng(point.lat, point.lng)));
+    const bottom = isMobile ? sheetPeek + 24 : 48;
+    map.setBounds(bounds, isMobile ? 90 : 48, isMobile ? 64 : 80, bottom, isMobile ? 24 : 48);
+  }, [map, isMobile, sheetPeek]);
+
+  // --- 길찾기 ---
   const cancelRoute = () => {
     routeRequestRef.current?.abort();
     routeRequestRef.current = null;
@@ -135,6 +190,13 @@ function App() {
     setRouteError(null);
   };
   useEffect(() => () => routeRequestRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (!isRouting) return;
+    const onKey = (event) => { if (event.key === 'Escape') cancelRoute(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isRouting]);
 
   const enabledRouteOptions = Object.entries(routeOptionsBySport[sport]).filter(([, on]) => on).map(([id]) => id);
 
@@ -151,11 +213,22 @@ function App() {
     try {
       const segment = await fetchRoutePath(currentMarkers.at(-1), newPoint, { mode, sport, options: enabledRouteOptions }, controller.signal);
       if (routeRequestRef.current !== controller || controller.signal.aborted) return;
-      pushState({ markers: [...currentMarkers, newPoint], polylines: [...currentPolylines, segment] });
-      setIsChartOpen(true);
+      // 점 표시를 실제 길 위(경로의 시작·끝)로 옮겨, 찍은 점이 어느 길에 붙었는지 바로 보이게 합니다.
+      // 출발점으로 복귀할 때는 순환 코스로 인식되도록 출발점 좌표를 그대로 씁니다.
+      const onRoad = (point) => ({ lat: point.lat, lng: point.lng });
+      const closesLoop = newPoint.lat === currentMarkers[0].lat && newPoint.lng === currentMarkers[0].lng;
+      const markers = currentMarkers.length === 1 ? [onRoad(segment[0])] : [...currentMarkers];
+      markers.push(closesLoop ? markers[0] : onRoad(segment.at(-1)));
+      pushState({ markers, polylines: [...currentPolylines, segment] });
     } catch {
       if (routeRequestRef.current === controller && !controller.signal.aborted) {
-        setRouteError({ point: newPoint, mode, message: `${currentSport.label} 경로를 찾지 못했습니다. 다시 시도하거나 직선 연결을 선택하세요.` });
+        setRouteError({
+          point: newPoint,
+          mode,
+          message: mode === 'straight'
+            ? '고도 정보를 가져오지 못했어요. 인터넷 연결을 확인하고 다시 시도하세요.'
+            : `${currentSport.label} 길을 찾지 못했어요. 다시 시도하거나 직선으로 이어보세요.`,
+        });
       }
     } finally {
       if (routeRequestRef.current === controller) {
@@ -164,36 +237,51 @@ function App() {
       }
     }
   };
+
   const handleMapClick = (_target, event) => {
     if (isSportPickerOpen) return;
+    // 모바일에서 시트를 펼친 상태로 지도를 누르면 먼저 시트만 접습니다.
+    if (isMobile && sheetExpanded) { setSheetExpanded(false); return; }
     addPoint({ lat: event.latLng.getLat(), lng: event.latLng.getLng() });
+  };
+
+  const handleMapIdle = (target) => {
+    const center = target.getCenter();
+    writeStored('trazo:view', { lat: center.getLat(), lng: center.getLng(), level: target.getLevel() });
   };
 
   const first = currentMarkers[0];
   const last = currentMarkers.at(-1);
-  const isLoop = currentMarkers.length >= 2 && first.lat === last.lat && first.lng === last.lng;
+  const isLoop = hasCourse && first.lat === last.lat && first.lng === last.lng;
 
   // 마지막 점에서 출발점까지 길을 찾아 순환 코스를 만듭니다.
   const handleCloseLoop = () => {
-    if (currentMarkers.length < 2 || isLoop) return;
+    if (!hasCourse || isLoop) return;
     addPoint({ lat: currentMarkers[0].lat, lng: currentMarkers[0].lng });
   };
 
   // 지금까지 그린 길을 그대로 되짚어 출발점으로 돌아옵니다. 길찾기 요청은 필요 없습니다.
   const handleOutAndBack = () => {
-    if (currentMarkers.length < 2 || routeRequestRef.current || savingRef.current) return;
+    if (!hasCourse || routeRequestRef.current || savingRef.current) return;
     setRouteError(null);
     pushState({
       markers: [...currentMarkers, ...currentMarkers.slice(0, -1).reverse()],
       polylines: [...currentPolylines, ...currentPolylines.slice().reverse().map(segment => segment.slice().reverse())],
     });
+    toast('왕복 코스를 만들었어요.', { tone: 'success' });
   };
 
-  const handleChangeSport = (nextSport) => {
+  // --- 종목 · 설정 ---
+  const handleChangeSport = async (nextSport) => {
     if (nextSport === sport || routeRequestRef.current || savingRef.current) return;
-    if (currentMarkers.length > 0 && !window.confirm(
-      `이 코스를 ${SPORTS[nextSport].label} 코스로 바꿉니다.\n이미 그린 길은 그대로 두고, 다음에 찍는 점부터 ${SPORTS[nextSport].label} 길찾기를 사용합니다.`
-    )) return;
+    if (hasMarkers) {
+      const ok = await confirm({
+        title: `${SPORTS[nextSport].label} 코스로 바꿀까요?`,
+        message: `이미 그린 길은 그대로 두고, 다음에 찍는 점부터 ${SPORTS[nextSport].label} 길찾기를 사용해요.`,
+        confirmLabel: '바꾸기',
+      });
+      if (!ok) return;
+    }
     setRouteError(null);
     setSport(nextSport);
     writeStored('trazo:sport', nextSport);
@@ -203,6 +291,7 @@ function App() {
     setSport(nextSport);
     writeStored('trazo:sport', nextSport);
     setSavedState(prev => ({ ...prev, sport: nextSport }));
+    setHasPickedSport(true);
     setIsSportPickerOpen(false);
   };
 
@@ -222,129 +311,201 @@ function App() {
     });
   };
 
+  const handleToggleElevation = () => {
+    setIsElevationOpen(open => {
+      writeStored('trazo:elevationOpen', !open);
+      return !open;
+    });
+  };
+
+  // --- 계정 ---
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, (nextUser) => {
-      accountRef.current = nextUser?.uid || null;
       setUser(nextUser);
       setAuthLoading(false);
-      setCourseList([]);
-      setIsLoadModalOpen(false);
+      setIsLibraryOpen(false);
       setCurrentId(null);
-    }, (error) => { setAuthError(authErrorMessage(error)); setAuthLoading(false); });
-  }, []);
+    }, (error) => { toast(authErrorMessage(error), { tone: 'error' }); setAuthLoading(false); });
+  }, [toast]);
 
-  const handleAuth = async () => {
-    if (!auth || authBusy || savingRef.current) return;
+  const runAuth = async (action) => {
+    if (!auth || authBusy || savingRef.current) return false;
     setAuthBusy(true);
-    setAuthError('');
-    try { if (user) await logout(); else await loginWithGoogle(); }
-    catch (error) { setAuthError(authErrorMessage(error)); }
+    try { await action(); return true; }
+    catch (error) { toast(authErrorMessage(error), { tone: 'error' }); return false; }
     finally { setAuthBusy(false); }
   };
+  const handleLogin = () => runAuth(loginWithGoogle);
+  const handleLogout = async () => {
+    if (await runAuth(logout)) toast('로그아웃했어요.');
+  };
 
-  const handleSave = async () => {
-    if (!user) return alert('코스를 저장하려면 구글 로그인이 필요합니다.');
-    if (authBusy || routeRequestRef.current || savingRef.current) return;
+  const requireLogin = async (reason) => {
+    if (user) return true;
+    if (!auth) {
+      toast('구글 로그인이 아직 설정되지 않았어요. 관리자에게 문의해주세요.', { tone: 'error' });
+      return false;
+    }
+    const ok = await confirm({ title: '로그인이 필요해요', message: reason, confirmLabel: '구글로 로그인' });
+    return ok && handleLogin();
+  };
+
+  // --- 저장 · 불러오기 ---
+  const handleOpenSave = async () => {
+    if (!hasCourse || isBusy) return;
+    if (!(await requireLogin('코스를 저장하려면 구글 계정으로 로그인하세요. 저장한 코스는 어느 기기에서든 다시 불러올 수 있어요.'))) return;
+    setIsSaveOpen(true);
+  };
+
+  const handleSubmitSave = async ({ mode, title: nextTitle }) => {
+    if (savingRef.current || routeRequestRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
-    const snapshot = { course: JSON.stringify(currentState), sport };
+    const snapshot = { course: JSON.stringify(currentState), sport, title: nextTitle };
     try {
-      if (currentMarkers.length < 2) return alert("저장할 코스가 없어요!");
-
-      if (currentId) {
-        if (window.confirm(`수정된 내용이 있습니다.\n기존 코스 [${currentTitle}]에 덮어쓰시겠습니까?\n('취소'를 누르면 새 이름으로 저장합니다.)`)) {
-          try {
-            await updateCourse(currentId, currentTitle, currentMarkers, currentPolylines, sport);
-            alert("✅ 저장 완료!");
-            setSavedState(snapshot);
-            return;
-          } catch {
-            alert("저장 실패");
-            return;
-          }
-        }
+      if (mode === 'update' && currentId) {
+        await updateCourse(currentId, nextTitle, currentMarkers, currentPolylines, sport);
+      } else {
+        const response = await saveCourse(nextTitle, currentMarkers, currentPolylines, sport);
+        if (response.data.status !== 'success') throw new Error('save failed');
+        setCurrentId(response.data.course_id);
       }
-
-      const title = prompt("새 코스로 저장합니다. 이름을 입력하세요:", currentTitle !== "새 코스" ? currentTitle : currentSport.defaultTitle);
-      if (!title) return;
-
-      try {
-        const response = await saveCourse(title, currentMarkers, currentPolylines, sport);
-        if (response.data.status === 'success') {
-          alert(`✅ 저장 완료!`);
-          setCurrentTitle(title);
-          setCurrentId(response.data.course_id);
-          setSavedState(snapshot);
-        }
-      } catch { alert("저장 실패: 로그인 상태와 서버 연결을 확인하세요."); }
-    } finally { savingRef.current = false; setIsSaving(false); }
-  };
-
-  const handleFetchList = async () => {
-    if (!user) return alert('내 코스를 보려면 구글 로그인이 필요합니다.');
-    const account = user.uid;
-    try {
-      const response = await getCourseList();
-      if (accountRef.current !== account) return;
-      setCourseList(response.data);
-      setIsLoadModalOpen(true);
-    } catch { alert("목록 로드 실패"); }
-  };
-
-  const handleLoadCourse = (course) => {
-    if (savingRef.current) return;
-    if (isModified) {
-      if (!window.confirm("수정 중인 내용이 사라집니다. 불러오시겠습니까?")) return;
+      setTitle(nextTitle);
+      setSavedState(snapshot);
+      setIsSaveOpen(false);
+      toast(mode === 'update' ? '코스를 업데이트했어요.' : '내 코스에 저장했어요.', { tone: 'success' });
+    } catch {
+      toast('저장하지 못했어요. 로그인 상태와 인터넷 연결을 확인하세요.', { tone: 'error' });
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
     }
+  };
 
+  const handleOpenLibrary = async () => {
+    if (!(await requireLogin('저장한 코스를 보려면 구글 계정으로 로그인하세요.'))) return;
+    setIsLibraryOpen(true);
+  };
+
+  const handleLoadCourse = async (course) => {
+    if (savingRef.current) return;
+    if (isModified && course.id !== currentId) {
+      const ok = await confirm({
+        title: '저장하지 않은 코스가 있어요',
+        message: `'${course.title}'을(를) 불러오면 지금 만든 코스의 변경 사항이 사라져요.`,
+        confirmLabel: '불러오기',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
     try {
       const loadedMarkers = JSON.parse(course.markers_json);
       const loadedPolylines = JSON.parse(course.polylines_json);
       const loadedSport = isSport(course.sport) ? course.sport : 'bike';
       cancelRoute();
       reset({ markers: loadedMarkers, polylines: loadedPolylines });
-      if (loadedMarkers.length > 0) setCenter(loadedMarkers[0]);
-      setIsLoadModalOpen(false);
-      setIsChartOpen(true);
-
+      setIsLibraryOpen(false);
       setSport(loadedSport);
       writeStored('trazo:sport', loadedSport);
-      setCurrentTitle(course.title);
+      setTitle(course.title);
       setCurrentId(course.id);
-      setSavedState({ course: JSON.stringify({ markers: loadedMarkers, polylines: loadedPolylines }), sport: loadedSport });
-    } catch { alert("데이터 오류"); }
+      setSavedState({ course: JSON.stringify({ markers: loadedMarkers, polylines: loadedPolylines }), sport: loadedSport, title: course.title });
+      const points = flattenCourse(loadedPolylines);
+      fitToPoints(points.length ? points : loadedMarkers);
+      toast(`'${course.title}'을(를) 불러왔어요.`, { tone: 'success' });
+    } catch {
+      toast('코스 데이터를 읽지 못했어요.', { tone: 'error' });
+    }
   };
 
-  const exportName = currentTitle !== "새 코스" ? currentTitle : currentSport.defaultTitle;
+  const handleCourseRenamed = (id, nextTitle) => {
+    if (id !== currentId) return;
+    setTitle(nextTitle);
+    setSavedState(prev => ({ ...prev, title: nextTitle }));
+  };
 
+  const handleCourseDeleted = (id) => {
+    if (id !== currentId) return;
+    // 지도에 남은 코스는 저장되지 않은 새 코스가 됩니다.
+    setCurrentId(null);
+    setSavedState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
+  };
+
+  // --- 내보내기 ---
   const handleDownloadGpx = () => {
-    if (currentPolylines.length === 0) return alert("경로가 없습니다.");
-    const gpx = buildGpx(currentPolylines, { name: exportName, type: currentSport.gpxType });
-    downloadBlob(new Blob([gpx], { type: 'application/gpx+xml' }), `${safeFileName(exportName)}.gpx`);
+    if (!currentPolylines.length) return;
+    const gpx = buildGpx(currentPolylines, { name: displayTitle, type: currentSport.gpxType });
+    downloadBlob(new Blob([gpx], { type: 'application/gpx+xml' }), `${safeFileName(displayTitle)}.gpx`);
+    toast('GPX 파일을 내려받았어요.', { tone: 'success' });
   };
 
   const handleDownloadTcx = async () => {
-    if (currentPolylines.length === 0) return alert("경로가 없습니다.");
+    if (!currentPolylines.length || isExportingTcx) return;
+    setIsExportingTcx(true);
     try {
-      const response = await downloadTCX(flattenCourse(currentPolylines), { name: exportName, speedKmh: speedBySport[sport] });
-      downloadBlob(new Blob([response.data]), `${safeFileName(exportName)}.tcx`);
-    } catch { alert("TCX 생성 실패"); }
+      const response = await downloadTCX(flattenCourse(currentPolylines), { name: displayTitle, speedKmh: speedBySport[sport] });
+      downloadBlob(new Blob([response.data]), `${safeFileName(displayTitle)}.tcx`);
+      toast('TCX 파일을 내려받았어요.', { tone: 'success' });
+    } catch {
+      toast('TCX 파일을 만들지 못했어요. 잠시 후 다시 시도하세요.', { tone: 'error' });
+    } finally {
+      setIsExportingTcx(false);
+    }
   };
 
-  const handleResetApp = () => {
+  const handleNewCourse = async () => {
     if (savingRef.current) return;
-    if (isModified && !window.confirm("저장하지 않은 코스가 사라집니다. 새 코스를 시작하시겠습니까?")) return;
-
+    if (isModified && hasMarkers) {
+      const ok = await confirm({
+        title: '새 코스를 시작할까요?',
+        message: '저장하지 않은 지금 코스는 사라져요.',
+        confirmLabel: '새로 시작',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
     cancelRoute();
     reset(EMPTY_COURSE);
-    if (hoverMarkerRef.current) hoverMarkerRef.current.setVisible(false);
-
-    setCurrentTitle("새 코스");
+    hoverMarkerRef.current?.setVisible(false);
+    setTitle(null);
     setCurrentId(null);
-    setSavedState({ course: JSON.stringify(EMPTY_COURSE), sport });
+    setSavedState({ course: JSON.stringify(EMPTY_COURSE), sport, title: null });
+    setSheetExpanded(false);
     // 새 코스는 종목부터 고릅니다.
     setIsSportPickerOpen(true);
+  };
+
+  const handleRename = (nextTitle) => setTitle(nextTitle);
+
+  // --- 지도 도구 ---
+  const handleLocate = () => {
+    if (!navigator.geolocation) {
+      toast('이 브라우저에서는 위치 확인을 지원하지 않아요.', { tone: 'error' });
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const point = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setMyLocation(point);
+        map?.setLevel(Math.min(map.getLevel(), 4));
+        map?.panTo(new window.kakao.maps.LatLng(point.lat, point.lng));
+        setIsLocating(false);
+      },
+      (error) => {
+        setIsLocating(false);
+        toast(error.code === error.PERMISSION_DENIED
+          ? '위치 권한이 꺼져 있어요. 브라우저 설정에서 위치 접근을 허용해주세요.'
+          : '현재 위치를 확인하지 못했어요.', { tone: 'error' });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
+  const handleFit = () => {
+    const points = flattenCourse(currentPolylines);
+    fitToPoints(points.length ? points : currentMarkers);
   };
 
   const updateHoverMarker = useCallback((coord) => {
@@ -358,139 +519,220 @@ function App() {
     }
   }, []);
 
+  // --- 화면 조각 ---
+  const summary = (
+    <CourseSummary
+      sport={sport}
+      title={displayTitle}
+      onRename={handleRename}
+      isModified={isModified}
+      isSavedCourse={Boolean(currentId)}
+      stats={stats}
+      speedKmh={speedBySport[sport]}
+      hasCourse={hasCourse}
+      onSave={handleOpenSave}
+      canSave={hasCourse && !isBusy && !authBusy}
+      isSaving={isSaving}
+      onDownloadGpx={handleDownloadGpx}
+      onDownloadTcx={handleDownloadTcx}
+      isExportingTcx={isExportingTcx}
+    />
+  );
+
+  const settings = (
+    <CourseSettings
+      sport={sport}
+      markerCount={currentMarkers.length}
+      isLoop={isLoop}
+      isBusy={isBusy}
+      onCloseLoop={handleCloseLoop}
+      onOutAndBack={handleOutAndBack}
+      onNewCourse={handleNewCourse}
+      isAutoRouting={isAutoRouting}
+      onToggleAutoRouting={setIsAutoRouting}
+      routeOptions={routeOptionsBySport[sport]}
+      onToggleRouteOption={handleToggleRouteOption}
+      onOpenHelp={() => setIsHelpOpen(true)}
+      speedKmh={speedBySport[sport]}
+      onChangeSpeed={handleChangeSpeed}
+    />
+  );
+
+  const sportSwitch = (size) => (
+    <SegmentedControl
+      label="코스 종목"
+      options={SPORT_OPTIONS}
+      value={sport}
+      onChange={handleChangeSport}
+      disabled={isBusy}
+      size={size}
+    />
+  );
+
+  const account = (
+    <AccountButton
+      user={user}
+      configured={Boolean(auth)}
+      loading={authLoading}
+      busy={authBusy}
+      onLogin={handleLogin}
+      onLogout={handleLogout}
+      onOpenLibrary={handleOpenLibrary}
+      compact
+    />
+  );
+
+  const mapArea = (
+    <div className="map-area" ref={mapAreaRef}>
+      <Map
+        center={INITIAL_VIEW.center}
+        level={INITIAL_VIEW.level}
+        className="map-canvas"
+        style={{ width: '100%', height: '100%' }}
+        onClick={handleMapClick}
+        onCreate={setMap}
+        onIdle={handleMapIdle}
+      >
+        {currentPolylines.map((path, idx) => (
+          // 밝은 종목 색이 지도 위에서도 잘 보이도록 짙은 테두리 선을 먼저 그립니다.
+          <Polyline key={`o-${idx}`} path={path} strokeWeight={9} strokeColor={COLORS.primary} strokeOpacity={0.45} strokeStyle="solid" />
+        ))}
+        {currentPolylines.map((path, idx) => (
+          <Polyline key={`l-${idx}`} path={path} strokeWeight={5} strokeColor={currentSport.color} strokeOpacity={0.95} strokeStyle="solid" />
+        ))}
+        {kmMarkers.map(marker => (
+          <CustomOverlayMap key={`km-${marker.km}`} position={marker} zIndex={3}>
+            <div className="km-badge">{marker.km}km</div>
+          </CustomOverlayMap>
+        ))}
+        {currentMarkers.map((pos, idx) => {
+          const isStart = idx === 0;
+          const isEnd = idx === currentMarkers.length - 1 && idx > 0;
+          const image = isStart ? icons.start : isEnd ? icons.end : icons.waypoint;
+          return <MapMarker key={`m-${idx}`} position={pos} zIndex={isStart ? 6 : isEnd ? 5 : 4} image={image} />;
+        })}
+        {myLocation && (
+          <CustomOverlayMap position={myLocation} zIndex={2}>
+            <div className="my-location" aria-label="내 위치" />
+          </CustomOverlayMap>
+        )}
+      </Map>
+
+      {!isSportPickerOpen && !isRouting && !routeError && <MapHint sport={sport} markerCount={currentMarkers.length} />}
+      <RouteStatus
+        sport={sport}
+        isRouting={isRouting}
+        error={routeError}
+        onCancel={cancelRoute}
+        onRetry={() => addPoint(routeError.point, routeError.mode)}
+        onStraight={() => addPoint(routeError.point, 'straight')}
+        onDismiss={() => setRouteError(null)}
+      />
+      <MapControls
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={canUndo && !isBusy}
+        canRedo={canRedo && !isBusy}
+        onLocate={handleLocate}
+        isLocating={isLocating}
+        onFit={handleFit}
+        canFit={hasMarkers}
+      />
+    </div>
+  );
+
+  const hasPolylines = currentPolylines.length > 0;
+  const rootStyle = { '--sport': currentSport.color, '--on-sport': currentSport.onColor, '--sheet-peek': `${sheetPeek}px` };
+
   return (
-    <div style={{ width: '100vw', height: '100dvh', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-        <Map center={center} style={{ width: '100%', height: '100%' }} level={5} onClick={handleMapClick} onCreate={setMap}>
-          {currentPolylines.map((path, idx) => (
-            // 밝은 종목 색이 지도 위에서도 잘 보이도록 짙은 테두리 선을 먼저 그립니다.
-            <Polyline key={`o-${idx}`} path={path} strokeWeight={9} strokeColor={COLORS.primary} strokeOpacity={0.45} strokeStyle={"solid"} />
-          ))}
-          {currentPolylines.map((path, idx) => (
-            <Polyline key={`l-${idx}`} path={path} strokeWeight={5} strokeColor={currentSport.color} strokeOpacity={0.95} strokeStyle={"solid"} />
-          ))}
-          {kmMarkers.map(marker => (
-            <CustomOverlayMap key={`km-${marker.km}`} position={marker} zIndex={3}>
-              <div style={{
-                padding: '1px 6px', borderRadius: '999px', fontSize: '11px', fontWeight: 800,
-                backgroundColor: COLORS.white, color: COLORS.primary, border: `2px solid ${currentSport.color}`,
-                boxShadow: SHADOWS.button, whiteSpace: 'nowrap', pointerEvents: 'none',
-              }}>
-                {marker.km}km
-              </div>
-            </CustomOverlayMap>
-          ))}
-          {currentMarkers.map((pos, idx) => {
-            let imageSrc = ICONS.WAYPOINT;
-            if (idx === 0) imageSrc = ICONS.START;
-            else if (idx === currentMarkers.length - 1) imageSrc = ICONS.END;
-            return <MapMarker key={`m-${idx}`} position={pos} zIndex={idx === 0 ? 5 : 4} image={{ src: imageSrc, size: { width: 20, height: 20 }, options: { offset: { x: 10, y: 10 } } }} />;
-          })}
-        </Map>
-
-        {currentMarkers.length === 0 && !isSportPickerOpen && (
-          <div role="status" style={{
-            position: 'absolute', top: 16, left: 16, zIndex: 5, maxWidth: 'min(360px, calc(100vw - 32px))',
-            backgroundColor: COLORS.white, color: COLORS.textMain, padding: '12px 14px', borderRadius: '10px',
-            boxShadow: SHADOWS.card, borderLeft: `4px solid ${currentSport.color}`, fontSize: '13px', lineHeight: 1.5,
-          }}>
-            <strong>{currentSport.icon} {currentSport.label} 코스 만들기</strong><br />
-            {currentSport.emptyHint}
-          </div>
-        )}
-
-        {(isRouting || routeError) && (
-          <div role={routeError ? 'alert' : 'status'} style={{
-            position: 'absolute', bottom: 20, left: 16, zIndex: 15, maxWidth: 'calc(100vw - 32px)',
-            background: COLORS.white, color: COLORS.textMain, padding: 14, borderRadius: 10, boxShadow: SHADOWS.card,
-            display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13,
-          }}>
-            {isRouting ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {currentSport.icon} {currentSport.label} 길을 찾는 중…
-                <Button size="small" variant="outline" onClick={cancelRoute}>취소</Button>
-              </div>
-            ) : <>
-              <div>{routeError.message}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                <Button size="small" onClick={() => addPoint(routeError.point, routeError.mode)}>재시도</Button>
-                <Button size="small" variant="secondary" onClick={() => addPoint(routeError.point, 'straight')}>직선 연결</Button>
-                <Button size="small" variant="outline" onClick={() => setRouteError(null)}>닫기</Button>
-              </div>
-            </>}
-          </div>
-        )}
-        <ControlPanel
-          sport={sport}
-          onChangeSport={handleChangeSport}
-          markerCount={currentMarkers.length}
-          isLoop={isLoop}
-          stats={stats}
-          speedKmh={speedBySport[sport]}
-          onChangeSpeed={handleChangeSpeed}
-          onUndo={undo}
-          onRedo={redo}
-          canUndo={canUndo && !isRouting && !isSaving}
-          canRedo={canRedo && !isRouting && !isSaving}
-          onCloseLoop={handleCloseLoop}
-          onOutAndBack={handleOutAndBack}
-          onSave={handleSave}
-          onList={handleFetchList}
-          onDownloadGpx={handleDownloadGpx}
-          onDownloadTcx={handleDownloadTcx}
-          onReset={handleResetApp}
-          isAutoRouting={isAutoRouting}
-          onToggleAutoRouting={setIsAutoRouting}
-          routeOptions={routeOptionsBySport[sport]}
-          onToggleRouteOption={handleToggleRouteOption}
-          currentTitle={currentTitle}
-          isModified={isModified}
-          isBusy={isRouting || isSaving}
-          isSaving={isSaving}
-          user={user}
-          authLoading={authLoading}
-          authBusy={authBusy}
-          authError={authError}
-          authConfigured={Boolean(auth)}
-          onAuth={handleAuth}
-        />
-      </div>
-
-      {currentPolylines.length > 0 && (
-        <div style={{ position: 'relative', zIndex: 20 }}>
-          <button
-            onClick={() => setIsChartOpen(!isChartOpen)}
-            style={{
-              position: 'absolute', top: '-30px', right: '20px', height: '30px',
-              backgroundColor: COLORS.white,
-              border: `1px solid ${COLORS.border}`, borderBottom: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer',
-              padding: '0 15px', fontSize: '13px', fontWeight: 'bold', color: COLORS.primary,
-              boxShadow: '0 -3px 5px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}
+    <>
+      {isMobile ? (
+        <div className="app app--mobile" style={rootStyle}>
+          <main className="workspace">{mapArea}</main>
+          <header className="topbar">
+            <Brand compact />
+            {sportSwitch()}
+            {account}
+          </header>
+          <BottomSheet
+            label="코스 정보"
+            peek={summary}
+            expanded={sheetExpanded}
+            onExpandedChange={setSheetExpanded}
+            onPeekHeightChange={setSheetPeek}
           >
-            {isChartOpen ? '▼ 고도 차트 닫기' : '▲ 고도 차트 보기'}
-          </button>
-          <div style={{
-            height: isChartOpen ? '220px' : '0px', transition: 'height 0.3s ease-in-out', overflow: 'hidden',
-            backgroundColor: COLORS.white, borderTop: `1px solid ${COLORS.border}`, display: 'flex', flexDirection: 'row'
-          }}>
-            <div style={{ flex: 1, minWidth: 0, position: 'relative', padding: '10px' }}>
-              <ElevationChart polylines={currentPolylines} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} />
+            {hasPolylines && (
+              <ElevationPanel variant="inline" polylines={currentPolylines} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} />
+            )}
+            {settings}
+            <div className="tool-grid">
+              <Button variant="secondary" icon="folder" onClick={handleOpenLibrary}>내 코스</Button>
+              <Button variant="ghost" icon="help" onClick={() => setIsHelpOpen(true)}>도움말</Button>
             </div>
-            <GradientLegend zones={currentSport.gradeZones} />
-          </div>
+          </BottomSheet>
+        </div>
+      ) : (
+        <div className="app" style={rootStyle}>
+          <aside className="sidebar">
+            <header className="sidebar__header">
+              <Brand />
+              {user && <Button variant="ghost" icon="folder" iconSize={20} onClick={handleOpenLibrary} aria-label="내 코스" title="내 코스" />}
+              {account}
+            </header>
+            <div className="sidebar__body">
+              {sportSwitch('lg')}
+              {summary}
+              {settings}
+            </div>
+            <footer className="sidebar__footer">
+              <span>지도 데이터 © OpenStreetMap 기여자</span>
+              <button type="button" className="link-btn" onClick={() => setIsHelpOpen(true)}>사용법</button>
+            </footer>
+          </aside>
+          <main className="workspace">
+            {mapArea}
+            {hasPolylines && (
+              <ElevationPanel
+                variant="dock"
+                open={isElevationOpen}
+                onToggle={handleToggleElevation}
+                polylines={currentPolylines}
+                zones={currentSport.gradeZones}
+                onHoverPoint={updateHoverMarker}
+              />
+            )}
+          </main>
         </div>
       )}
 
-      <LoadCourseModal
-        isOpen={isLoadModalOpen}
-        onClose={() => setIsLoadModalOpen(false)}
-        courseList={courseList}
-        onLoad={handleLoadCourse}
-        onRefresh={handleFetchList}
+      {isLibraryOpen && (
+        <CourseLibrary
+          key={user?.uid}
+          onClose={() => setIsLibraryOpen(false)}
+          currentId={currentId}
+          onLoad={handleLoadCourse}
+          onRenamed={handleCourseRenamed}
+          onDeleted={handleCourseDeleted}
+        />
+      )}
+      {isSaveOpen && (
+        <SaveCourseDialog
+          open
+          onClose={() => setIsSaveOpen(false)}
+          defaultTitle={displayTitle}
+          existingTitle={currentId ? savedState.title ?? displayTitle : null}
+          onSubmit={handleSubmitSave}
+          isSaving={isSaving}
+        />
+      )}
+      <RoutingHelpDialog open={isHelpOpen} onClose={() => setIsHelpOpen(false)} sport={sport} />
+      <SportPicker
+        open={isSportPickerOpen}
+        onSelect={handlePickSport}
+        onClose={() => setIsSportPickerOpen(false)}
+        isFirstVisit={!hasPickedSport}
       />
-      <SportPicker isOpen={isSportPickerOpen} onSelect={handlePickSport} />
-    </div>
+    </>
   );
 }
 

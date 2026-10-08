@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 
 export function useHistoryState(initialState, isLocked = () => false) {
     const lockRef = useRef(isLocked);
-    lockRef.current = isLocked;
+    useEffect(() => { lockRef.current = isLocked; });
     const [history, setHistory] = useState([initialState]);
     const [step, setStep] = useState(0);
 
@@ -33,6 +33,10 @@ export function useHistoryState(initialState, isLocked = () => false) {
     // 키보드 단축키 지원
     useEffect(() => {
         const handleKeyDown = (e) => {
+            // 글자를 입력하는 중에는 입력란의 되돌리기를 그대로 둡니다.
+            const target = e.target;
+            if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+            if (document.querySelector('[role="dialog"]')) return;
             if (e.ctrlKey || e.metaKey) {
                 if (e.key === 'z' || e.key === 'Z') {
                     if (e.shiftKey) {

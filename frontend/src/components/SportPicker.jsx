@@ -1,60 +1,57 @@
 // src/components/SportPicker.jsx
-// 처음 방문했을 때 어떤 코스를 만들지 고르는 화면
-import React from 'react';
-import { COLORS, SHADOWS } from '../styles/theme';
+// 처음 방문하거나 새 코스를 시작할 때 어떤 코스를 만들지 고르는 화면
 import { SPORTS, SPORT_IDS } from '../sports';
+import Dialog from './ui/Dialog';
+import Icon from './ui/Icon';
+import trazoMark from '../assets/trazo-mark.svg';
 
-const SportPicker = ({ isOpen, onSelect }) => {
-    if (!isOpen) return null;
+const featuresFor = (sport) => [
+    sport.tagline,
+    `${sport.distanceMarkerKm}km마다 거리 표시 · ${sport.speedInput === 'pace' ? '페이스' : '평균 속도'}로 예상 시간`,
+    'GPX·TCX 파일로 내보내기',
+];
 
-    return (
-        <div style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            backgroundColor: 'rgba(11, 79, 87, 0.55)', backdropFilter: 'blur(3px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
-        }}>
-            <div role="dialog" aria-modal="true" aria-labelledby="sport-picker-title" style={{
-                backgroundColor: COLORS.white, borderRadius: '16px', boxShadow: SHADOWS.modal,
-                width: 'min(560px, 100%)', padding: '28px', color: COLORS.textMain,
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '22px', fontWeight: 800, color: COLORS.primary, letterSpacing: '-0.5px' }}>
-                    <img src="/favicon.svg" alt="" width={36} height={36} />
-                    Trazo
-                </div>
-                <h2 id="sport-picker-title" style={{ margin: '6px 0 4px', fontSize: '18px' }}>어떤 코스를 만들까요?</h2>
-                <p style={{ margin: '0 0 20px', fontSize: '13px', color: COLORS.textSub }}>
-                    종목에 맞춰 길을 찾아드려요. 만드는 중에도 패널 위쪽에서 언제든 바꿀 수 있어요.
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                    {SPORT_IDS.map(id => {
-                        const sport = SPORTS[id];
-                        return (
-                            <button
-                                key={id}
-                                onClick={() => onSelect(id)}
-                                style={{
-                                    textAlign: 'left', cursor: 'pointer', padding: '18px',
-                                    borderRadius: '12px', border: `2px solid ${sport.color}`,
-                                    backgroundColor: COLORS.white, color: COLORS.textMain,
-                                    display: 'flex', flexDirection: 'column', gap: '6px',
-                                }}
-                            >
-                                <span style={{ fontSize: '32px', lineHeight: 1 }}>{sport.icon}</span>
-                                <span style={{ fontSize: '16px', fontWeight: 800 }}>{sport.label} 코스 만들기</span>
-                                <span style={{ fontSize: '12px', color: COLORS.textSub, lineHeight: 1.5 }}>{sport.tagline}</span>
-                                <span style={{
-                                    marginTop: '4px', alignSelf: 'flex-start', fontSize: '11px', fontWeight: 700,
-                                    padding: '3px 8px', borderRadius: '999px', backgroundColor: sport.color, color: sport.onColor,
-                                }}>
-                                    {sport.distanceMarkerKm}km마다 거리 표시 · GPX 내보내기
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+const SportPicker = ({ open, onSelect, onClose, isFirstVisit }) => (
+    <Dialog
+        open={open}
+        onClose={onClose}
+        dismissible={!isFirstVisit}
+        size="lg"
+        initialFocus="dialog"
+    >
+        <div className="welcome__brand">
+            <span className="brand__mark"><img src={trazoMark} alt="" /></span>
+            <span className="brand__text">
+                <span className="brand__name">Trazo</span>
+                <span className="brand__tagline">지도 위에 점을 찍어 그리는 나만의 코스</span>
+            </span>
         </div>
-    );
-};
+        <h2 className="dialog__title">어떤 코스를 만들까요?</h2>
+        <p className="welcome__lead">종목에 맞는 길로 점과 점을 이어드려요. 만드는 중에도 위쪽 종목 버튼으로 언제든 바꿀 수 있어요.</p>
+        <div className="sport-cards">
+            {SPORT_IDS.map(id => {
+                const sport = SPORTS[id];
+                return (
+                    <button
+                        key={id}
+                        type="button"
+                        className="sport-card"
+                        style={{ '--card-color': sport.color, '--card-on': sport.onColor }}
+                        onClick={() => onSelect(id)}
+                    >
+                        <span className="sport-card__icon"><Icon name={sport.icon} size={26} /></span>
+                        <span className="sport-card__title">{sport.label} 코스</span>
+                        <ul className="sport-card__features">
+                            {featuresFor(sport).map(text => (
+                                <li key={text}><Icon name="check" size={14} strokeWidth={2.5} />{text}</li>
+                            ))}
+                        </ul>
+                        <span className="sport-card__cta">{sport.label} 코스 만들기 <Icon name="chevron-right" size={16} /></span>
+                    </button>
+                );
+            })}
+        </div>
+    </Dialog>
+);
 
 export default SportPicker;

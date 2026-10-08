@@ -6,7 +6,7 @@ export const SPORTS = {
     bike: {
         id: 'bike',
         label: '자전거',
-        icon: '🚴',
+        icon: 'bike',
         color: COLORS.bike,
         // 경로 위 글자색 (라임 위에는 흰 글씨가 잘 보이지 않음)
         onColor: COLORS.primary,
@@ -37,7 +37,7 @@ export const SPORTS = {
     run: {
         id: 'run',
         label: '러닝',
-        icon: '🏃',
+        icon: 'run',
         color: COLORS.run,
         onColor: COLORS.white,
         tagline: '공원길·강변 산책로처럼 달리기 좋은 길을 우선으로 찾아요',

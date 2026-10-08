@@ -1,27 +1,118 @@
+/* src/index.css
+ * 디자인 토큰과 전역 기본값. 화면별 스타일은 styles/app.css에 있습니다.
+ * 종목 색(--sport, --on-sport)은 App이 현재 종목에 맞춰 최상위 요소에 지정합니다.
+ */
 :root {
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  --c-primary: #0B4F57;
+  --c-primary-hover: #0E5F69;
+  --c-primary-strong: #083C42;
+  --c-primary-soft: #E6F0F1;
+  --c-accent: #8FCE3A;
+  --c-terra: #965A3E;
+  --c-danger: #C0392B;
+  --c-danger-soft: #FBECEA;
+  --c-success: #2E8B57;
+
+  --c-bg: #F3F5F6;
+  --c-surface: #FFFFFF;
+  --c-surface-2: #F6F8F9;
+  --c-surface-3: #EDF1F2;
+  --c-border: #E2E7E9;
+  --c-border-strong: #CBD3D6;
+  --c-text: #15262C;
+  --c-text-2: #536269;
+  --c-text-3: #869399;
+  --c-overlay: rgba(10, 30, 34, 0.48);
+
+  --sport: var(--c-accent);
+  --on-sport: var(--c-primary);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-full: 999px;
+
+  --shadow-1: 0 1px 2px rgba(16, 40, 46, 0.06), 0 1px 3px rgba(16, 40, 46, 0.08);
+  --shadow-2: 0 4px 14px rgba(16, 40, 46, 0.12), 0 1px 3px rgba(16, 40, 46, 0.08);
+  --shadow-3: 0 18px 48px rgba(16, 40, 46, 0.22), 0 4px 12px rgba(16, 40, 46, 0.1);
+  --focus-ring: 0 0 0 3px rgba(11, 79, 87, 0.28);
+
+  --font: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', Roboto, sans-serif;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --sidebar-w: 372px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  font-family: var(--font);
+  font-size: 14px;
   line-height: 1.5;
-  font-weight: 400;
+  color: var(--c-text);
+  background-color: var(--c-bg);
   color-scheme: light;
-  color: #2C3E50;
-  background-color: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
   overflow: hidden;
+  background-color: var(--c-bg);
+  overscroll-behavior: none;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
 }
 
 button {
-  font-family: inherit;
+  cursor: pointer;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+h1, h2, h3, h4, p {
+  margin: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
