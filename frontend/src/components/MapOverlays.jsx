@@ -1,7 +1,8 @@
 // src/components/MapOverlays.jsx
 // 지도 위에 떠 있는 요소: 오른쪽 도구 버튼, 우클릭 메뉴, 처음 안내, 길찾기 진행·실패 알림
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SPORTS } from '../sports';
+import { readStored, writeStored } from '../utils/storage';
 import Button from './ui/Button';
 import Icon from './ui/Icon';
 
@@ -95,11 +96,46 @@ export const MapContextMenu = ({ menu, onClose, onAddWaypoint }) => {
     );
 };
 
+// '이번만 닫기'는 새로고침 전까지, '앞으로도 닫기'는 브라우저에 기억해 계속 숨깁니다.
+const HINT_HIDDEN_KEY = 'trazo.hintHidden';
+let hintClosedThisVisit = false;
+
 export const MapHint = ({ sport, markerCount }) => {
     const current = SPORTS[sport];
+    const [isHidden, setIsHidden] = useState(() => hintClosedThisVisit || readStored(HINT_HIDDEN_KEY, false));
+    const [isAsking, setIsAsking] = useState(false);
+
+    const closeHint = (forever) => {
+        hintClosedThisVisit = true;
+        if (forever) writeStored(HINT_HIDDEN_KEY, true);
+        setIsHidden(true);
+    };
+
     if (markerCount === 0) {
+        if (isHidden) return null;
+        if (isAsking) {
+            return (
+                <div className="map-hint" role="dialog" aria-label="안내 닫기">
+                    <div className="map-hint__title"><Icon name="help" size={18} />앞으로는 안 보이게 해드릴까요?</div>
+                    <p className="map-hint__ask">'앞으로도 닫기'를 누르면 다음에 방문해도 이 안내가 나오지 않아요.</p>
+                    <div className="map-hint__actions">
+                        <Button size="sm" variant="ghost" onClick={() => closeHint(false)}>이번만 닫기</Button>
+                        <Button size="sm" variant="primary" onClick={() => closeHint(true)}>앞으로도 닫기</Button>
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className="map-hint" role="status">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    icon="x"
+                    className="map-hint__close"
+                    onClick={() => setIsAsking(true)}
+                    aria-label="안내 닫기"
+                    title="안내 닫기"
+                />
                 <div className="map-hint__title"><Icon name={current.icon} size={18} />{current.label} 코스 만들기</div>
                 <ol className="map-hint__steps">
                     <li><span className="map-hint__num">1</span>지도를 눌러 출발점을 찍어요.</li>
