@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /map-tiles/
 
-Sitemap: https://trazo.kro.kr/sitemap.xml
+Sitemap: https://trazo.runvia.app/sitemap.xml

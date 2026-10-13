@@ -1,6 +1,6 @@
 # Trazo 검색 노출 운영 안내
 
-소유권 인증은 완료됐더라도 페이지 수집·색인·검색 순위는 별도입니다. 이번 변경은 검색엔진이 읽을 수 있는 서비스 본문과 한국어·영어 안내 페이지를 제공하고, 검색 설정 파일과 대표 URL을 명시합니다. 순위나 색인 시점을 보장하지 않습니다. 운영 사이트는 이 작업 환경에서 DNS 조회 및 웹 도구 접근에 실패했으므로, 현재 서비스 장애나 검색 제외 여부를 확정할 수 없습니다.
+소유권 인증은 완료됐더라도 페이지 수집·색인·검색 순위는 별도입니다. 이번 변경은 검색엔진이 읽을 수 있는 서비스 본문과 한국어·영어 안내 페이지를 제공하고, 검색 설정 파일과 대표 URL을 명시합니다. 순위나 색인 시점을 보장하지 않습니다. 운영 검증은 실제 도메인 `trazo.runvia.app`을 기준으로 진행합니다. 이전에 다른 도메인을 대상으로 얻은 접속 실패 결과는 실제 서비스 상태를 설명하지 않습니다.
 
 ## 코드에 반영한 항목
 
@@ -24,20 +24,20 @@
 기존 배포 절차로 프론트엔드 및 백엔드를 재빌드·배포합니다. CDN에 이전 HTML·404 응답이 남아 있다면 해당 URL 캐시를 갱신합니다. 운영 서버 배포와 검색엔진 계정 제출은 이 로컬 수정에 포함되지 않았습니다.
 
 ```bash
-curl -i https://trazo.kro.kr/robots.txt
-curl -i https://trazo.kro.kr/sitemap.xml
-curl -i https://trazo.kro.kr/guide/
-curl -i https://trazo.kro.kr/en/guide/
-curl -i https://trazo.kro.kr/this-page-does-not-exist
-curl -s https://trazo.kro.kr/
+curl -i https://trazo.runvia.app/robots.txt
+curl -i https://trazo.runvia.app/sitemap.xml
+curl -i https://trazo.runvia.app/guide/
+curl -i https://trazo.runvia.app/en/guide/
+curl -i https://trazo.runvia.app/this-page-does-not-exist
+curl -s https://trazo.runvia.app/
 ```
 
 앞의 네 URL은 200, 없는 주소는 404여야 합니다. robots.txt는 text/plain, 사이트맵은 XML이어야 하며, HTML이나 Cloudflare 인증 화면이면 안 됩니다. 홈 HTML에 SSI 주석으로 만든 중복 제목이 남지 않았는지, canonical·robots·설명·OG 태그가 한 벌씩 있는지 확인합니다. 공유 코스도 기존 미리보기 제목·이미지가 유지되고 noindex가 나오는지 확인합니다. `/guide`와 `/en/guide`에서 슬래시가 붙은 주소로 이동할 때 HTTPS와 대표 도메인이 유지되는지도 확인합니다. 외부 프록시에서 HTTPS를 종료하는 구성이라면 리디렉션의 Location 헤더를 특히 확인합니다.
 
 ## 검색엔진에 제출할 작업
 
-1. **Google Search Console**: 사이트맵 `https://trazo.kro.kr/sitemap.xml`을 제출합니다. 홈, `/guide/`, `/en/guide/` 각각 URL 검사 → 실제 URL 테스트를 수행하고 색인 생성을 요청합니다. 페이지 색인 보고서에서 제외 사유와 Google이 선택한 canonical을 확인합니다. 인증 성공만으로 색인이 완료된 것은 아닙니다.
-2. **네이버 서치어드바이저**: `https://trazo.kro.kr`을 등록하고 소유권을 확인합니다. 요청 → 사이트맵 제출에 같은 사이트맵을 넣고 웹페이지 수집 요청으로 홈과 한국어 안내를 요청합니다. DNS 인증을 Google에서 완료했더라도 네이버 인증은 별도입니다. 네이버가 제공하는 HTML 파일/메타 태그는 실제 값을 받은 뒤 적용합니다.
+1. **Google Search Console**: 사이트맵 `https://trazo.runvia.app/sitemap.xml`을 제출합니다. 홈, `/guide/`, `/en/guide/` 각각 URL 검사 → 실제 URL 테스트를 수행하고 색인 생성을 요청합니다. 페이지 색인 보고서에서 제외 사유와 Google이 선택한 canonical을 확인합니다. 인증 성공만으로 색인이 완료된 것은 아닙니다.
+2. **네이버 서치어드바이저**: `https://trazo.runvia.app`을 등록하고 소유권을 확인합니다. 요청 → 사이트맵 제출에 같은 사이트맵을 넣고 웹페이지 수집 요청으로 홈과 한국어 안내를 요청합니다. DNS 인증을 Google에서 완료했더라도 네이버 인증은 별도입니다. 네이버가 제공하는 HTML 파일/메타 태그는 실제 값을 받은 뒤 적용합니다.
 3. **Bing Webmaster Tools**: 이미 인증한 Google Search Console 사이트를 가져오거나 직접 소유권을 확인합니다. 사이트맵 제출 및 URL 검사로 수집 상태를 확인합니다.
 4. **Cloudflare**: Security Events에서 실제 Googlebot·Bingbot·Yeti 요청이 차단되거나 Challenge 대상인지 확인합니다. 국가 제한·WAF·봇 규칙에서 검증된 검색 로봇을 고려합니다. User-Agent 문자열만으로 무조건 허용하지 않습니다. robots.txt 최종 응답에 Cloudflare가 추가한 차단 규칙이 있는지도 확인합니다.
 
@@ -55,4 +55,4 @@ curl -s https://trazo.kro.kr/
 
 ## 로컬 검증 결과
 
-프론트엔드 빌드·린트, 백엔드 단위 테스트 17개, 빌드된 안내 페이지의 메타·canonical·hreflang·사이트맵 검증을 통과했습니다. 임시 nginx 컨테이너에서 홈 및 안내 페이지 200, robots.txt text/plain, 사이트맵 XML, 없는 URL 404, 홈 SSI 처리와 공유 링크 백엔드 장애 시 noindex fallback을 확인했습니다. 운영 사이트 HTTP 응답 및 검색엔진 계정의 실제 색인 상태는 확인하지 못했습니다.
+프론트엔드 빌드·린트, 백엔드 단위 테스트 17개, 빌드된 안내 페이지의 메타·canonical·hreflang·사이트맵 검증을 통과했습니다. 임시 nginx 컨테이너에서 홈 및 안내 페이지 200, robots.txt text/plain, 사이트맵 XML, 없는 URL 404, 홈 SSI 처리와 공유 링크 백엔드 장애 시 noindex fallback을 확인했습니다. 도메인 수정 과정에서 운영 `https://trazo.runvia.app/robots.txt`를 curl로 요청한 결과 HTTP 200이지만 text/html과 이전 앱 HTML이 반환됐습니다. 이번 검색 설정 변경이 반영된 프론트엔드 재빌드·재배포와 해당 URL의 CDN 캐시 갱신 후 다시 확인해야 합니다. 검색엔진 계정의 실제 색인 상태는 확인하지 못했습니다.
