@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} | Trazo {{ sport }} 코스</title>
+  <meta name="description" content="{{ summary }}">
+  <meta name="robots" content="{{ robots }}">
+  <link rel="canonical" href="{{ url }}">
+  <link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/course-landing.css">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="Trazo"><meta property="og:locale" content="ko_KR">
+  <meta property="og:title" content="{{ title }} | Trazo {{ sport }} 코스"><meta property="og:description" content="{{ summary }}">
+  <meta property="og:url" content="{{ url }}"><meta property="og:image" content="https://trazo.runvia.app/og-image.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="900"><meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{ title }}"><meta name="twitter:description" content="{{ summary }}"><meta name="twitter:image" content="https://trazo.runvia.app/og-image.png">
+</head>
+<body>
+  <header><a class="brand" href="/">Trazo<span>점을 찍어 그리는 나만의 코스</span></a><a href="/guide/">사용 안내</a></header>
+  <main>
+    <section class="hero"><p class="eyebrow">{{ sport }} · {{ visibility }}</p><h1>{{ title }}</h1><p class="author">{{ nickname }}님이 공유한 코스</p>{% if description %}<p class="description">{{ description }}</p>{% endif %}<div class="hero-action"><p>거리 {{ distance }}km · 상승 고도 {{ ascent }}m</p><a class="button" href="{{ start_url }}">내 코스에 담고 편집하기</a></div></section>
+    <div class="layout"><div>
+      <section class="card map-card"><h2>코스 경로</h2><div id="course-map"><svg viewBox="0 0 800 440" role="img" aria-label="{{ title }} 경로 모양 미리보기"><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#dce7e2"/></pattern></defs><rect width="800" height="440" fill="url(#grid)"/><polyline points="{{ route_svg }}" fill="none" stroke="#0b616a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><p class="muted">지도 로딩 전에는 경로 모양을 보여줍니다. 현장의 통행 가능 여부를 확인하세요.</p></section>
+      <section class="card"><h2>고도 프로필</h2>{% if elevation_svg %}<svg class="elevation" viewBox="0 0 800 160" role="img" aria-label="코스 진행 방향의 고도 변화"><polyline points="{{ elevation_svg }}" fill="none" stroke="#0b616a" stroke-width="3"/></svg><p class="muted">최저 {{ min_ele }}m · 최고 {{ max_ele }}m</p>{% else %}<p>고도 정보가 없는 코스입니다.</p>{% endif %}</section>
+    </div><aside>
+      <section class="card"><h2>코스 한눈에 보기</h2><dl><div><dt>거리</dt><dd>{{ distance }}<small>km</small></dd></div><div><dt>상승 고도</dt><dd>{{ ascent }}<small>m</small></dd></div><div><dt>내 코스에 담은 사람</dt><dd>{{ copies }}<small>명</small></dd></div></dl><a class="button" href="{{ start_url }}">내 코스에 담고 편집하기</a><p class="muted">구글 로그인 후 내 코스에 저장하세요. 나만의 경로로 수정하고 GPX·FIT·TCX로 내려받을 수 있어요.</p><a class="secondary" href="{{ view_url }}">지도에서 자세히 보기</a></section>
+      <section class="card"><h2>이 코스에서 나만의 코스로</h2><p>출발점을 바꾸거나 경유점을 추가해 보세요. 거리와 고도를 확인하며 자전거·러닝 코스를 계획할 수 있어요.</p><a href="/guide/">Trazo 사용 방법 →</a></section>
+    </aside></div>
+    {% if related %}<section class="related"><h2>함께 둘러볼 공개 코스</h2><div class="related-grid">{% for item in related %}<a class="card" href="/c/{{ item.token }}"><strong>{{ item.title }}</strong><span>{{ item.sport }}</span></a>{% endfor %}</div></section>{% endif %}
+  </main>
+  <footer><a href="/">Trazo에서 새 코스 만들기</a><a href="/en/guide/" lang="en">English guide</a></footer>
+  <script id="course-data" type="application/json">{{ map_json | safe }}</script>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=c3b4179a9bd3e0eb5e124c5e0cc5da49&amp;autoload=false" defer></script>
+  <script src="/course-landing.js" defer></script>
+</body>
+</html>

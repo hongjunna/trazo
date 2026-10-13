@@ -24,13 +24,14 @@ const Stat = ({ label, value, unit }) => (
 
 // userId: 로그인한 계정(없으면 null). 로그인 상태가 바뀌면 좋아요·내 코스 여부를 다시 받습니다.
 // onChange: 담기·좋아요·댓글 수가 바뀌면 커뮤니티 목록에도 알려줍니다.
-const SharedCourseDialog = ({ token, userId, ensureMember, onOpenCourse, onChange, onClose }) => {
+const SharedCourseDialog = ({ token, userId, memberReady, ensureMember, onOpenCourse, onChange, onClose }) => {
     const { toast, confirm } = useFeedback();
     // 응답을 요청한 토큰·계정과 함께 보관해, 다른 코스나 계정의 응답이 섞이지 않게 합니다.
     const [result, setResult] = useState(null);
     const [hoverPoint, setHoverPoint] = useState(null);
     const [isAdding, setIsAdding] = useState(false);
     const [likeBusy, setLikeBusy] = useState(false);
+    const [pendingAdd, setPendingAdd] = useState(() => new URLSearchParams(window.location.search).get('action') === 'save');
     const requestKey = `${token}:${userId ?? ''}`;
 
     useEffect(() => {
@@ -60,8 +61,20 @@ const SharedCourseDialog = ({ token, userId, ensureMember, onOpenCourse, onChang
     };
 
     const handleAdd = async () => {
-        if (await ensureMember('코스를 내 코스에 담으려면 구글 계정으로 로그인하세요.')) setIsAdding(true);
+        setPendingAdd(true);
+        if (await ensureMember('코스를 내 코스에 담으려면 구글 계정으로 로그인하세요.')) {
+            setPendingAdd(false);
+            setIsAdding(true);
+        }
     };
+
+    // 첫 가입의 닉네임 입력까지 끝나면 선택했던 코스 담기를 이어갑니다.
+    useEffect(() => {
+        if (pendingAdd && memberReady && course && !course.is_owner && !stale) {
+            setPendingAdd(false);
+            setIsAdding(true);
+        }
+    }, [pendingAdd, memberReady, course, stale]);
 
     const submitAdd = async (folderId) => {
         try {

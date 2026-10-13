@@ -7,6 +7,19 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '^/c/': {
+        target: process.env.DEV_API_PROXY || 'http://localhost:8001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/c\//, '/pages/c/').replace(/\/$/, ''),
+      },
+      '^/sitemap\\.xml$': {
+        target: process.env.DEV_API_PROXY || 'http://localhost:8001',
+        rewrite: () => '/seo/sitemap.xml',
+      },
+      '^/sitemap-courses-[0-9]+\\.xml$': {
+        target: process.env.DEV_API_PROXY || 'http://localhost:8001',
+        rewrite: (path) => path.replace(/^\/sitemap-courses-([0-9]+)\.xml$/, '/seo/sitemap-courses/$1.xml'),
+      },
       '/api': {
         target: process.env.DEV_API_PROXY || 'http://localhost:8001',
         changeOrigin: true,

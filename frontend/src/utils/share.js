@@ -4,12 +4,12 @@
 export const VISIBILITY = {
     private: { label: '비공개', icon: 'lock', desc: '나만 볼 수 있어요.' },
     link: { label: '링크 공유', icon: 'link', desc: '링크를 받은 사람만 볼 수 있어요. 커뮤니티에는 올라가지 않아요.' },
-    public: { label: '전체 공개', icon: 'globe', desc: '커뮤니티에 올라가 누구나 보고 좋아요·댓글을 남길 수 있어요.' },
+    public: { label: '전체 공개', icon: 'globe', desc: '커뮤니티에 올라가 누구나 보고 좋아요·댓글을 남길 수 있어요. 검색엔진에도 노출될 수 있어요.' },
 };
 export const VISIBILITY_IDS = Object.keys(VISIBILITY);
 export const visibilityOf = (course) => (VISIBILITY[course?.visibility] ? course.visibility : 'private');
 
-// 공유 링크는 /c/<토큰> 형식입니다. 서버(Nginx·Vite)는 모든 경로에 같은 화면을 돌려줍니다.
+// 공유 링크 /c/<토큰>은 서버 랜딩페이지, 앱의 ?course=<토큰>은 공유 코스 뷰어로 연결합니다.
 const SHARE_PATH = /^\/c\/([A-Za-z0-9_-]{6,64})\/?$/;
 export const shareTokenFromPath = (pathname) => SHARE_PATH.exec(pathname)?.[1] ?? null;
 export const sharePath = (token) => `/c/${token}`;

@@ -46,7 +46,8 @@ const INITIAL_VIEW = storedView && Number.isFinite(storedView.lat) && Number.isF
   ? { center: { lat: storedView.lat, lng: storedView.lng }, level: Number.isInteger(storedView.level) ? storedView.level : 5 }
   : { center: { lat: 37.521285, lng: 126.999852 }, level: 5 };
 // 공유 링크(/c/<토큰>)로 들어오면 공유받은 코스부터 보여줍니다.
-const INITIAL_SHARE_TOKEN = shareTokenFromPath(window.location.pathname);
+const INITIAL_SHARE_TOKEN = shareTokenFromPath(window.location.pathname)
+  ?? shareTokenFromPath(`/c/${new URLSearchParams(window.location.search).get('course') ?? ''}`);
 
 const initialRouteOptions = () => {
   const stored = readStored('trazo:routeOptions', {});
@@ -1374,6 +1375,7 @@ function App() {
         <SharedCourseDialog
           token={sharedToken}
           userId={user?.uid ?? null}
+          memberReady={Boolean(user && nickname)}
           ensureMember={ensureMember}
           onOpenCourse={handleOpenCopiedCourse}
           onClose={() => {

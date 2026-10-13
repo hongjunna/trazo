@@ -226,6 +226,70 @@ class CommunityTests(unittest.TestCase):
             self.assertIn('<meta name="robots" content="noindex, follow" />', html)
             self.assertIn('<meta property="og:title" content="Trazo (트라소) | 점을 찍어 그리는 나만의 코스" />', html)
 
+    def test_public_course_landing_and_visibility_changes(self):
+        self.nickname(self.owner, '라이더')
+        course = self.create(visibility='public', title='한강 <script>alert(1)</script>', description='출발점과 풍경 설명')
+        token = course['share_token']
+        self.client.put(f"/courses/{course['id']}", headers=self.owner, json={'description': '출발점과 풍경 설명'})
+        page = self.client.get(f'/pages/c/{token}')
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(self.client.head(f'/pages/c/{token}').status_code, 200)
+        self.assertEqual(page.headers['cache-control'], 'no-store')
+        self.assertIn('index, follow, max-image-preview:large', page.text)
+        self.assertIn(f'https://trazo.runvia.app/c/{token}', page.text)
+        self.assertIn('한강 &lt;script&gt;alert(1)&lt;/script&gt;', page.text)
+        self.assertNotIn('<script>alert(1)</script>', page.text)
+        self.assertIn('출발점과 풍경 설명', page.text)
+        self.assertIn('고도 프로필', page.text)
+        self.assertIn(f'/?course={token}&amp;action=save', page.text)
+        self.client.put(f"/courses/{course['id']}", headers=self.owner, json={'visibility': 'link'})
+        self.assertIn('noindex, follow', self.client.get(f'/pages/c/{token}').text)
+        self.client.put(f"/courses/{course['id']}", headers=self.owner, json={'visibility': 'private'})
+        denied = self.client.get(f'/pages/c/{token}')
+        self.assertEqual(denied.status_code, 404)
+        self.assertNotIn('풍경 설명', denied.text)
+        self.assertEqual(denied.headers['x-robots-tag'], 'noindex')
+        self.assertEqual(self.client.get('/pages/c/unknown123').status_code, 404)
+
+    def test_sitemaps_only_include_public_live_courses(self):
+        self.nickname(self.owner, '라이더')
+        public = self.create(visibility='public')
+        linked = self.create(visibility='link')
+        deleted = self.create(visibility='public')
+        self.client.delete(f"/courses/{deleted['id']}", headers=self.owner)
+        index = self.client.get('/seo/sitemap.xml')
+        self.assertEqual(index.status_code, 200)
+        self.assertEqual(self.client.head('/seo/sitemap.xml').status_code, 200)
+        self.assertIn('/sitemap-pages.xml', index.text)
+        self.assertIn('/sitemap-courses-1.xml', index.text)
+        sitemap = self.client.get('/seo/sitemap-courses/1.xml')
+        xml = ElementTree.fromstring(sitemap.text)
+        urls = [item.text for item in xml.iter('{http://www.sitemaps.org/schemas/sitemap/0.9}loc')]
+        self.assertEqual(urls, [f"https://trazo.runvia.app/c/{public['share_token']}"])
+        self.assertNotIn(linked['share_token'], sitemap.text)
+        self.assertNotIn(deleted['share_token'], sitemap.text)
+        self.assertEqual(self.client.get('/seo/sitemap-courses/2.xml').status_code, 404)
+        self.assertEqual(self.client.get('/seo/sitemap-courses/0.xml').status_code, 404)
+        self.client.put(f"/courses/{public['id']}", headers=self.owner, json={'visibility': 'private'})
+        self.assertNotIn('/sitemap-courses-1.xml', self.client.get('/seo/sitemap.xml').text)
+
+    def test_sitemap_pagination_and_related_course_privacy(self):
+        from unittest.mock import patch
+        self.nickname(self.owner, '라이더')
+        first = self.create(visibility='public')
+        second = self.create(visibility='public', title='공개 추천 코스')
+        hidden = self.create(visibility='link', title='숨겨진 링크 코스')
+        with patch.object(api, 'SITEMAP_PAGE_SIZE', 1):
+            index = self.client.get('/seo/sitemap.xml').text
+            self.assertIn('/sitemap-courses-2.xml', index)
+            self.assertNotIn('/sitemap-courses-3.xml', index)
+            self.assertIn(first['share_token'], self.client.get('/seo/sitemap-courses/1.xml').text)
+            self.assertIn(second['share_token'], self.client.get('/seo/sitemap-courses/2.xml').text)
+        page = self.client.get(f"/pages/c/{first['share_token']}").text
+        self.assertIn('공개 추천 코스', page)
+        self.assertNotIn(hidden['share_token'], page)
+        self.assertNotIn('숨겨진 링크 코스', page)
+
     def test_visibility_and_shared_access(self):
         private = self.create()
         self.assertEqual(private['visibility'], 'private')

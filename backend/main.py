@@ -711,8 +711,7 @@ def read_shared_course(token: str, session: Session = Depends(get_session), user
     }
 
 # --- 링크 미리보기 (카카오톡·페이스북 등) ---
-# 미리보기를 만드는 서비스는 자바스크립트를 실행하지 않으므로, 공유 링크(/c/<토큰>)의 index.html에
-# nginx SSI가 이 태그 조각을 끼워 넣습니다(frontend/nginx.conf). 코스 이름이 제목, 서비스 소개가 부제목이 됩니다.
+# 이전 SSI 미리보기 API는 호환성을 위해 유지합니다. /c/<토큰>은 아래 서버 렌더링 페이지를 제공합니다.
 SITE_NAME = "Trazo"
 SITE_TAGLINE = "점을 찍어 그리는 나만의 코스"
 SPORT_LABELS = {"bike": "자전거", "run": "러닝"}
@@ -774,6 +773,53 @@ def shared_course_preview(token: str, request: HTTPRequest, session: Session = D
         # 공개 범위를 바꾸면 바로 반영되도록 오래 저장하지 않습니다.
         headers={"Cache-Control": "public, max-age=300"},
     )
+
+# --- 검색용 사이트맵과 공유 코스 랜딩페이지 ---
+PUBLIC_SITE_URL = "https://trazo.runvia.app"
+SITEMAP_PAGE_SIZE = 10000
+
+def public_course_query():
+    return select(Course).where(Course.visibility == "public", Course.is_deleted == False, Course.share_token != None)
+
+def sitemap_response(content):
+    return Response(content='<?xml version="1.0" encoding="UTF-8"?>\n' + content,
+                    media_type="application/xml", headers={"Cache-Control": "no-store"})
+
+@app.api_route("/seo/sitemap.xml", methods=["GET", "HEAD"])
+def sitemap_index(session: Session = Depends(get_session)):
+    count = session.exec(select(func.count()).select_from(Course).where(
+        Course.visibility == "public", Course.is_deleted == False, Course.share_token != None)).one()
+    urls = [PUBLIC_SITE_URL + "/sitemap-pages.xml"] + [
+        f"{PUBLIC_SITE_URL}/sitemap-courses-{page}.xml" for page in range(1, math.ceil(count / SITEMAP_PAGE_SIZE) + 1)]
+    return sitemap_response('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+        ''.join(f'<sitemap><loc>{escape(url)}</loc></sitemap>' for url in urls) + '</sitemapindex>')
+
+@app.api_route("/seo/sitemap-courses/{page}.xml", methods=["GET", "HEAD"])
+def course_sitemap(page: int, session: Session = Depends(get_session)):
+    if page < 1:
+        raise HTTPException(status_code=404, detail="Sitemap not found")
+    courses = session.exec(public_course_query().order_by(Course.id).offset((page-1)*SITEMAP_PAGE_SIZE).limit(SITEMAP_PAGE_SIZE)).all()
+    if not courses:
+        raise HTTPException(status_code=404, detail="Sitemap not found")
+    return sitemap_response('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+        ''.join(f'<url><loc>{PUBLIC_SITE_URL}/c/{escape(course.share_token)}</loc></url>' for course in courses) + '</urlset>')
+
+@app.api_route("/pages/c/{token}", methods=["GET", "HEAD"])
+def shared_course_page(token: str, session: Session = Depends(get_session)):
+    try:
+        course = get_shared_course(session, token)
+    except HTTPException:
+        return Response(content='<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="robots" content="noindex"><title>코스를 볼 수 없어요 | Trazo</title></head><body><h1>코스를 볼 수 없어요</h1><p>공유가 해제됐거나 삭제된 코스입니다.</p><a href="/">Trazo에서 코스 만들기</a></body></html>',
+                        status_code=404, media_type="text/html", headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
+    # 비공개/링크 공유 코스는 관련 코스 목록에도 노출하지 않습니다.
+    related = session.exec(public_course_query().where(Course.id != course.id, Course.sport == course.sport).order_by(Course.id.desc()).limit(3)).all()
+    try:
+        from .course_pages import render_course_page
+    except ImportError:
+        from course_pages import render_course_page
+    content = render_course_page(course, course_summary(course), nickname_of(session, course.firebase_uid),
+        [{"token": item.share_token, "title": item.title, "sport": SPORT_LABELS.get(item.sport, "자전거")} for item in related])
+    return Response(content=content, media_type="text/html", headers={"Cache-Control": "no-store"})
 
 @app.post("/shared/{token}/copy")
 def copy_shared_course(token: str, data: CopyCourseRequest, session: Session = Depends(get_session), user_id: str = Depends(get_google_user)):
