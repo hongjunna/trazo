@@ -211,6 +211,7 @@ class CommunityTests(unittest.TestCase):
         token = self.client.put(f"/courses/{course['id']}", headers=self.owner, json={'visibility': 'link'}).json()['course']['share_token']
         headers = {'Host': 'trazo.runvia.app'}
         html = self.client.get(f'/og/c/{token}', headers=headers).text
+        self.assertIn('<meta name="robots" content="noindex, follow" />', html)
         # 코스 이름이 제목, 서비스 소개가 부제목이 되고, 주소는 접속한 도메인을 따릅니다.
         self.assertIn('<title>2025 춘천 "그란폰도" &lt;122km&gt;</title>', html)
         self.assertIn('<meta property="og:title" content="2025 춘천 &quot;그란폰도&quot; &lt;122km&gt;" />', html)
@@ -222,6 +223,7 @@ class CommunityTests(unittest.TestCase):
         for path in (f'/og/c/{token}', '/og/c/unknown12345'):
             html = self.client.get(path, headers=headers).text
             self.assertNotIn('그란폰도', html)
+            self.assertIn('<meta name="robots" content="noindex, follow" />', html)
             self.assertIn('<meta property="og:title" content="Trazo (트라소) | 점을 찍어 그리는 나만의 코스" />', html)
 
     def test_visibility_and_shared_access(self):

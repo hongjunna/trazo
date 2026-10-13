@@ -14,6 +14,7 @@ const RoutingHelpDialog = ({ open, onClose, sport }) => {
             footer={<Button variant="primary" onClick={onClose} data-autofocus>확인</Button>}
             initialFocus="dialog"
         >
+            <p><a href="/guide/">서비스 소개와 사용 안내</a> · <a href="/en/guide/" lang="en">English guide</a></p>
             <div className="help-block">
                 <h3><Icon name="route" size={16} />{current.label} 길 따라 연결</h3>
                 <p>점과 점 사이를 <b>{current.label}에 맞는 길로 자동 연결</b>해요. {current.tagline}.</p>

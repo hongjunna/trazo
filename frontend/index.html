@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko-kr">
+<html lang="ko">
 
 <head>
   <meta charset="UTF-8" />
@@ -10,29 +10,35 @@
   <!--
     카카오톡·페이스북·슬랙 등의 링크 미리보기 (이미지 원본은 design/og-image.html).
     운영 nginx가 SSI로 처리합니다: 공유 코스 링크(/c/<토큰>)는 백엔드가 만든 코스 이름 태그를 넣고,
-    다른 주소는 아래 기본 태그를 접속한 도메인 기준으로 씁니다. 개발 서버에서는 SSI 주석이 그대로 남습니다.
+    홈은 아래 기본 태그와 대표 도메인 trazo.kro.kr을 사용합니다. 개발 서버에서는 SSI 주석이 그대로 남습니다.
   -->
   <!--# if expr="$request_uri = /^\/c\/([A-Za-z0-9_-]{6,64})(?:[\/?]|\z)/" -->
   <!--# block name="og_fallback" -->
-  <title>Trazo (트라소) | 점을 찍어 그리는 나만의 자전거·러닝 코스</title><!--# endblock -->
+  <title>Trazo (트라소) | 자전거·러닝 코스 만들기</title>
+  <meta name="robots" content="noindex, follow" /><!--# endblock -->
   <!--# include virtual="/api/og/c/$1" stub="og_fallback" -->
   <!--# else -->
-  <title>Trazo (트라소) | 점을 찍어 그리는 나만의 자전거·러닝 코스</title>
+  <title>Trazo (트라소) | 자전거·러닝 코스 만들기 · GPX 경로 플래너</title>
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://trazo.kro.kr/" />
   <meta name="description"
     content="지도 위에 점을 찍어 자전거·러닝 코스를 만드는 Trazo(트라소). 종목에 맞는 길찾기로 경로와 고도를 확인하고 GPX·FIT 파일로 내려받으세요." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Trazo" />
   <meta property="og:locale" content="ko_KR" />
-  <meta property="og:url" content="https://<!--# echo var='host' default='' -->/" />
+  <meta property="og:url" content="https://trazo.kro.kr/" />
   <meta property="og:title" content="Trazo (트라소) | 점을 찍어 그리는 나만의 코스" />
   <meta property="og:description"
     content="지도 위에 점을 찍어 그리는 나만의 자전거·러닝 코스. 종목에 맞는 길찾기로 경로와 고도를 확인하고 GPX·FIT 파일로 내려받으세요." />
-  <meta property="og:image" content="https://<!--# echo var='host' default='' -->/og-image.png" />
+  <meta property="og:image" content="https://trazo.kro.kr/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="900" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Trazo (트라소) | 점을 찍어 그리는 나만의 코스" />
-  <meta name="twitter:image" content="https://<!--# echo var='host' default='' -->/og-image.png" />
+  <meta name="twitter:image" content="https://trazo.kro.kr/og-image.png" />
+  <meta name="twitter:description" content="한국의 자전거·러닝 코스를 만들고 거리와 고도를 확인하세요. GPX·FIT·TCX 파일로 내보내기와 코스 공유를 지원합니다." />
+  <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "Trazo", "alternateName": "트라소", "url": "https://trazo.kro.kr/", "inLanguage": "ko", "description": "한국의 자전거·러닝 코스를 만들고 고도를 확인하는 경로 플래너"}</script>
   <!--# endif -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="stylesheet"
@@ -41,7 +47,13 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <main>
+      <h1>Trazo (트라소) — 자전거·러닝 코스 만들기</h1>
+      <p>한국 지도에 점을 찍어 자전거와 러닝 경로를 계획하고 거리, 상승 고도, 경사도와 예상 시간을 확인하세요. GPX·FIT·TCX·KML·GeoJSON 파일을 불러와 편집하거나 내려받고, 구글 로그인으로 내 코스를 저장하고 공유할 수 있습니다.</p>
+      <p><a href="/guide/">서비스 소개와 사용 방법</a> · <a href="/en/guide/" lang="en">Cycling &amp; running route planner for South Korea — English guide</a></p>
+    </main>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 

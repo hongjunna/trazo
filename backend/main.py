@@ -732,6 +732,8 @@ def preview_tags(base: str, path: str, title: str, description: str) -> str:
     image = f"{base}/og-image.png"
     meta = [
         ("name", "description", description),
+        # 공유 페이지는 링크 공유/비공개 전환을 지원하므로 검색 색인 대상에서 제외합니다.
+        ("name", "robots", "noindex, follow"),
         ("property", "og:type", "website"),
         ("property", "og:site_name", SITE_NAME),
         ("property", "og:locale", "ko_KR"),
