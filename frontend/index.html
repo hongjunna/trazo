@@ -13,10 +13,11 @@
     운영 nginx가 SSI로 처리합니다: 공유 코스 링크(/c/<토큰>)는 백엔드가 만든 코스 이름 태그를 넣고,
     홈은 아래 기본 태그와 대표 도메인 trazo.runvia.app을 사용합니다. 개발 서버에서는 SSI 주석이 그대로 남습니다.
   -->
-  <!--# if expr="$request_uri = /^\/c\/([A-Za-z0-9_-]{6,64})(?:[\/?]|\z)/" -->
   <!--# block name="og_fallback" -->
   <title>Trazo (트라소) | 자전거·러닝 코스 만들기</title>
   <meta name="robots" content="noindex, follow" /><!--# endblock -->
+  <!--# if expr="$request_uri = /^\/c\/([A-Za-z0-9_-]{6,64})(?:[\/?]|\z)/" -->
+
   <!--# include virtual="/api/og/c/$1" stub="og_fallback" -->
   <!--# else -->
   <title>Trazo (트라소) | 자전거·러닝 코스 만들기 · GPX 경로 플래너</title>
