@@ -29,7 +29,7 @@
     </aside></div>
     {% if related %}<section class="related"><h2>함께 둘러볼 공개 코스</h2><div class="related-grid">{% for item in related %}<a class="card" href="/c/{{ item.token }}"><strong>{{ item.title }}</strong><span>{{ item.sport }}</span></a>{% endfor %}</div></section>{% endif %}
   </main>
-  <footer><a href="/">Trazo에서 새 코스 만들기</a><a href="/en/guide/" lang="en">English guide</a></footer>
+  <footer><a href="/">Trazo에서 새 코스 만들기</a><a href="/en/guide/" lang="en">English guide</a><a href="/privacy/">개인정보처리방침</a></footer>
   <script id="course-data" type="application/json">{{ map_json | safe }}</script>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=c3b4179a9bd3e0eb5e124c5e0cc5da49&amp;autoload=false" defer></script>
   <script src="/course-landing.js" defer></script>

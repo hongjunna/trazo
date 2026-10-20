@@ -809,6 +809,11 @@
   text-align: left;
 }
 
+.menu__item--link {
+  color: inherit;
+  text-decoration: none;
+}
+
 .menu__item:hover {
   background: var(--c-surface-3);
 }

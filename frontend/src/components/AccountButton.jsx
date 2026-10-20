@@ -76,6 +76,9 @@ const AccountButton = ({ user, nickname, configured, loading, busy, onLogin, onL
                     <button type="button" role="menuitem" className="menu__item" disabled={busy} onClick={() => { setOpen(false); onLogout(); }}>
                         <Icon name="logout" /> 로그아웃
                     </button>
+                    <a role="menuitem" className="menu__item menu__item--link" href="/privacy/">
+                        <Icon name="lock" /> 개인정보처리방침
+                    </a>
                 </div>
             )}
         </div>
