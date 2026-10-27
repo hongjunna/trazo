@@ -34,7 +34,7 @@ services:
       - GRAPHHOPPER_URL=http://graphhopper:8989
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL 값을 .env에 입력해주세요}
       - FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID:?VITE_FIREBASE_PROJECT_ID 값을 .env에 입력해주세요}
-      # 관리자 페이지(/admin/) 계정. 비워 두거나 비밀번호가 12자보다 짧으면 관리자 페이지를 쓰지 않습니다.
+      # 관리자 페이지(/admin/) 계정. 비워 두거나 비밀번호가 8자보다 짧으면 관리자 페이지를 쓰지 않습니다.
       - ADMIN_USERNAME=${ADMIN_USERNAME:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET:-}

@@ -1012,7 +1012,7 @@ def health(session: Session = Depends(get_session)):
 # 관리자 계정은 .env의 ADMIN_USERNAME·ADMIN_PASSWORD로 정합니다. 둘 중 하나가 없거나 비밀번호가 짧으면 관리자 기능을 끕니다.
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-ADMIN_PASSWORD_MIN = 12
+ADMIN_PASSWORD_MIN = 8
 ADMIN_SESSION_SECONDS = 12 * 3600
 # 로그인 토큰 서명 키. 지정하지 않으면 실행할 때마다 새로 만들어, 백엔드를 다시 시작하면 다시 로그인해야 합니다.
 ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "").encode() or secrets.token_bytes(32)

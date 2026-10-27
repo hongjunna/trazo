@@ -273,7 +273,7 @@ docker compose -p toporider start backend
 
 ## 관리자 페이지
 
-`https://trazo.runvia.app/admin/`에서 회원과 모든 코스를 조회합니다. 계정은 서버 `.env`의 `ADMIN_USERNAME`·`ADMIN_PASSWORD`로 정하며, 둘 중 하나가 비었거나 비밀번호가 12자보다 짧으면 관리자 페이지와 API(`/api/admin/*`)는 404를 반환합니다. 계정을 바꾼 뒤에는 백엔드를 다시 만들어야(`./deploy.sh live`) 반영되며, 이전 로그인은 모두 풀립니다.
+`https://trazo.runvia.app/admin/`에서 회원과 모든 코스를 조회합니다. 계정은 서버 `.env`의 `ADMIN_USERNAME`·`ADMIN_PASSWORD`로 정하며, 둘 중 하나가 비었거나 비밀번호가 8자보다 짧으면 관리자 페이지와 API(`/api/admin/*`)는 404를 반환합니다. 계정을 바꾼 뒤에는 백엔드를 다시 만들어야(`./deploy.sh live`) 반영되며, 이전 로그인은 모두 풀립니다.
 
 - **개요**: 회원 수, 코스 수(공개 범위·종목별), 최근 7일 신규, 삭제한 코스, 댓글·좋아요 수
 - **회원**: Firebase UID, 닉네임, 가입·최근 활동 시각, 코스·공개 코스·삭제한 코스·댓글·좋아요·폴더 수. 닉네임을 정하지 않은 계정도 코스·댓글 기록이 있으면 보입니다. 이메일은 개인정보처리방침대로 서버에 저장하지 않으므로, 필요하면 UID로 Firebase 콘솔에서 찾습니다.
