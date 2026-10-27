@@ -62,9 +62,14 @@ if ! "${compose[@]}" config --quiet; then
   echo "Docker Compose 설정을 확인하지 못했습니다. 위 메시지와 .env 값을 확인해주세요." >&2
   exit 1
 fi
-if [ "$mode" = live ]; then
+if [ "$mode" = live ] && [ -z "${TRAZO_DEPLOY_PULLED:-}" ]; then
   echo "main 브랜치의 최신 코드를 가져옵니다…"
+  before="$(git rev-parse HEAD)"
   git pull --ff-only origin main
+  # 이 스크립트나 Compose 프로필이 바뀌었을 수 있으므로, 새 코드를 받았으면 새 스크립트로 다시 실행합니다.
+  if [ "$(git rev-parse HEAD)" != "$before" ]; then
+    TRAZO_DEPLOY_PULLED=1 exec "$0" "$mode" "$action"
+  fi
 fi
 echo "Trazo를 시작합니다 ($mode)…"
 "${compose[@]}" up -d --build
