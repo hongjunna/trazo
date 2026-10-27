@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import process from 'node:process'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 // /ga.js (GA4 로더): 운영 빌드에서만 VITE_GA_MEASUREMENT_ID를 넣고, 그 밖에는 아무것도 하지 않는 빈 스크립트입니다.
 const EMPTY_GA = '// Google Analytics: 측정 ID가 없거나 운영 빌드가 아니어서 수집하지 않습니다.\n'
@@ -30,6 +31,15 @@ function analytics() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), analytics()],
+  // 관리자 페이지(/admin/)는 코스 편집 화면과 따로 빌드합니다.
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        admin: fileURLToPath(new URL('./admin/index.html', import.meta.url)),
+      },
+    },
+  },
   server: {
     proxy: {
       '^/c/': {

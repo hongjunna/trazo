@@ -385,6 +385,96 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual(self.client.delete(f'/shared/{first}/like', headers=self.other).json(), {'liked': False, 'like_count': 0})
 
 
+class AdminTests(unittest.TestCase):
+    nickname = CommunityTests.nickname
+    create = CommunityTests.create
+
+    def setUp(self):
+        CommunityTests.setUp(self)
+        from unittest.mock import patch
+        for name, value in (('ADMIN_USERNAME', 'admin'), ('ADMIN_PASSWORD', 'correct-horse-battery'), ('admin_login_failures', [])):
+            patcher = patch.object(api, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def login(self, password='correct-horse-battery', ip='1.1.1.1'):
+        return self.client.post('/admin/login', json={'username': 'admin', 'password': password}, headers={'CF-Connecting-IP': ip})
+
+    def admin(self):
+        return {'Authorization': 'Bearer ' + self.login().json()['token']}
+
+    def test_login_and_token(self):
+        self.assertEqual(self.client.get('/admin/summary').status_code, 401)
+        # 사용자 로그인 토큰이나 위조한 토큰으로는 들어올 수 없습니다.
+        self.assertEqual(self.client.get('/admin/summary', headers=self.owner).status_code, 401)
+        expires = int(api.time.time()) + 3600
+        self.assertEqual(self.client.get('/admin/summary', headers={'Authorization': f'Bearer {expires}.forged'}).status_code, 401)
+        self.assertEqual(self.login('wrong').status_code, 401)
+        headers = self.admin()
+        self.assertEqual(self.client.get('/admin/summary', headers=headers).status_code, 200)
+        # 비밀번호를 바꾸면 이전 로그인이 풀립니다.
+        from unittest.mock import patch
+        with patch.object(api, 'ADMIN_PASSWORD', 'another-long-password'):
+            self.assertEqual(self.client.get('/admin/summary', headers=headers).status_code, 401)
+
+    def test_expired_token(self):
+        expired = int(api.time.time()) - 1
+        token = f'{expired}.{api.admin_signature(expired).decode()}'
+        self.assertEqual(self.client.get('/admin/summary', headers={'Authorization': f'Bearer {token}'}).status_code, 401)
+
+    def test_disabled_without_strong_password(self):
+        from unittest.mock import patch
+        with patch.object(api, 'ADMIN_PASSWORD', 'short'):
+            self.assertEqual(self.login('short').status_code, 404)
+        with patch.object(api, 'ADMIN_USERNAME', ''):
+            self.assertEqual(self.login().status_code, 404)
+
+    def test_login_rate_limit(self):
+        for _ in range(api.ADMIN_LOGIN_MAX_PER_IP):
+            self.assertEqual(self.login('wrong').status_code, 401)
+        self.assertEqual(self.login().status_code, 429)
+        self.assertEqual(self.login(ip='2.2.2.2').status_code, 200)
+
+    def test_users_and_all_courses(self):
+        self.nickname(self.owner, '주인장')
+        private = self.create(title='비밀 코스')
+        public = self.create(title='공개 코스', visibility='public')
+        deleted = self.create(title='지운 코스')
+        self.client.delete(f"/courses/{deleted['id']}", headers=self.owner)
+        self.create(self.other, title='닉네임 없는 코스')
+        headers = self.admin()
+
+        summary = self.client.get('/admin/summary', headers=headers).json()
+        self.assertEqual((summary['users'], summary['users_with_nickname']), (2, 1))
+        self.assertEqual((summary['courses'], summary['deleted_courses']), (3, 1))
+        self.assertEqual(summary['visibility'], {'private': 2, 'link': 0, 'public': 1})
+
+        users = self.client.get('/admin/users', headers=headers).json()
+        self.assertEqual(users['total'], 2)
+        owner = next(item for item in users['items'] if item['firebase_uid'] == 'owner-token')
+        self.assertEqual((owner['nickname'], owner['course_count'], owner['public_count'], owner['deleted_count']), ('주인장', 2, 1, 1))
+        self.assertEqual(self.client.get('/admin/users', headers=headers, params={'q': '주인장'}).json()['total'], 1)
+
+        # 공개 범위와 상관없이 모든 코스를 봅니다. 지운 코스는 따로 골라 봅니다.
+        courses = self.client.get('/admin/courses', headers=headers).json()
+        self.assertEqual({item['title'] for item in courses['items']}, {'비밀 코스', '공개 코스', '닉네임 없는 코스'})
+        only_deleted = self.client.get('/admin/courses', headers=headers, params={'deleted': 'only'}).json()
+        self.assertEqual([item['id'] for item in only_deleted['items']], [deleted['id']])
+        mine = self.client.get('/admin/courses', headers=headers, params={'uid': 'owner-token', 'deleted': 'include'}).json()
+        self.assertEqual(mine['total'], 3)
+        self.assertEqual(self.client.get('/admin/courses', headers=headers, params={'q': '주인장'}).json()['total'], 2)
+        self.assertEqual(self.client.get('/admin/courses', headers=headers, params={'visibility': 'public'}).json()['items'][0]['id'], public['id'])
+
+        detail = self.client.get(f"/admin/courses/{private['id']}", headers=headers).json()
+        self.assertEqual((detail['title'], detail['nickname'], detail['visibility']), ('비밀 코스', '주인장', 'private'))
+        self.assertEqual(detail['polylines'], self.polylines)
+        self.assertEqual(self.client.get(f"/admin/courses/{private['id']}", headers=self.owner).status_code, 401)
+        self.assertEqual(self.client.get('/admin/courses/99999', headers=headers).status_code, 404)
+
+    def test_health(self):
+        self.assertEqual(self.client.get('/health').json(), {'status': 'ok'})
+
+
 class RouteRequestTests(unittest.TestCase):
     def test_options_are_mapped_per_profile(self):
         body = api.build_route_request(['37.5,127.0', '37.6,127.1'], 'run', ['avoid_stairs', 'avoid_stairs', 'prefer_trails'])

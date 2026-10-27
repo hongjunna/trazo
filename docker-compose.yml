@@ -12,6 +12,11 @@ services:
     ports:
       # [수정] 왼쪽(5401)은 내 컴퓨터용, 오른쪽(5432)은 컨테이너 내부용
       - '127.0.0.1:${DB_PORT:-5401}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d toporider_db']
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - toporider_net
 
@@ -21,12 +26,24 @@ services:
     ports:
       - '127.0.0.1:${BACKEND_PORT:-8001}:8000'
     depends_on:
-      - graphhopper
-      - db
+      graphhopper:
+        condition: service_started
+      db:
+        condition: service_healthy
     environment:
       - GRAPHHOPPER_URL=http://graphhopper:8989
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL 값을 .env에 입력해주세요}
       - FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID:?VITE_FIREBASE_PROJECT_ID 값을 .env에 입력해주세요}
+      # 관리자 페이지(/admin/) 계정. 비워 두거나 비밀번호가 12자보다 짧으면 관리자 페이지를 쓰지 않습니다.
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET:-}
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - toporider_net
 
@@ -38,6 +55,16 @@ services:
       - ./graphhopper/config-gh.yml:/graphhopper/config.yml
     environment:
       - JAVA_OPTS=-Xmx2g -Xms2g
+    # 그래프(RAM_STORE)가 스왑으로 밀려나면 한동안 쉬다 들어온 경로 요청이 느려집니다.
+    # 메모리 한도와 스왑 포함 한도를 같게 두어 이 컨테이너는 스왑을 쓰지 않게 합니다 (힙 2g + JVM 여유분).
+    mem_limit: 3g
+    memswap_limit: 3g
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:8989/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5m
     labels:
       # 설정 파일은 볼륨이라 내용이 바뀌어도 컨테이너가 다시 만들어지지 않습니다.
       # deploy.sh가 설정 파일 체크섬을 넘겨, 설정이 바뀐 경우에만 GraphHopper를 다시 시작합니다.
@@ -58,9 +85,15 @@ services:
         VITE_GA_MEASUREMENT_ID: ${VITE_GA_MEASUREMENT_ID:-}
     restart: unless-stopped
     ports:
-      - '${FRONTEND_BIND:-0.0.0.0}:${FRONTEND_PORT:-3000}:80' # 호스트의 3000번 포트로 연결
+      # 호스트 nginx가 127.0.0.1:3000으로 연결하므로 외부에는 열지 않습니다. 다른 기기에서 직접 접속하려면 FRONTEND_BIND=0.0.0.0
+      - '${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-3000}:80'
     depends_on:
       - backend
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1/robots.txt']
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - toporider_net
 
@@ -82,6 +115,37 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - graphhopper
+    networks:
+      - toporider_net
+
+  # DB 백업 (운영 전용, deploy.sh live에서만 실행). 매일 pg_dump 파일을 BACKUP_DIR(백업용 하드)에 저장합니다.
+  db-backup:
+    build: ./db-backup
+    profiles: ['db-backup']
+    restart: unless-stopped
+    # 백업 파일을 호스트 계정 소유로 만듭니다.
+    user: '${BACKUP_UID:-1000}:${BACKUP_GID:-1000}'
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL 값을 .env에 입력해주세요}
+      - BACKUP_TIME=${BACKUP_TIME:-03:30}
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-30}
+      - TZ=Asia/Seoul
+    volumes:
+      # 백업 디스크가 마운트되지 않았으면 메인 디스크에 쌓이지 않도록, 폴더가 없을 때는 시작하지 않습니다.
+      - type: bind
+        source: ${BACKUP_DIR:-./backups}
+        target: /backups
+        bind:
+          create_host_path: false
+    # 최근 26시간 안에 만든 백업이 없으면 unhealthy로 표시합니다.
+    healthcheck:
+      test: ['CMD-SHELL', "find /backups -maxdepth 1 -name 'toporider-*.dump' -mmin -1560 | grep -q ."]
+      interval: 10m
+      timeout: 10s
+      start_period: 10m
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - toporider_net
 

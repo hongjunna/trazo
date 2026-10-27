@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import httpx
 import json
 import logging
@@ -5,12 +7,14 @@ import os
 import math
 import re
 import secrets
+import threading
+import time
 from google.oauth2 import id_token
 from google.auth.transport.requests import Request
 from google.auth.exceptions import GoogleAuthError, TransportError
 from cachecontrol import CacheControl
 import requests
-from sqlalchemy import func, inspect, or_, text, update
+from sqlalchemy import case, func, inspect, or_, text, update
 from sqlalchemy.exc import IntegrityError
 from typing import List, Literal, Optional, Any
 from fastapi import FastAPI, Query, HTTPException, Depends
@@ -997,6 +1001,263 @@ def read_community(
         **course_summary(course),
     } for course, nickname, likes, comments in page]
     return {"items": items, "has_more": len(rows) > limit}
+
+# Docker 헬스체크: DB까지 응답하는지 확인합니다.
+@app.get("/health")
+def health(session: Session = Depends(get_session)):
+    session.connection().execute(text("SELECT 1"))
+    return {"status": "ok"}
+
+# --- 6-4. 관리자 ---
+# 관리자 계정은 .env의 ADMIN_USERNAME·ADMIN_PASSWORD로 정합니다. 둘 중 하나가 없거나 비밀번호가 짧으면 관리자 기능을 끕니다.
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+ADMIN_PASSWORD_MIN = 12
+ADMIN_SESSION_SECONDS = 12 * 3600
+# 로그인 토큰 서명 키. 지정하지 않으면 실행할 때마다 새로 만들어, 백엔드를 다시 시작하면 다시 로그인해야 합니다.
+ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "").encode() or secrets.token_bytes(32)
+# 비밀번호 대입 방지: 15분 동안 IP마다 5번, 전체 20번 실패하면 잠시 로그인을 막습니다.
+ADMIN_LOGIN_WINDOW = 15 * 60
+ADMIN_LOGIN_MAX_PER_IP = 5
+ADMIN_LOGIN_MAX_TOTAL = 20
+admin_login_failures: list[tuple[float, str]] = []
+admin_login_lock = threading.Lock()
+admin_logger = logging.getLogger("trazo.admin")
+if (ADMIN_USERNAME or ADMIN_PASSWORD) and len(ADMIN_PASSWORD) < ADMIN_PASSWORD_MIN:
+    admin_logger.warning("ADMIN_PASSWORD가 %d자보다 짧아 관리자 페이지를 사용하지 않습니다.", ADMIN_PASSWORD_MIN)
+
+def admin_enabled() -> bool:
+    return bool(ADMIN_USERNAME) and len(ADMIN_PASSWORD) >= ADMIN_PASSWORD_MIN
+
+def admin_signature(expires: int) -> bytes:
+    # 계정 정보를 서명 키에 섞어, .env의 계정을 바꾸면 이전 로그인이 모두 풀리게 합니다.
+    key = hmac.new(ADMIN_SESSION_SECRET, f"{ADMIN_USERNAME}\n{ADMIN_PASSWORD}".encode(), hashlib.sha256).digest()
+    return hmac.new(key, str(expires).encode(), hashlib.sha256).hexdigest().encode()
+
+def require_admin(credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer)) -> None:
+    if not admin_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+    token = credentials.credentials if credentials and credentials.scheme.lower() == "bearer" else ""
+    expires, _, signature = token.partition(".")
+    if (not expires.isdigit() or int(expires) < time.time()
+            or not hmac.compare_digest(signature.encode(), admin_signature(int(expires)))):
+        raise HTTPException(status_code=401, detail="Admin login required", headers={"WWW-Authenticate": "Bearer"})
+
+def client_ip(request: HTTPRequest) -> str:
+    return (request.headers.get("cf-connecting-ip") or request.headers.get("x-real-ip")
+            or (request.client.host if request.client else "")).strip()
+
+class AdminLoginRequest(BaseModel):
+    username: str = PydanticField(max_length=128)
+    password: str = PydanticField(max_length=256)
+
+@app.post("/admin/login")
+def admin_login(data: AdminLoginRequest, request: HTTPRequest):
+    if not admin_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+    now = time.time()
+    ip = client_ip(request)
+    with admin_login_lock:
+        admin_login_failures[:] = [(at, who) for at, who in admin_login_failures if now - at < ADMIN_LOGIN_WINDOW]
+        if (len(admin_login_failures) >= ADMIN_LOGIN_MAX_TOTAL
+                or sum(who == ip for _, who in admin_login_failures) >= ADMIN_LOGIN_MAX_PER_IP):
+            raise HTTPException(status_code=429, detail="Too many login attempts", headers={"Retry-After": str(ADMIN_LOGIN_WINDOW)})
+        username_ok = hmac.compare_digest(data.username.encode(), ADMIN_USERNAME.encode())
+        password_ok = hmac.compare_digest(data.password.encode(), ADMIN_PASSWORD.encode())
+        if not (username_ok and password_ok):
+            admin_login_failures.append((now, ip))
+            admin_logger.warning("관리자 로그인 실패: %s", ip)
+            raise HTTPException(status_code=401, detail="Invalid admin credentials")
+    admin_logger.warning("관리자 로그인: %s", ip)
+    expires = int(now) + ADMIN_SESSION_SECONDS
+    return {"token": f"{expires}.{admin_signature(expires).decode()}", "expires_at": expires}
+
+def latest(*values: Optional[str]) -> Optional[str]:
+    # 저장 시각 형식이 조금씩 달라(시간대 표기 유무) 초 단위까지만 비교합니다.
+    values = [value for value in values if value]
+    return max(values, key=lambda value: value[:19]) if values else None
+
+@app.get("/admin/summary", dependencies=[Depends(require_admin)])
+def admin_summary(session: Session = Depends(get_session)):
+    def count(model, *where):
+        return session.exec(select(func.count()).select_from(model).where(*where)).one()
+    week_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
+    live = Course.is_deleted == False
+    uids = set(session.exec(select(UserProfile.firebase_uid)).all())
+    uids |= set(session.exec(select(Course.firebase_uid).where(Course.firebase_uid != None).distinct()).all())
+    return {
+        "users": len(uids),
+        "users_with_nickname": count(UserProfile),
+        "new_users_7d": count(UserProfile, UserProfile.created_at >= week_ago.isoformat()),
+        "courses": count(Course, live),
+        "deleted_courses": count(Course, Course.is_deleted == True),
+        # 코스 저장 시각은 서버 기준 시간대 없는 형식입니다.
+        "new_courses_7d": count(Course, live, Course.created_at >= week_ago.replace(tzinfo=None).isoformat()),
+        "visibility": {value: count(Course, live, Course.visibility == value) for value in ("private", "link", "public")},
+        "sport": {value: count(Course, live, Course.sport == value) for value in ("bike", "run")},
+        "comments": count(CourseComment),
+        "likes": count(CourseLike),
+    }
+
+@app.get("/admin/users", dependencies=[Depends(require_admin)])
+def admin_users(
+    q: str = "",
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: Session = Depends(get_session),
+):
+    live = Course.is_deleted == False
+    users: dict[str, dict] = {}
+    def user(uid: str) -> dict:
+        return users.setdefault(uid, {
+            "firebase_uid": uid, "nickname": None, "joined_at": None, "last_active_at": None,
+            "course_count": 0, "public_count": 0, "link_count": 0, "deleted_count": 0,
+            "comment_count": 0, "like_count": 0, "folder_count": 0,
+        })
+    for profile in session.exec(select(UserProfile)).all():
+        item = user(profile.firebase_uid)
+        item.update(nickname=profile.nickname, joined_at=profile.created_at, last_active_at=profile.updated_at)
+    course_rows = session.exec(select(
+        Course.firebase_uid,
+        func.sum(case((live, 1), else_=0)),
+        func.sum(case((live & (Course.visibility == "public"), 1), else_=0)),
+        func.sum(case((live & (Course.visibility == "link"), 1), else_=0)),
+        func.sum(case((Course.is_deleted == True, 1), else_=0)),
+        func.min(Course.created_at),
+        func.max(Course.created_at),
+    ).where(Course.firebase_uid != None).group_by(Course.firebase_uid)).all()
+    for uid, courses, public, link, deleted, first_at, last_at in course_rows:
+        item = user(uid)
+        item.update(course_count=courses or 0, public_count=public or 0, link_count=link or 0, deleted_count=deleted or 0)
+        # 닉네임을 정하기 전에 코스를 만든 계정은 첫 코스를 만든 때를 가입 시각으로 봅니다.
+        item["joined_at"] = item["joined_at"] or first_at
+        item["last_active_at"] = latest(item["last_active_at"], last_at)
+    for model, field in ((CourseComment, "comment_count"), (CourseLike, "like_count"), (Folder, "folder_count")):
+        for uid, total, last_at in session.exec(select(model.firebase_uid, func.count(), func.max(model.created_at)).group_by(model.firebase_uid)).all():
+            if uid in users or field != "folder_count":
+                item = user(uid)
+                item[field] = total
+                item["last_active_at"] = latest(item["last_active_at"], last_at)
+    items = list(users.values())
+    keyword = q.strip().lower()
+    if keyword:
+        items = [item for item in items if keyword in item["firebase_uid"].lower() or keyword in (item["nickname"] or "").lower()]
+    items.sort(key=lambda item: (item["last_active_at"] or "")[:19], reverse=True)
+    return {"total": len(items), "items": items[offset:offset + limit]}
+
+def admin_course_filters(q: str, uid: Optional[str], sport: Optional[str], visibility: Optional[str], deleted: str) -> list:
+    filters = []
+    if deleted != "include":
+        filters.append(Course.is_deleted == (deleted == "only"))
+    if uid:
+        filters.append(Course.firebase_uid == uid)
+    if sport:
+        filters.append(Course.sport == sport)
+    if visibility:
+        filters.append(Course.visibility == visibility)
+    keyword = q.strip()[:50]
+    if keyword:
+        pattern = f"%{escape_like(keyword)}%"
+        conditions = [Course.title.ilike(pattern, escape="\\"), UserProfile.nickname.ilike(pattern, escape="\\")]
+        if keyword.isdigit():
+            conditions.append(Course.id == int(keyword))
+        filters.append(or_(*conditions))
+    return filters
+
+def admin_owner(course: Course, nickname: Optional[str]) -> dict:
+    return {
+        "firebase_uid": course.firebase_uid,
+        "nickname": nickname,
+        # 구글 로그인 전 방식(COURSE_API_TOKENS)으로 저장한 코스는 정수 사용자 ID만 있습니다.
+        "legacy_user_id": course.user_id if course.firebase_uid is None else None,
+    }
+
+@app.get("/admin/courses", dependencies=[Depends(require_admin)])
+def admin_courses(
+    q: str = "",
+    uid: Optional[str] = None,
+    sport: Optional[Sport] = None,
+    visibility: Optional[Visibility] = None,
+    deleted: Literal["exclude", "include", "only"] = "exclude",
+    sort: Literal["recent", "oldest", "title"] = "recent",
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=30, ge=1, le=100),
+    session: Session = Depends(get_session),
+):
+    filters = admin_course_filters(q, uid, sport, visibility, deleted)
+    profile_join = UserProfile.firebase_uid == Course.firebase_uid
+    total = session.exec(select(func.count()).select_from(Course).join(UserProfile, profile_join, isouter=True).where(*filters)).one()
+    like_count = select(func.count()).select_from(CourseLike).where(CourseLike.course_id == Course.id).correlate(Course).scalar_subquery()
+    comment_count = select(func.count()).select_from(CourseComment).where(CourseComment.course_id == Course.id).correlate(Course).scalar_subquery()
+    order = {
+        "recent": (Course.id.desc(),),
+        "oldest": (Course.id.asc(),),
+        "title": (Course.title.asc(), Course.id.desc()),
+    }[sort]
+    rows = session.exec(
+        select(Course, UserProfile.nickname, like_count, comment_count)
+        .join(UserProfile, profile_join, isouter=True).where(*filters)
+        .order_by(*order).offset(offset).limit(limit)
+    ).all()
+    items = [{
+        "id": course.id,
+        "title": course.title,
+        "sport": course.sport,
+        "visibility": course.visibility,
+        "is_deleted": course.is_deleted,
+        "created_at": course.created_at,
+        "published_at": course.published_at,
+        "share_token": course.share_token,
+        "share_count": course.share_count,
+        "source_course_id": course.source_course_id,
+        "waypoint_count": len(load_waypoints(course)),
+        "like_count": likes,
+        "comment_count": comments,
+        **admin_owner(course, nickname),
+        **course_summary(course),
+    } for course, nickname, likes, comments in rows]
+    return {"total": total, "items": items}
+
+@app.get("/admin/courses/{course_id}", dependencies=[Depends(require_admin)])
+def admin_course_detail(course_id: int, session: Session = Depends(get_session)):
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    folder = session.get(Folder, course.folder_id) if course.folder_id else None
+    comments = session.exec(
+        select(CourseComment, UserProfile.nickname)
+        .join(UserProfile, UserProfile.firebase_uid == CourseComment.firebase_uid, isouter=True)
+        .where(CourseComment.course_id == course.id).order_by(CourseComment.id)
+    ).all()
+    try:
+        markers, polylines = json.loads(course.markers_json), json.loads(course.polylines_json)
+    except ValueError:
+        markers, polylines = [], []
+    return {
+        "id": course.id,
+        "title": course.title,
+        "description": course.description,
+        "sport": course.sport,
+        "visibility": course.visibility,
+        "is_deleted": course.is_deleted,
+        "created_at": course.created_at,
+        "published_at": course.published_at,
+        "share_token": course.share_token,
+        "share_count": course.share_count,
+        "source_course_id": course.source_course_id,
+        "folder": folder.name if folder else None,
+        "copies": count_rows(session, CourseShare, course.id),
+        "like_count": count_rows(session, CourseLike, course.id),
+        "markers": markers,
+        "polylines": polylines,
+        "waypoints": load_waypoints(course),
+        "comments": [{
+            "id": comment.id, "body": comment.body, "nickname": nickname, "firebase_uid": comment.firebase_uid,
+            "created_at": comment.created_at, "updated_at": comment.updated_at,
+        } for comment, nickname in comments],
+        **admin_owner(course, nickname_of(session, course.firebase_uid)),
+        **course_summary(course),
+    }
 
 @app.get("/route")
 async def get_route(

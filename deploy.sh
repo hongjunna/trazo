@@ -17,12 +17,16 @@ case "$mode" in
     compose=(docker compose -p toporider-dev -f docker-compose.yml -f docker-compose.dev.yml)
     ;;
   live)
-    # 운영에서만 지도 자동 업데이트 컨테이너(osm-updater)를 함께 실행합니다.
-    compose=(docker compose -p toporider --profile osm-updater -f docker-compose.yml)
+    # 운영에서만 지도 자동 업데이트(osm-updater)와 DB 백업(db-backup) 컨테이너를 함께 실행합니다.
+    compose=(docker compose -p toporider --profile osm-updater --profile db-backup -f docker-compose.yml)
     ;;
-  *) echo "사용법: ./deploy.sh [dev|live] [up|down|logs|status]" >&2; exit 1 ;;
+  *) echo "사용법: ./deploy.sh [dev|live] [up|down|logs|status|backup]" >&2; exit 1 ;;
 esac
-case "$action" in up|down|logs|status) ;; *) echo "알 수 없는 작업: $action" >&2; exit 1 ;; esac
+case "$action" in up|down|logs|status|backup) ;; *) echo "알 수 없는 작업: $action" >&2; exit 1 ;; esac
+if [ "$action" = backup ] && [ "$mode" != live ]; then
+  echo "DB 백업은 운영(live)에서만 실행합니다: ./deploy.sh live backup" >&2
+  exit 1
+fi
 if [ ! -f .env ]; then
   echo ".env 파일이 없습니다. .env.example을 .env로 복사하고 DB와 Firebase 설정을 입력해주세요." >&2
   exit 1
@@ -39,6 +43,7 @@ case "$action" in
   down) "${compose[@]}" down; exit ;;
   logs) "${compose[@]}" logs -f --tail=100; exit ;;
   status) "${compose[@]}" ps; exit ;;
+  backup) "${compose[@]}" exec db-backup db-backup now; exit ;;
 esac
 # GraphHopper는 data/south-korea-latest.osm.pbf 링크를 읽습니다. 링크가 없으면 가장 최근 날짜 파일에 연결합니다.
 if [ ! -e data/south-korea-latest.osm.pbf ]; then

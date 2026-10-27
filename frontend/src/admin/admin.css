@@ -1,0 +1,333 @@
+/* src/admin/admin.css
+ * 관리자 페이지 화면. 색·간격은 index.css의 디자인 토큰을 그대로 씁니다.
+ * 코스 편집 화면과 달리 페이지 전체가 스크롤됩니다.
+ */
+body { overflow: auto; }
+
+.admin-login {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.admin-login__card {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 24px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+}
+
+.admin-login__card h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: var(--c-primary);
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.admin-field input,
+.admin-toolbar select,
+.admin-search {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  font-weight: 400;
+  color: var(--c-text);
+}
+
+.admin-field input:focus,
+.admin-toolbar select:focus,
+.admin-search:focus-within {
+  outline: none;
+  border-color: var(--c-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.admin-error { margin: 0; color: var(--c-danger); }
+.admin-muted { color: var(--c-text-3); }
+.admin-empty { padding: 32px 0; text-align: center; color: var(--c-text-3); }
+.admin-pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+/* 머리글과 탭 */
+.admin-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 24px;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.admin-header h1 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--c-primary);
+  white-space: nowrap;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--c-text-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-tab:hover { background: var(--c-surface-3); }
+.admin-tab[aria-current="page"] { background: var(--c-primary); color: #fff; }
+
+.admin-main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* 개요 */
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.admin-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.admin-stat__label { font-size: 13px; font-weight: 600; color: var(--c-text-2); }
+.admin-stat__value { font-size: 28px; font-weight: 700; color: var(--c-text); font-variant-numeric: tabular-nums; }
+.admin-stat__sub { font-size: 12px; color: var(--c-text-3); }
+
+/* 검색·필터 */
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.admin-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 240px;
+  max-width: 360px;
+  color: var(--c-text-3);
+}
+
+.admin-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--c-text);
+}
+
+.admin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 6px 0 12px;
+  border-radius: var(--radius-full);
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-weight: 600;
+}
+
+.admin-chip button {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-chip button:hover { background: rgba(11, 79, 87, 0.12); }
+
+/* 회원 표 */
+.admin-table-wrap {
+  overflow-x: auto;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+}
+
+.admin-table th { background: var(--c-surface-2); font-size: 12px; color: var(--c-text-2); }
+.admin-table tbody tr:last-child td { border-bottom: 0; }
+.admin-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.admin-uid {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: var(--c-surface-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+[aria-busy="true"] { opacity: 0.6; }
+
+.admin-pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--c-text-2);
+}
+
+/* 코스 카드 */
+.admin-courses {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.admin-course {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-course:hover { border-color: var(--c-primary); box-shadow: var(--shadow-1); }
+.admin-course--deleted { background: var(--c-surface-2); }
+.admin-course--deleted .admin-course__thumb { opacity: 0.5; }
+
+.admin-course__thumb {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--c-surface-2);
+}
+
+.admin-course__thumb svg { width: 100%; height: 100%; display: block; }
+
+.admin-course__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-course__title {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-course__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-course__meta { font-size: 12px; color: var(--c-text-2); }
+
+.admin-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-tag--deleted { background: var(--c-danger-soft); color: var(--c-danger); }
+
+/* 코스 상세 */
+.admin-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.admin-detail dt { color: var(--c-text-2); font-weight: 600; }
+.admin-detail dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.admin-subtitle { margin: 4px 0 8px; font-size: 15px; }
+
+.admin-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-comments li {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--c-surface-2);
+}
+
+@media (max-width: 767px) {
+  .admin-header { flex-wrap: wrap; padding: 10px 16px; gap: 8px; }
+  .admin-tabs { order: 3; flex-basis: 100%; }
+  .admin-main { padding: 16px; }
+  .admin-courses { grid-template-columns: 1fr; }
+  .admin-search { max-width: none; }
+}

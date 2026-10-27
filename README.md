@@ -164,7 +164,7 @@ Firebase 웹 앱 구성값은 브라우저에 포함되는 공개 설정입니�
 | 항목 | 개발 모드 | 운영 모드 |
 |---|---|---|
 | 실행 명령 | `./deploy.sh dev` | `./deploy.sh live` |
-| 접속 주소 | `http://localhost:3001` | 서버의 3000번 포트 |
+| 접속 주소 | `http://localhost:3001` | 서버의 `127.0.0.1:3000` (호스트 nginx가 연결) |
 | 프론트엔드 | Vite 개발 서버, 코드 자동 반영 | 빌드 결과를 Nginx로 제공 |
 | 백엔드 | 코드 수정 시 자동 재시작 | 빌드된 코드로 실행 |
 | Git 업데이트 | 실행하지 않음 | `main`을 `--ff-only`로 업데이트 |
@@ -174,7 +174,7 @@ Firebase 웹 앱 구성값은 브라우저에 포함되는 공개 설정입니�
 | GraphHopper 호스트 포트 | 8991 | 8989 |
 | 지도·고도 캐시 | `data/dev` 내부 | `data` 내부 |
 
-개발 DB는 별도 볼륨에 저장하므로 운영 DB와 분리됩니다. 운영의 기존 `toporider` 프로젝트 이름은 유지해야 기존 DB 볼륨을 계속 사용할 수 있습니다. 개발 화면은 로컬 주소에만 연결되며, DB·백엔드·GraphHopper도 로컬 주소에만 포트를 공개합니다. 운영 프론트엔드는 기본적으로 외부 접속을 허용합니다. 배포 스크립트는 빌드 전에 서비스를 종료하거나 다른 Docker 이미지를 정리하지 않습니다.
+개발 DB는 별도 볼륨에 저장하므로 운영 DB와 분리됩니다. 운영의 기존 `toporider` 프로젝트 이름은 유지해야 기존 DB 볼륨을 계속 사용할 수 있습니다. 개발 화면은 로컬 주소에만 연결되며, DB·백엔드·GraphHopper도 로컬 주소에만 포트를 공개합니다. 운영 프론트엔드도 `127.0.0.1:3000`에만 열고, 서버의 호스트 nginx(`trazo.runvia.app`)가 이 포트와 백엔드 `127.0.0.1:8001`로 연결합니다. 다른 기기에서 3000번 포트로 직접 접속해야 하면 `.env`에 `FRONTEND_BIND=0.0.0.0`을 넣으세요. 배포 스크립트는 빌드 전에 서비스를 종료하거나 다른 Docker 이미지를 정리하지 않습니다.
 
 서비스명은 Trazo로 변경했지만 기존 데이터 연결을 유지하기 위해 Compose 프로젝트 이름(`toporider`, `toporider-dev`), DB 이름(`toporider_db`), Docker 네트워크 이름(`toporider_net`)은 유지합니다. 이 이름을 서비스명과 함께 바꾸면 기존 DB 볼륨 대신 새 볼륨을 사용할 수 있으므로 별도 데이터 이전 없이 변경하지 마세요.
 
@@ -253,6 +253,34 @@ docker compose -p toporider --profile osm-updater -f docker-compose.yml exec osm
 
 지도 파일을 교체해도 이미 만들어진 그래프는 자동 갱신되지 않습니다. 지도 갱신이나 호환되지 않는 경로 설정 변경 시에는 관련 그래프 캐시를 별도로 재생성해야 합니다. 전국 OSM 원본을 자동 다운로드하는 기능은 없습니다.
 
+## DB 백업
+
+운영 서비스에는 DB 백업 컨테이너(`db-backup`)가 함께 실행됩니다. 매일 새벽 3시 30분(한국 시간)에 `pg_dump`로 `toporider-YYYYMMDD-HHMMSS.dump`(custom 형식)를 만들고, `pg_restore --list`로 읽을 수 있는지 확인한 뒤 `BACKUP_DIR`에 저장합니다. 처음 시작했거나 최근 24시간 안에 만든 백업이 없으면 바로 한 번 백업합니다. 백업에 성공했을 때만 30일보다 오래된 백업을 지웁니다.
+
+- 운영 서버의 `BACKUP_DIR`은 메인 SSD가 아닌 백업용 하드(`/srv/storage`, `/dev/sda1`)의 `/srv/storage/backups/trazo`입니다.
+- 폴더가 없으면 컨테이너가 시작하지 않습니다. 백업용 하드가 마운트되지 않았을 때 메인 디스크에 백업이 쌓이지 않게 하려는 것입니다. 처음 한 번은 `mkdir -p /srv/storage/backups/trazo`로 만듭니다.
+- 백업 파일은 호스트 계정(`BACKUP_UID`·`BACKUP_GID`, 기본 1000) 소유로, 소유자만 읽을 수 있게(600) 만듭니다.
+- 최근 26시간 안에 만든 백업이 없으면 `docker ps`에 `unhealthy`로 표시됩니다. 실행 기록은 `./deploy.sh live logs`의 `db-backup-1`에서 확인합니다.
+- 지금 바로 백업하려면 `./deploy.sh live backup`을 실행합니다.
+
+백업 시각(`BACKUP_TIME`)과 보관 일수(`BACKUP_KEEP_DAYS`)는 `.env`에서 바꿀 수 있습니다. 복원은 백엔드를 멈춘 뒤 실행합니다. `--clean`은 기존 테이블을 지우고 백업 내용으로 바꾸므로, 복원 전에 `./deploy.sh live backup`으로 현재 상태를 한 번 더 백업해 두세요.
+
+```bash
+docker compose -p toporider stop backend
+docker exec -i toporider-db-1 pg_restore -U admin -d toporider_db --clean --if-exists < /srv/storage/backups/trazo/toporider-YYYYMMDD-HHMMSS.dump
+docker compose -p toporider start backend
+```
+
+## 관리자 페이지
+
+`https://trazo.runvia.app/admin/`에서 회원과 모든 코스를 조회합니다. 계정은 서버 `.env`의 `ADMIN_USERNAME`·`ADMIN_PASSWORD`로 정하며, 둘 중 하나가 비었거나 비밀번호가 12자보다 짧으면 관리자 페이지와 API(`/api/admin/*`)는 404를 반환합니다. 계정을 바꾼 뒤에는 백엔드를 다시 만들어야(`./deploy.sh live`) 반영되며, 이전 로그인은 모두 풀립니다.
+
+- **개요**: 회원 수, 코스 수(공개 범위·종목별), 최근 7일 신규, 삭제한 코스, 댓글·좋아요 수
+- **회원**: Firebase UID, 닉네임, 가입·최근 활동 시각, 코스·공개 코스·삭제한 코스·댓글·좋아요·폴더 수. 닉네임을 정하지 않은 계정도 코스·댓글 기록이 있으면 보입니다. 이메일은 개인정보처리방침대로 서버에 저장하지 않으므로, 필요하면 UID로 Firebase 콘솔에서 찾습니다.
+- **코스**: 공개 범위와 상관없이 모든 코스를 이름·닉네임·코스 번호로 검색하고 종목·공개 범위·삭제 여부로 거릅니다. 코스를 누르면 지도, 거리·고도, 웨이포인트, 폴더, 댓글을 봅니다. 화면에서 지운 코스도 볼 수 있습니다.
+
+관리자 페이지는 조회만 하며 데이터를 바꾸지 않습니다. 로그인은 12시간 동안 유지되고(브라우저 탭을 닫으면 로그아웃), 15분 동안 같은 IP에서 5번 또는 전체 20번 로그인에 실패하면 잠시 막습니다. 로그인 기록은 백엔드 로그에 남습니다. `ADMIN_SESSION_SECRET`을 비워 두면 백엔드를 다시 시작할 때 다시 로그인해야 합니다.
+
 ## 기존 코스 소유권
 
 서버는 시작할 때 기존 코스 테이블에 `firebase_uid` 열이 없으면 추가합니다. 종목을 저장하는 `sport` 열도 없으면 기본값 `bike`로 추가합니다. 공유 기능에 쓰는 `visibility`(기본값 `private`), `share_token`, `share_count`, `folder_id`, `source_course_id`, `published_at` 열과 웨이포인트를 저장하는 `waypoints_json` 열도 같은 방식으로 추가하므로 기존 코스는 모두 비공개로 남습니다. 닉네임·폴더·담기 기록·좋아요·댓글 테이블은 없으면 새로 만듭니다. 기존 코스를 처음 로그인한 구글 계정에 자동 배정하지 않습니다. 이전 코스의 소유자를 확인한 뒤 관리자가 해당 계정의 Firebase UID를 코스의 `firebase_uid`에 지정해야 합니다.
@@ -277,6 +305,6 @@ npm run build --prefix frontend
 python -m unittest discover -s backend/tests
 ```
 
-백엔드 테스트 전에는 `backend/requirements.txt`의 의존성을 설치해야 합니다. 테스트는 인증 실패, 계정별 코스 접근, 삭제된 코스 접근 제한, 기존 테이블 변경, 코스 종목 저장, 닉네임 규칙과 중복, 폴더, 공개 범위별 접근, 담은 사람 수, 좋아요·댓글 권한, 커뮤니티 정렬·검색, 웨이포인트 저장·검증, TCX 코스 포인트, 공유 링크 미리보기 태그와 종목별 경로 옵션 검증을 확인합니다.
+백엔드 테스트 전에는 `backend/requirements.txt`의 의존성을 설치해야 합니다. 테스트는 인증 실패, 계정별 코스 접근, 삭제된 코스 접근 제한, 기존 테이블 변경, 코스 종목 저장, 닉네임 규칙과 중복, 폴더, 공개 범위별 접근, 담은 사람 수, 좋아요·댓글 권한, 커뮤니티 정렬·검색, 웨이포인트 저장·검증, TCX 코스 포인트, 공유 링크 미리보기 태그, 종목별 경로 옵션 검증, 관리자 로그인(토큰 위조·만료·대입 제한)과 회원·전체 코스 조회를 확인합니다.
 
 전체 프론트엔드 코드 검사에는 `npm run lint --prefix frontend`를 사용합니다. 현재 검사 오류 없이 통과합니다.
