@@ -79,7 +79,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/sitemap-courses-([0-9]+)\.xml$/, '/seo/sitemap-courses/$1.xml'),
       },
       // AI 서비스가 직접 호출하는 MCP 서버와 OAuth 주소
-      '^/(mcp$|\\.well-known/oauth-|oauth/(token|register|revoke)$)': {
+      '^/(mcp$|\\.well-known/(oauth-|openai-apps-challenge)|oauth/(token|register|revoke)$)': {
         target: process.env.DEV_API_PROXY || 'http://localhost:8001',
       },
       '/api': {

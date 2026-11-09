@@ -3528,3 +3528,98 @@
   font-size: 13.5px;
   font-weight: 650;
 }
+
+/* 코스 지도: 바탕 지도를 흑백으로 흐리게 해 코스 선이 도로·공원 색과 섞이지 않게 합니다 (지도 타일만, 코스 선은 그대로). */
+.explore__map.is-muted .map-canvas img {
+  filter: grayscale(1) contrast(0.82) brightness(1.08);
+}
+
+.explore-pin {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--pin);
+  color: var(--pin-on);
+  box-shadow: 0 0 0 1.5px #0E2A2E, 0 2px 6px rgba(0, 0, 0, 0.3);
+  transform: translate(0, 0);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.explore-pin:hover,
+.explore-pin.is-focused {
+  transform: scale(1.3);
+}
+
+.explore-pin.is-dimmed {
+  opacity: 0.35;
+}
+
+.explore-tip {
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  background: #0E2A2E;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
+
+.connect-card--wide {
+  grid-column: 1 / -1;
+}
+
+.connect-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.connect-field {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface-2);
+}
+
+.connect-field__label {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--c-text-2);
+}
+
+.connect-field__value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-primary-strong);
+  word-break: break-all;
+}
+
+.connect-notes {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+@media (max-width: 767px) {
+  .connect-field {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .connect-field__label {
+    grid-column: 1 / -1;
+    padding-top: 4px;
+  }
+}

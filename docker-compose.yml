@@ -46,6 +46,12 @@ services:
       - SEED_ACCOUNT_EMAILS=${SEED_ACCOUNT_EMAILS:-}
       # 좋아요 봇(like-bot)과 함께 쓰는 비밀 값. 비워 두면 좋아요 봇을 쓰지 않습니다.
       - LIKE_BOT_TOKEN=${LIKE_BOT_TOKEN:-}
+      # AI 마켓(ChatGPT·Claude) 심사자 전용 로그인. 세 값이 모두 있어야 켜집니다 (mcp/reviewer-info.md).
+      - REVIEWER_LOGIN_ID=${REVIEWER_LOGIN_ID:-}
+      - REVIEWER_LOGIN_PASSWORD=${REVIEWER_LOGIN_PASSWORD:-}
+      - REVIEWER_UID=${REVIEWER_UID:-}
+      # OpenAI 플러그인 제출의 도메인 인증 토큰 (/.well-known/openai-apps-challenge)
+      - OPENAI_APPS_CHALLENGE=${OPENAI_APPS_CHALLENGE:-}
     healthcheck:
       test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
       interval: 30s

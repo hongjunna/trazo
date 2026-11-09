@@ -1,0 +1,104 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "trazo",
+  "version": "1.0.0",
+  "description": "Read your Trazo running and cycling routes and public community routes in South Korea, with distance, elevation, gradient, climbs and location, to recommend routes and check them against your training plan. Read-only.",
+  "author": {
+    "name": "Junlab",
+    "email": "trazo@junlab.xyz",
+    "url": "https://trazo.runvia.app"
+  },
+  "homepage": "https://trazo.runvia.app/en/ai/",
+  "license": "Proprietary",
+  "keywords": ["running", "cycling", "routes", "training", "korea", "gpx"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Trazo",
+        "shortDescription": "Running & cycling routes",
+        "longDescription": "Trazo is a running and cycling route planner for South Korea. Connect your Trazo account and ChatGPT can search your saved routes (including private and link-shared ones) and routes the community has made public, then explain them with real data: distance, elevation gain and loss, gradient distribution, main climbs, per-kilometre elevation, loop or out-and-back, start and end coordinates and the neighbourhoods a route passes through. Ask things like “Recommend a flat 10 km run along the Han River” or “Is my Namsan route good for hill repeats?”. You can also paste a Trazo share link to have a route analysed. The integration is read-only: it never creates, edits or deletes routes. Route data is for reference; always check real road conditions and exercise safely.",
+        "developerName": "Junlab",
+        "category": "Travel",
+        "capabilities": [
+          "Recommend running and cycling routes from your saved and public Trazo routes",
+          "Find routes near a place such as the Han River or Yeouido",
+          "Analyse elevation, gradient and climbs for interval, tempo or hill training",
+          "Read a route from a Trazo share link"
+        ],
+        "websiteURL": "https://trazo.runvia.app/en/ai/",
+        "supportURL": "https://trazo.runvia.app/support/",
+        "privacyPolicyURL": "https://trazo.runvia.app/en/privacy/",
+        "termsOfServiceURL": "https://trazo.runvia.app/en/terms/",
+        "defaultPrompt": [
+          "Recommend a flat 5 km running route along the Han River",
+          "Which of my Trazo routes is best for hill repeats?",
+          "Find a 40 km cycling loop that starts near Yeouido"
+        ],
+        "brandColor": "#0B4F57",
+        "composerIcon": "./assets/composer-icon.svg",
+        "logo": "./assets/logo.svg"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Search the signed-in user's own routes by sport and distance",
+              "prompt": "Show my Trazo running routes between 3 and 12 km.",
+              "tools_triggered": "search_courses",
+              "expected_behavior": "Calls search_courses with scope mine (or all), sport run and the distance range, then lists the matching routes with distance, elevation gain and route type."
+            },
+            {
+              "description": "Find public routes near a named place",
+              "prompt": "Find running routes on Trazo near Yeouido Hangang Park in Seoul.",
+              "tools_triggered": "find_place, search_courses",
+              "expected_behavior": "Calls find_place to get coordinates for Yeouido Hangang Park, then search_courses with near_lat/near_lng and sport run, and lists nearby routes with their distance from the place."
+            },
+            {
+              "description": "Analyse one route for a training goal",
+              "prompt": "Use Trazo to find my hilliest running route and tell me if it suits hill repeats.",
+              "tools_triggered": "search_courses, get_course",
+              "expected_behavior": "Calls search_courses sorted by ascent, then get_course on the top result, and explains the main climb (start km, length, gain, average grade) and how to use it for hill repeats."
+            },
+            {
+              "description": "Read a route from a share link",
+              "prompt": "What is the elevation profile of this Trazo route? https://trazo.runvia.app/c/az0e0VJQZ1HR",
+              "tools_triggered": "get_course",
+              "expected_behavior": "Calls get_course with the share link and summarises distance, elevation gain, minimum and maximum elevation and the per-kilometre splits."
+            },
+            {
+              "description": "Recommend a cycling route by distance and loop type",
+              "prompt": "Recommend a public Trazo cycling loop between 20 and 70 km.",
+              "tools_triggered": "search_courses, get_course",
+              "expected_behavior": "Calls search_courses with scope public, sport bike, route_type loop and the distance range, optionally get_course for details, and recommends routes with a link to each."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Write requests are not supported",
+              "prompt": "Delete my Trazo route called Namsan Hill."
+            },
+            {
+              "description": "Unrelated weather question",
+              "prompt": "What will the weather be in Seoul tomorrow?"
+            },
+            {
+              "description": "Unrelated general fitness question",
+              "prompt": "How many grams of protein should I eat after a workout?"
+            }
+          ]
+        },
+        "commerce": false
+      },
+      "publication": {
+        "countries": ["KR"],
+        "release_notes": "First release: search and analyse Trazo running and cycling routes (read-only).",
+        "translations": {
+          "ko-KR": {
+            "subtitle": "러닝·자전거 코스 추천",
+            "description": "Trazo(트라소)에 저장한 러닝·자전거 코스와 커뮤니티 공개 코스를 읽어 거리·고도·경사·위치를 근거로 코스를 추천하고 훈련 계획을 도와줍니다. “한강에서 뛸 5km 평지 코스 추천해줘”, “내 남산 코스로 언덕 반복 어때?”처럼 물어보세요. 읽기 전용이라 코스를 만들거나 고치지 않습니다."
+          }
+        }
+      }
+    }
+  }
+}

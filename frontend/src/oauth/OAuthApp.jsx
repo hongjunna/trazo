@@ -61,6 +61,9 @@ const Consent = ({ user }) => {
     const [client, setClient] = useState(null);
     const [error, setError] = useState('');
     const [deciding, setDeciding] = useState(false);
+    // 마켓 심사자 전용 로그인 (서버에 심사 계정이 설정된 경우에만 보입니다)
+    const [reviewerOpen, setReviewerOpen] = useState(false);
+    const [reviewer, setReviewer] = useState({ id: '', password: '' });
     const [login, loggingIn] = useLogin();
 
     useEffect(() => {
@@ -70,11 +73,11 @@ const Consent = ({ user }) => {
             .catch(() => setError('연결 요청이 올바르지 않습니다. AI 서비스에서 연결을 처음부터 다시 시도해주세요.'));
     }, []);
 
-    const decide = async (approve) => {
+    const decide = async (approve, credentials = null) => {
         setDeciding(true);
         try {
             const fields = Object.fromEntries(AUTHORIZE_FIELDS.filter(key => query.has(key)).map(key => [key, query.get(key)]));
-            const { redirect_to: redirectTo } = await request('/oauth/authorize', { method: 'POST', body: { ...fields, approve }, login: approve });
+            const { redirect_to: redirectTo } = await request('/oauth/authorize', { method: 'POST', body: { ...fields, approve, ...(credentials ? { reviewer_id: credentials.id, reviewer_password: credentials.password } : {}) }, login: approve && !credentials });
             window.location.replace(redirectTo);
         } catch (failure) {
             setError(failure.message);
@@ -116,6 +119,18 @@ const Consent = ({ user }) => {
                     <Button variant="secondary" onClick={() => decide(false)} disabled={deciding}>거부</Button>
                     <Button variant="primary" icon="user" onClick={login} loading={loggingIn} disabled={!auth}>구글 로그인하고 계속</Button>
                 </div>
+            )}
+            {!user && client.reviewer_login && (
+                reviewerOpen ? (
+                    <form className="ai-reviewer" onSubmit={(event) => { event.preventDefault(); decide(true, reviewer); }}>
+                        <strong>Reviewer sign-in (심사자 전용)</strong>
+                        <input aria-label="Reviewer ID" placeholder="Reviewer ID" autoComplete="username" value={reviewer.id} onChange={(event) => setReviewer(prev => ({ ...prev, id: event.target.value }))} required />
+                        <input aria-label="Password" placeholder="Password" type="password" autoComplete="current-password" value={reviewer.password} onChange={(event) => setReviewer(prev => ({ ...prev, password: event.target.value }))} required />
+                        <Button type="submit" variant="secondary" loading={deciding}>Sign in and allow</Button>
+                    </form>
+                ) : (
+                    <button type="button" className="ai-link ai-reviewer__toggle" onClick={() => setReviewerOpen(true)}>App reviewer? Sign in with reviewer credentials</button>
+                )
             )}
         </section>
     );

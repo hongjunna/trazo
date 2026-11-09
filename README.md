@@ -130,6 +130,8 @@ ChatGPT·Claude 같은 AI 서비스에 `https://trazo.runvia.app/mcp`를 MCP 커
 - `PUBLIC_BASE_URL`: AI 서비스에 알려 주는 서비스 주소. 비워 두면 `https://trazo.runvia.app`. 개발 환경에서는 브라우저로 접속하는 주소(예: `http://localhost:3000`)를 넣습니다.
 - `KAKAO_REST_API_KEY`: 선택. 카카오 개발자 콘솔의 REST API 키(지도용 JavaScript 키와 다름). 있으면 출발·도착 지역 이름(법정동), 지나는 지역, 장소 검색을 제공하고, 없으면 좌표만 제공합니다. 카카오 앱 설정에서 로컬 API를 사용할 수 있어야 합니다.
 - 서버 앞단(호스트 nginx, Cloudflare 등)이 `/mcp`, `/.well-known/oauth-*`, `/oauth/*` 요청을 프론트엔드 컨테이너로 그대로 넘겨야 합니다. `/mcp`는 `Authorization` 헤더를 지우지 않아야 합니다.
+- ChatGPT·Claude 공식 디렉터리(마켓) 등록 자료와 절차는 [mcp/README.md](mcp/README.md)에 있습니다. 심사자 전용 로그인(`REVIEWER_LOGIN_ID`·`REVIEWER_LOGIN_PASSWORD`·`REVIEWER_UID`)과 OpenAI 도메인 인증 토큰(`OPENAI_APPS_CHALLENGE`)은 `.env`로 켭니다.
+- Claude의 기본 연결 방식(클라이언트 ID 메타데이터 문서, CIMD)과 동적 등록(DCR)을 모두 지원합니다. CIMD 문서는 공인 IP의 https 주소에서만 내려받습니다.
 - 내 컴퓨터에서 시험하려면 `claude mcp add --transport http trazo http://localhost:3000/mcp`처럼 추가하고 MCP Inspector(`npx @modelcontextprotocol/inspector`)로 도구 호출을 확인할 수 있습니다.
 
 ## 검색엔진 노출

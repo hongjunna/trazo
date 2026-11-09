@@ -14,6 +14,10 @@ import Icon from './ui/Icon';
 import SegmentedControl from './ui/SegmentedControl';
 
 const FETCH_DELAY_MS = 250;
+// 이 축척보다 넓게 보면(숫자가 클수록 넓음) 출발점 핀을 숨겨 지도가 복잡해지지 않게 합니다.
+const PIN_MAX_LEVEL = 8;
+// 선 아래에 까는 짙은 테두리. 카카오 지도의 주황 도로·초록 공원과 코스 선이 섞여 보이지 않게 합니다.
+const CASING_COLOR = '#0E2A2E';
 const ROUTE_LABEL = { loop: '순환', out_and_back: '왕복', point_to_point: '편도' };
 const SPORT_FILTERS = [
     { value: 'all', label: '전체' },
@@ -29,6 +33,10 @@ const initialView = () => {
 };
 
 const toPath = (item) => item.path.map(([lat, lng]) => ({ lat, lng }));
+const midpoint = (item) => {
+    const [lat, lng] = item.path[Math.floor(item.path.length / 2)];
+    return { lat, lng };
+};
 const sportOf = (item) => SPORTS[item.sport] ?? SPORTS.bike;
 
 const CourseMeta = ({ item }) => (
@@ -74,6 +82,9 @@ const CourseExplorer = ({ onOpenCourse }) => {
     const [listOpen, setListOpen] = useState(false);
     const [attempt, setAttempt] = useState(0);
     const [myLocation, setMyLocation] = useState(null);
+    const [level, setLevel] = useState(view.level);
+    // 바탕 지도를 흑백으로 흐리게 해 코스 선이 잘 보이게 합니다 (기본 켜짐).
+    const [muted, setMuted] = useState(() => readStored('trazo:exploreMuted', true) !== false);
     const areaRef = useRef(null);
 
     // 지도가 아직 뜨지 않았으면(또는 지도를 불러오지 못하면) 범위 없이 인기 코스부터 불러옵니다.
@@ -109,9 +120,17 @@ const CourseExplorer = ({ onOpenCourse }) => {
         const padLng = (ne.getLng() - sw.getLng()) * 0.15;
         const round = (value) => Math.round(value * 1000) / 1000;
         setBounds({ south: round(sw.getLat() - padLat), west: round(sw.getLng() - padLng), north: round(ne.getLat() + padLat), east: round(ne.getLng() + padLng) });
+        setLevel(target.getLevel());
         const center = target.getCenter();
         writeStored('trazo:exploreView', { lat: center.getLat(), lng: center.getLng(), level: target.getLevel() });
     }, []);
+
+    const toggleMuted = () => {
+        setMuted(value => {
+            writeStored('trazo:exploreMuted', !value);
+            return !value;
+        });
+    };
 
     const changeSport = (value) => {
         setSport(value);
@@ -120,6 +139,7 @@ const CourseExplorer = ({ onOpenCourse }) => {
 
     const items = result.items;
     const selected = items.find(item => item.token === selectedToken) ?? null;
+    const hovered = items.find(item => item.token === hoveredToken) ?? null;
     // 고른 코스와 마우스를 올린 코스를 맨 위에 그립니다.
     const ordered = useMemo(() => {
         const front = new Set([hoveredToken, selectedToken]);
@@ -195,7 +215,7 @@ const CourseExplorer = ({ onOpenCourse }) => {
                 <div className="explore__list">{listBody}</div>
             </aside>
 
-            <div className="explore__map" ref={areaRef}>
+            <div className={`explore__map ${muted ? 'is-muted' : ''}`} ref={areaRef}>
                 <Map
                     center={view.center}
                     level={view.level}
@@ -205,28 +225,62 @@ const CourseExplorer = ({ onOpenCourse }) => {
                     onIdle={handleIdle}
                     onClick={() => setSelectedToken(null)}
                 >
+                    {/* 모든 코스의 짙은 테두리를 먼저 깔고, 그 위에 종목 색 선을 그립니다. */}
                     {ordered.map(item => {
-                        const isSelected = item.token === selectedToken;
-                        const isHovered = item.token === hoveredToken;
-                        const dimmed = selectedToken && !isSelected;
-                        const path = toPath(item);
-                        return [
-                            (isSelected || isHovered) && (
-                                <Polyline key={`${item.token}-o`} path={path} strokeWeight={9} strokeColor={COLORS.primary} strokeOpacity={0.55} strokeStyle="solid" />
-                            ),
+                        const focused = item.token === selectedToken || item.token === hoveredToken;
+                        const dimmed = selectedToken && !focused;
+                        return (
+                            <Polyline
+                                key={`${item.token}-casing`}
+                                path={toPath(item)}
+                                strokeWeight={focused ? 11 : 6.5}
+                                strokeColor={focused ? '#FFFFFF' : CASING_COLOR}
+                                strokeOpacity={dimmed ? 0.15 : focused ? 1 : 0.7}
+                                strokeStyle="solid"
+                            />
+                        );
+                    })}
+                    {ordered.map(item => {
+                        const focused = item.token === selectedToken || item.token === hoveredToken;
+                        const dimmed = selectedToken && !focused;
+                        return (
                             <Polyline
                                 key={item.token}
-                                path={path}
-                                strokeWeight={isSelected || isHovered ? 5 : 3}
+                                path={toPath(item)}
+                                strokeWeight={focused ? 6 : 3.5}
                                 strokeColor={sportOf(item).color}
-                                strokeOpacity={dimmed ? 0.3 : isSelected || isHovered ? 1 : 0.72}
+                                strokeOpacity={dimmed ? 0.3 : 1}
                                 strokeStyle="solid"
                                 onClick={() => select(item)}
                                 onMouseover={() => setHoveredToken(item.token)}
                                 onMouseout={() => setHoveredToken(token => (token === item.token ? null : token))}
-                            />,
-                        ];
+                            />
+                        );
                     })}
+                    {/* 출발점 핀: 코스가 겹쳐도 하나하나 눌러 고를 수 있게 합니다. */}
+                    {level <= PIN_MAX_LEVEL && items.map(item => {
+                        const focused = item.token === selectedToken || item.token === hoveredToken;
+                        return (
+                            <CustomOverlayMap key={`${item.token}-pin`} position={toPath(item)[0]} zIndex={focused ? 8 : 4} clickable>
+                                <button
+                                    type="button"
+                                    className={`explore-pin ${focused ? 'is-focused' : ''} ${selectedToken && !focused ? 'is-dimmed' : ''}`}
+                                    style={{ '--pin': sportOf(item).color, '--pin-on': sportOf(item).onColor }}
+                                    aria-label={`${item.title} 출발점`}
+                                    onClick={() => select(item)}
+                                    onMouseEnter={() => setHoveredToken(item.token)}
+                                    onMouseLeave={() => setHoveredToken(token => (token === item.token ? null : token))}
+                                >
+                                    <Icon name={sportOf(item).icon} size={12} strokeWidth={2.5} />
+                                </button>
+                            </CustomOverlayMap>
+                        );
+                    })}
+                    {hovered && hovered.token !== selectedToken && (
+                        <CustomOverlayMap position={midpoint(hovered)} zIndex={9} yAnchor={1.6}>
+                            <div className="explore-tip">{hovered.title} · {hovered.distance_km.toFixed(1)}km</div>
+                        </CustomOverlayMap>
+                    )}
                     {selected && (
                         <CustomOverlayMap position={toPath(selected)[0]} zIndex={5}>
                             <div className="explore-start" aria-hidden="true" />
@@ -241,6 +295,15 @@ const CourseExplorer = ({ onOpenCourse }) => {
 
                 <div className="explore__tools">
                     <Button variant="secondary" icon="locate" iconSize={18} onClick={locate} aria-label="내 위치" title="내 위치" />
+                    <Button
+                        variant="secondary"
+                        icon="layers"
+                        iconSize={18}
+                        onClick={toggleMuted}
+                        aria-pressed={!muted}
+                        aria-label={muted ? '컬러 지도로 보기' : '지도 흐리게 보기'}
+                        title={muted ? '컬러 지도로 보기' : '지도 흐리게 보기 (코스가 잘 보여요)'}
+                    />
                 </div>
 
                 <div className="explore__legend" aria-hidden="true">

@@ -188,6 +188,73 @@ class McpTests(unittest.TestCase):
         self.assertEqual(self.client.post('/mcp', headers={'Authorization': f"Bearer {tokens['access_token']}"}, json={}).status_code, 401)
         self.assertEqual(self.client.get('/oauth/connections', headers=self.owner).json(), [])
 
+    def test_client_metadata_document(self):
+        """Claude 기본 방식: client_id가 https 주소인 메타데이터 문서(CIMD) 클라이언트"""
+        import httpx
+        doc_url = 'https://claude.ai/oauth/mcp-client-metadata.json'
+        documents = {doc_url: {'client_id': doc_url, 'client_name': 'Claude', 'redirect_uris': [REDIRECT], 'token_endpoint_auth_method': 'none'},
+                     'https://evil.example/doc': {'client_id': 'https://other.example/doc', 'redirect_uris': [REDIRECT]}}
+        requests = []
+        def handler(request):
+            requests.append(str(request.url))
+            body = documents.get(str(request.url))
+            return httpx.Response(200, json=body) if body else httpx.Response(404)
+        real_client = httpx.Client
+        factory = lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs)
+        api.cimd_cache.clear()
+        with patch.object(api.httpx, 'Client', side_effect=factory), patch.object(api, 'public_host', return_value=True):
+            self.assertTrue(self.client.get('/.well-known/oauth-authorization-server').json()['client_id_metadata_document_supported'])
+            info = self.client.get('/oauth/client', params={'client_id': doc_url, 'redirect_uri': REDIRECT}).json()
+            self.assertEqual(info['client_name'], 'Claude')
+            # 문서의 client_id가 주소와 다르면 받지 않습니다.
+            self.assertEqual(self.client.get('/oauth/client', params={'client_id': 'https://evil.example/doc', 'redirect_uri': REDIRECT}).status_code, 400)
+            self.assertEqual(self.client.get('/oauth/client', params={'client_id': doc_url, 'redirect_uri': 'https://evil.example/cb'}).status_code, 400)
+            redirect = self.authorize(doc_url, self.owner).json()['redirect_to']
+            code = urllib.parse.parse_qs(urllib.parse.urlsplit(redirect).query)['code'][0]
+            tokens = self.client.post('/oauth/token', data={'grant_type': 'authorization_code', 'code': code, 'client_id': doc_url,
+                                                            'redirect_uri': REDIRECT, 'code_verifier': VERIFIER}).json()
+            self.assertIn('result', self.rpc(tokens['access_token'], 'ping'))
+            # 문서는 한 번 받으면 잠시 기억합니다.
+            self.assertEqual(requests.count(doc_url), 1)
+            connections = self.client.get('/oauth/connections', headers=self.owner).json()
+            self.assertEqual([(c['client_id'], c['client_name']) for c in connections], [(doc_url, 'Claude')])
+            self.client.delete('/oauth/connections/' + urllib.parse.quote(doc_url, safe=''), headers=self.owner)
+            self.assertEqual(self.client.get('/oauth/connections', headers=self.owner).json(), [])
+        # 내부 주소로 가는 문서는 내려받지 않습니다.
+        api.cimd_cache.clear()
+        with patch.object(api, 'public_host', return_value=False):
+            self.assertEqual(self.client.get('/oauth/client', params={'client_id': doc_url, 'redirect_uri': REDIRECT}).status_code, 400)
+        self.assertFalse(api.public_host('127.0.0.1', 443))
+
+    def test_reviewer_login(self):
+        client_id = self.register().json()['client_id']
+        login = {'reviewer_id': 'reviewer', 'reviewer_password': 'correct-horse-battery'}
+        self.assertEqual(self.authorize(client_id, **login).status_code, 404)
+        settings = (('REVIEWER_LOGIN_ID', 'reviewer'), ('REVIEWER_LOGIN_PASSWORD', 'correct-horse-battery'), ('REVIEWER_UID', 'owner-token'), ('reviewer_login_failures', []))
+        patchers = [patch.object(api, name, value) for name, value in settings]
+        for patcher in patchers:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.assertTrue(self.client.get('/oauth/client', params={'client_id': client_id, 'redirect_uri': REDIRECT}).json()['reviewer_login'])
+        self.save_course(self.owner, '심사용 코스', YEOUIDO_LOOP)
+        self.assertEqual(self.authorize(client_id, reviewer_id='reviewer', reviewer_password='wrong').status_code, 401)
+        redirect = self.authorize(client_id, **login).json()['redirect_to']
+        code = urllib.parse.parse_qs(urllib.parse.urlsplit(redirect).query)['code'][0]
+        tokens = self.client.post('/oauth/token', data={'grant_type': 'authorization_code', 'code': code, 'client_id': client_id,
+                                                        'redirect_uri': REDIRECT, 'code_verifier': VERIFIER}).json()
+        titles = [c['title'] for c in self.call(tokens['access_token'], 'search_courses', scope='mine')['structuredContent']['courses']]
+        self.assertEqual(titles, ['심사용 코스'])
+        for _ in range(api.ADMIN_LOGIN_MAX_PER_IP):
+            self.authorize(client_id, reviewer_id='reviewer', reviewer_password='wrong')
+        self.assertEqual(self.authorize(client_id, **login).status_code, 429)
+
+    def test_openai_domain_challenge(self):
+        self.assertEqual(self.client.get('/.well-known/openai-apps-challenge').status_code, 404)
+        with patch.object(api, 'OPENAI_APPS_CHALLENGE', 'token-123'):
+            response = self.client.get('/.well-known/openai-apps-challenge')
+            self.assertEqual(response.text, 'token-123')
+            self.assertTrue(response.headers['content-type'].startswith('text/plain'))
+
     # --- MCP ---
     def test_protocol(self):
         _, tokens = self.login()

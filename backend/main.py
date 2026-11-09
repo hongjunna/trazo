@@ -1521,10 +1521,13 @@ async def export_tcx(request: TCXExportRequest):
 #  4. AI 서비스가 /oauth/token 에서 코드를 액세스 토큰으로 바꾸고, 그 토큰으로 /mcp 를 호출합니다.
 # 토큰은 DB에 해시로만 저장합니다. Firebase ID 토큰은 AI 서비스에 넘기지 않습니다.
 import base64
+import ipaddress
+import socket
 import urllib.parse
+from types import SimpleNamespace
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import delete
 from sqlalchemy.orm import defer
 from pydantic import ConfigDict, model_validator
@@ -1580,6 +1583,95 @@ class OAuthToken(SQLModel, table=True):
     scope: str
     expires_at: int
     created_at: str = Field(default_factory=utc_now)
+
+# 클라이언트 ID 메타데이터 문서(CIMD)로 들어온 AI 서비스. client_id가 https 주소이고, 그 주소의 JSON에 이름과 돌아갈 주소가 있습니다.
+# Claude의 기본 연결 방식("Use Claude's published identity")이 이 방식입니다. 연결 관리 화면에 이름을 보여주려고 기록해 둡니다.
+class OAuthClientMetadata(SQLModel, table=True):
+    client_id: str = Field(primary_key=True)
+    client_name: str
+    redirect_uris_json: str
+    fetched_at: str = Field(default_factory=utc_now)
+
+CIMD_CACHE_SECONDS = 3600
+CIMD_MAX_BYTES = 64 * 1024
+cimd_cache: dict = {}
+
+# 마켓(ChatGPT·Claude 디렉터리) 심사자 전용 로그인. 세 값이 모두 있어야 켜집니다.
+# 심사자는 문자·이메일 인증 없이 로그인해야 하므로, 구글 로그인 대신 아이디·비밀번호로 REVIEWER_UID 계정에 연결합니다.
+REVIEWER_LOGIN_ID = os.getenv("REVIEWER_LOGIN_ID", "").strip()
+REVIEWER_LOGIN_PASSWORD = os.getenv("REVIEWER_LOGIN_PASSWORD", "")
+REVIEWER_UID = os.getenv("REVIEWER_UID", "").strip()
+REVIEWER_PASSWORD_MIN = 12
+reviewer_login_failures: list = []
+
+def reviewer_login_enabled() -> bool:
+    return bool(REVIEWER_LOGIN_ID and REVIEWER_UID and len(REVIEWER_LOGIN_PASSWORD) >= REVIEWER_PASSWORD_MIN)
+
+# OpenAI 플러그인 제출 화면의 도메인 인증 토큰 (/.well-known/openai-apps-challenge)
+OPENAI_APPS_CHALLENGE = os.getenv("OPENAI_APPS_CHALLENGE", "").strip()
+
+def is_metadata_client_id(client_id) -> bool:
+    return isinstance(client_id, str) and client_id.startswith("https://")
+
+def public_host(host: str, port: int) -> bool:
+    """내부 주소로 요청을 보내지 않도록, 공인 IP로만 연결되는 주소인지 확인합니다."""
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return False
+    return bool(infos) and all(ipaddress.ip_address(info[4][0]).is_global for info in infos)
+
+def fetch_client_metadata(client_id: str) -> Optional[dict]:
+    """CIMD 문서를 내려받아 확인합니다. 문서의 client_id가 주소와 같아야 하고, 돌아갈 주소는 등록 규칙을 따라야 합니다."""
+    now = time.time()
+    cached = cimd_cache.get(client_id)
+    if cached and cached[0] > now:
+        return cached[1]
+    document = None
+    try:
+        parts = urllib.parse.urlsplit(client_id)
+        if (len(client_id) <= 500 and parts.scheme == "https" and parts.hostname and parts.path not in ("", "/")
+                and not parts.fragment and not parts.username and not parts.password
+                and public_host(parts.hostname, parts.port or 443)):
+            with httpx.Client(timeout=5, follow_redirects=False) as client:
+                with client.stream("GET", client_id, headers={"Accept": "application/json"}) as response:
+                    body = b""
+                    if response.status_code == 200:
+                        for chunk in response.iter_bytes():
+                            body += chunk
+                            if len(body) > CIMD_MAX_BYTES:
+                                body = b""
+                                break
+            data = json.loads(body) if body else None
+            uris = data.get("redirect_uris") if isinstance(data, dict) else None
+            if (isinstance(data, dict) and data.get("client_id") == client_id
+                    and isinstance(uris, list) and 0 < len(uris) <= OAUTH_REDIRECT_URIS_MAX and all(valid_redirect_uri(uri) for uri in uris)
+                    and data.get("token_endpoint_auth_method", "none") == "none"):
+                name = data.get("client_name")
+                document = {"client_name": name.strip()[:80] if isinstance(name, str) and name.strip() else parts.hostname, "redirect_uris": uris}
+    except (httpx.HTTPError, ValueError, UnicodeDecodeError) as error:
+        mcp_logger.warning("클라이언트 메타데이터 문서를 읽지 못했습니다 (%s): %s", client_id, error)
+    # 실패도 잠시 기억해 같은 주소로 계속 요청하지 않습니다.
+    cimd_cache[client_id] = (now + (CIMD_CACHE_SECONDS if document else 60), document)
+    if len(cimd_cache) > 1000:
+        cimd_cache.clear()
+    if document:
+        with Session(engine) as session:
+            row = session.get(OAuthClientMetadata, client_id) or OAuthClientMetadata(client_id=client_id, client_name="", redirect_uris_json="[]")
+            row.client_name, row.redirect_uris_json, row.fetched_at = document["client_name"], json.dumps(document["redirect_uris"]), utc_now()
+            session.add(row)
+            session.commit()
+    return document
+
+def load_client(session: Session, client_id) -> Optional[SimpleNamespace]:
+    """등록한(DCR) 클라이언트와 메타데이터 문서(CIMD) 클라이언트를 같은 모양으로 돌려줍니다."""
+    if not isinstance(client_id, str) or not client_id:
+        return None
+    if is_metadata_client_id(client_id):
+        document = fetch_client_metadata(client_id)
+        return SimpleNamespace(client_id=client_id, client_name=document["client_name"], redirect_uris=document["redirect_uris"], secret_hash=None) if document else None
+    client = session.get(OAuthClient, client_id)
+    return SimpleNamespace(client_id=client.client_id, client_name=client.client_name, redirect_uris=client_redirect_uris(client), secret_hash=client.secret_hash) if client else None
 
 def secret_hash(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
@@ -1652,6 +1744,7 @@ def oauth_authorization_server():
         "token_endpoint_auth_methods_supported": ["none", "client_secret_post", "client_secret_basic"],
         "revocation_endpoint_auth_methods_supported": ["none", "client_secret_post", "client_secret_basic"],
         "authorization_response_iss_parameter_supported": True,
+        "client_id_metadata_document_supported": True,
         "service_documentation": PUBLIC_BASE_URL + "/ai/",
     }
 
@@ -1707,11 +1800,11 @@ async def oauth_register(request: HTTPRequest):
         body.update(client_secret=client_secret, client_secret_expires_at=0)
     return JSONResponse(body, status_code=201, headers=NO_STORE)
 
-def find_client(session: Session, client_id: str, redirect_uri: str) -> OAuthClient:
-    client = session.get(OAuthClient, client_id) if client_id else None
+def find_client(session: Session, client_id: str, redirect_uri: str):
+    client = load_client(session, client_id)
     if not client:
         raise HTTPException(status_code=400, detail="Unknown client")
-    if redirect_uri not in client_redirect_uris(client):
+    if redirect_uri not in client.redirect_uris:
         raise HTTPException(status_code=400, detail="Redirect URI is not registered")
     return client
 
@@ -1719,7 +1812,8 @@ def find_client(session: Session, client_id: str, redirect_uri: str) -> OAuthCli
 @app.get("/oauth/client")
 def oauth_client_info(client_id: str = "", redirect_uri: str = "", session: Session = Depends(get_session)):
     client = find_client(session, client_id, redirect_uri)
-    return {"client_name": client.client_name, "redirect_uri": redirect_uri, "redirect_host": redirect_host(redirect_uri)}
+    return {"client_name": client.client_name, "redirect_uri": redirect_uri, "redirect_host": redirect_host(redirect_uri),
+            "reviewer_login": reviewer_login_enabled()}
 
 class AuthorizeRequest(BaseModel):
     client_id: str = PydanticField(max_length=64)
@@ -1731,6 +1825,9 @@ class AuthorizeRequest(BaseModel):
     scope: Optional[str] = PydanticField(default=None, max_length=500)
     resource: Optional[str] = PydanticField(default=None, max_length=500)
     approve: bool = False
+    # 심사자 전용 로그인 (구글 로그인 대신)
+    reviewer_id: Optional[str] = PydanticField(default=None, max_length=128)
+    reviewer_password: Optional[str] = PydanticField(default=None, max_length=256)
 
 def with_query(uri: str, params: dict) -> str:
     parts = urllib.parse.urlsplit(uri)
@@ -1739,7 +1836,7 @@ def with_query(uri: str, params: dict) -> str:
 
 # 동의 화면에서 허용/거부를 누르면 호출합니다. AI 서비스로 이동할 주소를 돌려줍니다.
 @app.post("/oauth/authorize")
-def oauth_authorize(data: AuthorizeRequest, session: Session = Depends(get_session), user_id: str | int | None = Depends(get_optional_user)):
+def oauth_authorize(data: AuthorizeRequest, request: HTTPRequest, session: Session = Depends(get_session), user_id: str | int | None = Depends(get_optional_user)):
     find_client(session, data.client_id, data.redirect_uri)
     def back(**params):
         return {"redirect_to": with_query(data.redirect_uri, {**params, "state": data.state, "iss": PUBLIC_BASE_URL})}
@@ -1751,6 +1848,8 @@ def oauth_authorize(data: AuthorizeRequest, session: Session = Depends(get_sessi
         return back(error="invalid_request", error_description="PKCE with S256 is required")
     if data.resource and data.resource.rstrip("/") not in (mcp_resource(), PUBLIC_BASE_URL):
         return back(error="invalid_target", error_description="Unknown resource")
+    if data.reviewer_id is not None:
+        user_id = check_reviewer_login(data.reviewer_id, data.reviewer_password or "", client_ip(request))
     if not isinstance(user_id, str):
         raise HTTPException(status_code=401, detail="Google login required", headers={"WWW-Authenticate": "Bearer"})
     code = "trz_ac_" + secrets.token_urlsafe(32)
@@ -1758,6 +1857,29 @@ def oauth_authorize(data: AuthorizeRequest, session: Session = Depends(get_sessi
                           code_challenge=data.code_challenge, scope=MCP_SCOPE, expires_at=int(time.time()) + OAUTH_CODE_SECONDS))
     session.commit()
     return back(code=code)
+
+def check_reviewer_login(login_id: str, password: str, ip: str) -> str:
+    if not reviewer_login_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+    now = time.time()
+    with admin_login_lock:
+        reviewer_login_failures[:] = [(at, who) for at, who in reviewer_login_failures if now - at < ADMIN_LOGIN_WINDOW]
+        if (len(reviewer_login_failures) >= ADMIN_LOGIN_MAX_TOTAL
+                or sum(who == ip for _, who in reviewer_login_failures) >= ADMIN_LOGIN_MAX_PER_IP):
+            raise HTTPException(status_code=429, detail="Too many login attempts", headers={"Retry-After": str(ADMIN_LOGIN_WINDOW)})
+        id_ok = hmac.compare_digest(login_id.encode(), REVIEWER_LOGIN_ID.encode())
+        password_ok = hmac.compare_digest(password.encode(), REVIEWER_LOGIN_PASSWORD.encode())
+        if not (id_ok and password_ok):
+            reviewer_login_failures.append((now, ip))
+            raise HTTPException(status_code=401, detail="Invalid reviewer credentials")
+    mcp_logger.warning("심사자 로그인: %s", ip)
+    return REVIEWER_UID
+
+@app.get("/.well-known/openai-apps-challenge")
+def openai_apps_challenge():
+    if not OPENAI_APPS_CHALLENGE:
+        raise HTTPException(status_code=404, detail="Not Found")
+    return PlainTextResponse(OPENAI_APPS_CHALLENGE, headers={"Cache-Control": "no-store"})
 
 def authenticate_client(session: Session, form: dict, authorization: str):
     client_id, client_secret = form.get("client_id"), form.get("client_secret")
@@ -1768,7 +1890,7 @@ def authenticate_client(session: Session, form: dict, authorization: str):
             return None
         basic_id, _, basic_secret = decoded.partition(":")
         client_id, client_secret = urllib.parse.unquote_plus(basic_id), urllib.parse.unquote_plus(basic_secret)
-    client = session.get(OAuthClient, client_id) if isinstance(client_id, str) and client_id else None
+    client = load_client(session, client_id)
     if not client:
         return None
     if client.secret_hash and not (isinstance(client_secret, str)
@@ -1845,15 +1967,18 @@ async def oauth_revoke(request: HTTPRequest):
 @app.get("/oauth/connections")
 def oauth_connections(session: Session = Depends(get_session), user_id: str = Depends(get_google_user)):
     rows = session.exec(
-        select(OAuthToken.client_id, OAuthClient.client_name, func.min(OAuthToken.created_at), func.max(OAuthToken.created_at))
-        .join(OAuthClient, OAuthClient.client_id == OAuthToken.client_id)
+        select(OAuthToken.client_id, func.min(OAuthToken.created_at), func.max(OAuthToken.created_at))
         .where(OAuthToken.firebase_uid == user_id, OAuthToken.kind == "refresh", OAuthToken.expires_at >= int(time.time()))
-        .group_by(OAuthToken.client_id, OAuthClient.client_name)
+        .group_by(OAuthToken.client_id)
     ).all()
-    return [{"client_id": cid, "client_name": name, "connected_at": first, "last_refreshed_at": last}
-            for cid, name, first, last in sorted(rows, key=lambda row: row[3], reverse=True)]
+    ids = [row[0] for row in rows]
+    names = dict(session.exec(select(OAuthClient.client_id, OAuthClient.client_name).where(OAuthClient.client_id.in_(ids))).all()) if ids else {}
+    if ids:
+        names.update(session.exec(select(OAuthClientMetadata.client_id, OAuthClientMetadata.client_name).where(OAuthClientMetadata.client_id.in_(ids))).all())
+    return [{"client_id": cid, "client_name": names.get(cid) or redirect_host(cid), "connected_at": first, "last_refreshed_at": last}
+            for cid, first, last in sorted(rows, key=lambda row: row[2], reverse=True)]
 
-@app.delete("/oauth/connections/{client_id}")
+@app.delete("/oauth/connections/{client_id:path}")
 def oauth_disconnect(client_id: str, session: Session = Depends(get_session), user_id: str = Depends(get_google_user)):
     session.exec(delete(OAuthToken).where(OAuthToken.firebase_uid == user_id, OAuthToken.client_id == client_id))
     session.commit()

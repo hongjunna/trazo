@@ -16,3 +16,5 @@
 - English guide: https://trazo.runvia.app/en/guide/
 - Privacy policy (Korean): https://trazo.runvia.app/privacy/
 - Privacy policy (English): https://trazo.runvia.app/en/privacy/
+- Terms of Service: https://trazo.runvia.app/en/terms/
+- Support: https://trazo.runvia.app/support/

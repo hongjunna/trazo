@@ -1,0 +1,12 @@
+{
+  "name": "trazo",
+  "version": "1.0.0",
+  "description": "Read your Trazo running and cycling routes and public community routes in South Korea (distance, elevation, gradient, climbs, location) to recommend routes and check them against your training plan. Read-only.",
+  "author": {
+    "name": "Junlab",
+    "email": "trazo@junlab.xyz",
+    "url": "https://trazo.runvia.app"
+  },
+  "homepage": "https://trazo.runvia.app/en/ai/",
+  "keywords": ["running", "cycling", "routes", "training", "korea"]
+}

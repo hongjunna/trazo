@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "trazo": {
+      "type": "http",
+      "url": "https://trazo.runvia.app/mcp"
+    }
+  }
+}

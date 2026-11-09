@@ -17,30 +17,67 @@ const EXAMPLES = [
     '여의도 근처에서 출발하는 40km 자전거 코스 추천해줘',
 ];
 
+// ChatGPT '설명' 칸에 넣을 문구 (선택 항목)
+export const CHATGPT_DESCRIPTION = '내 Trazo 러닝·자전거 코스와 커뮤니티 공개 코스를 읽어, 거리·고도·경사·위치를 근거로 코스를 추천하고 훈련 계획을 도와줘요. 읽기 전용이라 코스를 바꾸지 않아요.';
+
+// 각 단계: text(설명), fields(입력 칸 이름과 넣을 값), check(확인 문구)
 const GUIDES = [
-    {
-        id: 'claude',
-        name: 'Claude',
-        note: 'claude.ai 웹·데스크톱 앱에서 연결하면 모바일 앱에서도 함께 쓸 수 있어요.',
-        steps: [
-            <>Claude에서 <b>설정 → 커넥터</b>로 들어갑니다.</>,
-            <><b>커스텀 커넥터 추가</b>를 누르고 이름에 <b>Trazo</b>, URL에 위 연결 주소를 넣은 뒤 <b>추가</b>를 누릅니다.</>,
-            <>목록의 Trazo에서 <b>연결</b>을 누르면 Trazo 로그인 창이 열립니다. 구글 계정으로 로그인하고 <b>허용</b>을 누릅니다.</>,
-            <>새 대화의 입력창 아래 도구(검색 및 도구) 메뉴에서 Trazo가 켜져 있는지 확인하고 질문하세요.</>,
-        ],
-    },
     {
         id: 'chatgpt',
         name: 'ChatGPT',
-        note: '개발자 모드로 직접 만든 앱(커넥터)을 추가하는 방식이에요. 요금제와 계정 종류에 따라 메뉴가 없을 수 있어요.',
         steps: [
-            <>ChatGPT에서 <b>설정 → 앱(Apps & Connectors) → 고급 설정</b>으로 들어가 <b>개발자 모드</b>를 켭니다.</>,
-            <>앱 화면에서 <b>만들기(Create)</b>를 누르고 이름에 <b>Trazo</b>, MCP 서버 URL에 위 연결 주소를 넣고, 인증은 <b>OAuth</b>를 고릅니다.</>,
-            <><b>만들기</b>를 누르면 Trazo 로그인 창이 열립니다. 구글 계정으로 로그인하고 <b>허용</b>을 누릅니다.</>,
-            <>새 대화의 <b>+</b> 메뉴에서 Trazo를 고른 뒤 질문하세요.</>,
+            { text: <>ChatGPT 왼쪽 <b>사이드바 → 플러그인</b>으로 들어가 <b>추가</b>를 누르고 <b>사용자 지정 MCP 서버 추가</b>를 고릅니다.</> },
+            {
+                text: <>아래 값을 입력합니다.</>,
+                fields: [
+                    { label: '이름', value: 'Trazo' },
+                    { label: '설명 (선택)', value: CHATGPT_DESCRIPTION },
+                    { label: '연결 세팅 › 서버 URL', value: 'MCP_URL' },
+                    { label: '인증', value: 'OAuth', plain: true },
+                ],
+            },
+            { text: <>아래쪽의 <b>“이해했으며 계속 진행하겠습니다”</b>에 체크하고 <b>플러그인으로 생성</b>을 누릅니다.</> },
+            { text: <><b>Trazo 연결</b> 창이 뜨면 <b>Trazo 연결 ↗︎</b>을 누르고, 열린 Trazo 화면에서 구글 계정으로 로그인한 뒤 <b>허용</b>을 누릅니다.</> },
+            { text: <>ChatGPT로 돌아와 <b>“Primary 연결이 완료되었습니다”</b> 녹색 알림이 보이면 연결 완료예요.</> },
+            { text: <>새 채팅에서 이렇게 보내 확인해 보세요.</>, fields: [{ label: '확인 메시지', value: '@Trazo 서비스 연결 상태 확인해줘' }] },
+        ],
+        notes: [
+            '연결되면 ChatGPT가 내 코스 수와 최근 코스를 읽어 “연결 정상”을 알려줘요. 이후에는 @Trazo를 붙이거나 그냥 코스 관련 질문을 하면 돼요.',
+            '플러그인 메뉴가 보이지 않으면 요금제나 워크스페이스 설정에서 사용자 지정 MCP 서버(개발자 모드)가 허용돼 있는지 확인하세요.',
+        ],
+    },
+    {
+        id: 'claude',
+        name: 'Claude',
+        steps: [
+            { text: <>Claude 웹(claude.ai) 또는 데스크톱 앱에서 <b>맞춤 설정(Customize) → 커넥터(Connectors)</b>로 들어갑니다.</> },
+            { text: <><b>+ 추가(+ Add)</b>를 누르고 <b>커스텀 커넥터 추가(Add custom connector)</b>를 고릅니다.</> },
+            {
+                text: <>이름과 주소를 넣고 <b>계속(Continue)</b>을 누릅니다.</>,
+                fields: [
+                    { label: '이름', value: 'Trazo' },
+                    { label: '원격 MCP 서버 URL', value: 'MCP_URL' },
+                ],
+            },
+            { text: <>감지된 인증 설정이 나오면 기본값(OAuth 로그인, <b>Use Claude’s published identity (권장)</b>)을 그대로 두고 <b>추가(Add)</b>를 누릅니다.</> },
+            { text: <>목록의 Trazo에서 <b>연결(Connect)</b>을 누르고, 열린 Trazo 화면에서 구글 계정으로 로그인한 뒤 <b>허용</b>을 누릅니다.</> },
+            { text: <>채팅 입력창 왼쪽 아래 <b>+</b> → <b>커넥터(Connectors)</b>에서 Trazo가 켜져 있는지 확인하고 질문하세요.</>, fields: [{ label: '확인 메시지', value: 'Trazo 서비스 연결 상태 확인해줘' }] },
+        ],
+        notes: [
+            '무료 요금제는 커스텀 커넥터를 1개까지 추가할 수 있어요.',
+            'Team·Enterprise는 조직 Owner가 먼저 조직 설정 → 커넥터 → 추가 → Custom → Web으로 Trazo를 추가해야 하고, 구성원은 맞춤 설정 → 커넥터에서 Trazo의 연결을 누르면 돼요.',
+            '웹·데스크톱에서 연결하면 같은 계정의 Claude 모바일 앱에서도 쓸 수 있어요. 메뉴 이름은 Claude 업데이트에 따라 조금 다를 수 있어요.',
         ],
     },
 ];
+
+const GuideField = ({ label, value, plain, onCopy }) => (
+    <div className="connect-field">
+        <span className="connect-field__label">{label}</span>
+        <span className="connect-field__value">{value}</span>
+        {!plain && <Button size="sm" variant="ghost" icon="copy" onClick={() => onCopy(value)} aria-label={`${label} 복사`} title="복사" />}
+    </div>
+);
 
 const Connections = ({ user, onLogin }) => {
     const { toast, confirm } = useFeedback();
@@ -96,10 +133,11 @@ const Connections = ({ user, onLogin }) => {
 
 const ConnectCenter = ({ user, onLogin }) => {
     const { toast } = useFeedback();
-    const [guide, setGuide] = useState('claude');
+    const [guide, setGuide] = useState('chatgpt');
     const mcpUrl = `${window.location.origin}/mcp`;
     const active = GUIDES.find(item => item.id === guide);
-    const copy = async () => toast(await copyText(mcpUrl) ? '연결 주소를 복사했어요.' : '복사하지 못했어요. 직접 선택해 복사하세요.', { tone: 'info' });
+    const copyValue = async (value) => toast(await copyText(value) ? '복사했어요.' : '복사하지 못했어요. 직접 선택해 복사하세요.', { tone: 'info' });
+    const copy = () => copyValue(mcpUrl);
 
     return (
         <PageFrame
@@ -119,7 +157,7 @@ const ConnectCenter = ({ user, onLogin }) => {
                     </div>
                 </section>
 
-                <section className="connect-card">
+                <section className="connect-card connect-card--wide">
                     <h2>연결 방법</h2>
                     <div className="connect-tabs" role="tablist" aria-label="AI 서비스">
                         {GUIDES.map(item => (
@@ -129,9 +167,22 @@ const ConnectCenter = ({ user, onLogin }) => {
                         ))}
                     </div>
                     <ol className="connect-steps">
-                        {active.steps.map((step, index) => <li key={index}>{step}</li>)}
+                        {active.steps.map((step, index) => (
+                            <li key={index}>
+                                {step.text}
+                                {step.fields && (
+                                    <div className="connect-fields">
+                                        {step.fields.map(field => (
+                                            <GuideField key={field.label} label={field.label} plain={field.plain} value={field.value === 'MCP_URL' ? mcpUrl : field.value} onCopy={copyValue} />
+                                        ))}
+                                    </div>
+                                )}
+                            </li>
+                        ))}
                     </ol>
-                    <p className="connect-muted">{active.note} AI 서비스의 메뉴 이름은 업데이트에 따라 조금씩 바뀔 수 있어요.</p>
+                    <ul className="connect-notes">
+                        {active.notes.map(note => <li key={note}>{note}</li>)}
+                    </ul>
                 </section>
 
                 <section className="connect-card">

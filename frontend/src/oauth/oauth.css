@@ -123,3 +123,28 @@ body { overflow: auto; }
   gap: 8px;
   margin-top: 6px;
 }
+
+/* 마켓 심사자 전용 로그인 */
+.ai-reviewer__toggle {
+  align-self: flex-start;
+  color: var(--c-text-3);
+  font-weight: 500;
+}
+
+.ai-reviewer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px dashed var(--c-border-strong);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+}
+
+.ai-reviewer input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
