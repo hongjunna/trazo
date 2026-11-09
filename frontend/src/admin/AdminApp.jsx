@@ -9,7 +9,7 @@ import CourseThumbnail from '../components/CourseThumbnail';
 import { useFeedback } from '../components/ui/feedbackContext';
 import { SPORTS } from '../sports';
 import { VISIBILITY, copyText, sharePath } from '../utils/share';
-import { getCourse, getCourses, getSummary, getUsers, isUnauthorized, loadToken, login, loginErrorMessage, saveToken } from './adminApi';
+import { assignVirtualAccounts, createVirtualAccounts, deleteVirtualAccount, getCourse, getCourses, getSummary, getUsers, getVirtualAccounts, isUnauthorized, loadToken, login, loginErrorMessage, saveToken } from './adminApi';
 
 const USER_PAGE = 50;
 const COURSE_PAGE = 30;
@@ -17,6 +17,7 @@ const TABS = [
     { id: 'overview', label: '개요', icon: 'chart' },
     { id: 'users', label: '회원', icon: 'users' },
     { id: 'courses', label: '코스', icon: 'route' },
+    { id: 'virtual', label: '가상 계정', icon: 'user' },
 ];
 
 // 코스 저장 시각은 시간대 없이 UTC로 저장돼 있어, 표시할 때 UTC로 읽습니다.
@@ -116,7 +117,8 @@ const Overview = ({ onUnauthorized }) => {
             <Stat label="공개 범위" value={data.visibility.public} sub={`전체 공개 · 링크 ${data.visibility.link} · 비공개 ${data.visibility.private}`} />
             <Stat label="종목" value={data.sport.bike} sub={`자전거 · 러닝 ${data.sport.run}`} />
             <Stat label="댓글" value={data.comments} />
-            <Stat label="좋아요" value={data.likes} />
+            <Stat label="좋아요" value={data.likes} sub={`가상 계정이 누른 좋아요 ${data.virtual_likes}`} />
+            <Stat label="가상 계정" value={data.virtual_accounts} sub="회원 수에서 빠집니다" />
         </div>
     );
 };
@@ -171,7 +173,11 @@ const UsersTab = ({ onUnauthorized, onShowCourses }) => {
                     <tbody>
                         {data?.items.map(user => (
                             <tr key={user.firebase_uid}>
-                                <td>{user.nickname ?? <span className="admin-muted">닉네임 없음</span>}</td>
+                                <td>
+                                    {user.nickname ?? <span className="admin-muted">닉네임 없음</span>}
+                                    {user.is_virtual && <span className="admin-tag">가상</span>}
+                                    {user.is_seed && <span className="admin-tag">운영</span>}
+                                </td>
                                 <td><CopyUid uid={user.firebase_uid} /></td>
                                 <td>{formatDate(user.joined_at)}</td>
                                 <td>{formatDate(user.last_active_at)}</td>
@@ -278,7 +284,7 @@ const CoursesTab = ({ owner, onClearOwner, onUnauthorized, onOpen }) => {
                                 {course.distance_km.toLocaleString('ko-KR')}km · 상승 {course.ascent_m.toLocaleString('ko-KR')}m
                                 {course.waypoint_count > 0 && ` · 웨이포인트 ${course.waypoint_count}`}
                             </span>
-                            <span className="admin-course__meta">#{course.id} · {ownerName(course)} · {formatDate(course.created_at)}</span>
+                            <span className="admin-course__meta">#{course.id} · {ownerName(course)}{course.display_nickname ? ` (표시: ${course.display_nickname})` : ''} · {formatDate(course.created_at)}</span>
                             {course.visibility === 'public' && !course.is_deleted && (
                                 <span className="admin-course__meta">좋아요 {course.like_count} · 댓글 {course.comment_count} · 담기 {course.share_count}</span>
                             )}
@@ -330,6 +336,7 @@ const CourseDetail = ({ courseId, onClose, onUnauthorized, onShowOwner }) => {
                             {ownerName(course)} {course.firebase_uid && <CopyUid uid={course.firebase_uid} />}
                             {course.firebase_uid && <Button size="sm" variant="ghost" onClick={() => onShowOwner(course)}>이 회원의 코스</Button>}
                         </dd>
+                        {course.display_nickname && <><dt>표시 작성자</dt><dd>{course.display_nickname} <span className="admin-muted">(가상 계정)</span></dd></>}
                         <dt>거리 · 상승</dt><dd>{course.distance_km.toLocaleString('ko-KR')}km · {course.ascent_m.toLocaleString('ko-KR')}m</dd>
                         <dt>만든 시각</dt><dd>{formatDate(course.created_at)}</dd>
                         {course.published_at && <><dt>전체 공개</dt><dd>{formatDate(course.published_at)}</dd></>}
@@ -355,6 +362,138 @@ const CourseDetail = ({ courseId, onClose, onUnauthorized, onShowOwner }) => {
                 </div>
             )}
         </Dialog>
+    );
+};
+
+const VirtualTab = ({ onUnauthorized }) => {
+    const { toast, confirm } = useFeedback();
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(null);
+    const [text, setText] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [problems, setProblems] = useState([]);
+
+    const fail = useCallback((err, message) => {
+        if (isUnauthorized(err)) onUnauthorized();
+        else toast(message, { tone: 'error' });
+    }, [onUnauthorized, toast]);
+    const load = useCallback(() => {
+        getVirtualAccounts()
+            .then(({ data: next }) => { setData(next); setError(null); })
+            .catch(err => { setError(err); if (isUnauthorized(err)) onUnauthorized(); });
+    }, [onUnauthorized]);
+    useEffect(load, [load]);
+
+    const add = async (event) => {
+        event.preventDefault();
+        const nicknames = text.split(/[\n,]/).map(item => item.trim()).filter(Boolean);
+        if (!nicknames.length) return;
+        setBusy(true);
+        try {
+            const { data: result } = await createVirtualAccounts(nicknames.slice(0, 100));
+            setProblems(result.errors);
+            setText(result.errors.map(item => item.nickname).join('\n'));
+            toast(`가상 계정 ${result.created.length}개를 만들었어요${result.assigned ? ` · 코스 ${result.assigned}개에 배정` : ''}.`, { tone: 'success' });
+            load();
+        } catch (err) {
+            fail(err, '가상 계정을 만들지 못했어요.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const assign = async (mode) => {
+        if (mode === 'all' && !(await confirm({ title: '작성자 다시 섞기', message: '운영 계정의 공개 코스 작성자를 모두 무작위로 다시 정해요. 이미 보이던 작성자 이름도 바뀌어요.', confirmLabel: '다시 섞기' }))) return;
+        try {
+            const { data: result } = await assignVirtualAccounts(mode);
+            toast(`코스 ${result.assigned}개에 작성자를 배정했어요.`, { tone: 'success' });
+            load();
+        } catch (err) {
+            fail(err, '배정하지 못했어요. 가상 계정이 있는지 확인하세요.');
+        }
+    };
+
+    const remove = async (item) => {
+        const ok = await confirm({
+            title: `'${item.nickname}' 삭제`,
+            message: `이 계정이 누른 좋아요 ${item.like_count}개가 지워지고, 작성자로 보이던 코스 ${item.course_count}개는 다른 가상 계정으로 바뀌어요.`,
+            confirmLabel: '삭제', tone: 'danger',
+        });
+        if (!ok) return;
+        try {
+            await deleteVirtualAccount(item.firebase_uid);
+            toast('가상 계정을 지웠어요.', { tone: 'success' });
+            load();
+        } catch (err) {
+            fail(err, '지우지 못했어요.');
+        }
+    };
+
+    if (error && !data) return <p className="admin-error">가상 계정을 불러오지 못했어요.</p>;
+    if (!data) return <p className="admin-muted">불러오는 중…</p>;
+    return (
+        <section className="admin-virtual">
+            <div className="admin-panel">
+                <h3 className="admin-subtitle">운영 계정</h3>
+                {data.seed_emails.length === 0 ? (
+                    <p className="admin-muted">서버 .env의 SEED_ACCOUNT_EMAILS에 운영 계정 이메일을 넣어야 해요.</p>
+                ) : (
+                    <>
+                        <p className="admin-muted">이 계정이 전체 공개한 코스는 아래 가상 계정 중 하나가 작성자로 보여요: {data.seed_emails.join(', ')}</p>
+                        {data.seed_accounts.length === 0
+                            ? <p className="admin-muted">아직 확인된 계정이 없어요. 서비스에 운영 계정으로 한 번 로그인하면 표시돼요.</p>
+                            : (
+                                <ul className="admin-list">
+                                    {data.seed_accounts.map(seed => (
+                                        <li key={seed.firebase_uid}>{seed.nickname ?? '닉네임 없음'} · {seed.email} · 전체 공개 코스 {seed.public_count}개</li>
+                                    ))}
+                                </ul>
+                            )}
+                        <div className="admin-actions">
+                            <Button size="sm" variant="soft" onClick={() => assign('unassigned')} disabled={!data.items.length || !data.unassigned_count}>
+                                작성자 없는 코스에 배정 ({data.unassigned_count})
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => assign('all')} disabled={!data.items.length}>모두 다시 섞기</Button>
+                        </div>
+                    </>
+                )}
+                <p className="admin-muted">좋아요 봇: {data.like_bot_enabled ? '켜짐 (가상 계정이 무작위 간격으로 공개 코스에 좋아요를 눌러요)' : '꺼짐 (서버 .env의 LIKE_BOT_TOKEN이 비어 있어요)'}</p>
+            </div>
+
+            <form className="admin-panel" onSubmit={add}>
+                <h3 className="admin-subtitle">가상 계정 추가</h3>
+                <p className="admin-muted">닉네임을 한 줄에 하나씩(또는 쉼표로 나눠) 입력하세요. 한글·영문·숫자·밑줄 3~16자, 실제 회원과 겹치지 않아야 해요.</p>
+                <textarea className="admin-textarea" rows={5} value={text} onChange={e => setText(e.target.value)} placeholder={'한강러너\n주말라이더\nrun_seoul'} />
+                {problems.length > 0 && (
+                    <ul className="admin-list admin-error">
+                        {problems.map(item => <li key={item.nickname}>{item.nickname}: {item.reason}</li>)}
+                    </ul>
+                )}
+                <div className="admin-actions">
+                    <Button type="submit" variant="primary" size="sm" loading={busy} disabled={!text.trim()}>추가</Button>
+                </div>
+            </form>
+
+            <div className="admin-table-wrap">
+                <table className="admin-table">
+                    <thead>
+                        <tr><th>닉네임</th><th>만든 시각</th><th className="num">작성자로 보이는 코스</th><th className="num">누른 좋아요</th><th /></tr>
+                    </thead>
+                    <tbody>
+                        {data.items.map(item => (
+                            <tr key={item.firebase_uid}>
+                                <td>{item.nickname}</td>
+                                <td>{formatDate(item.created_at)}</td>
+                                <td className="num">{item.course_count}</td>
+                                <td className="num">{item.like_count}</td>
+                                <td><Button size="sm" variant="danger-ghost" onClick={() => remove(item)}>삭제</Button></td>
+                            </tr>
+                        ))}
+                        {!data.items.length && <tr><td colSpan={5} className="admin-empty">아직 가상 계정이 없어요.</td></tr>}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     );
 };
 
@@ -396,6 +535,7 @@ const AdminApp = () => {
                 {tab === 'overview' && <Overview onUnauthorized={handleUnauthorized} />}
                 {tab === 'users' && <UsersTab onUnauthorized={handleUnauthorized} onShowCourses={showCourses} />}
                 {/* 회원을 바꾸면 필터와 쪽을 처음부터 다시 봅니다. */}
+                {tab === 'virtual' && <VirtualTab onUnauthorized={handleUnauthorized} />}
                 {tab === 'courses' && <CoursesTab key={owner?.firebase_uid ?? 'all'} owner={owner} onClearOwner={() => setOwner(null)} onUnauthorized={handleUnauthorized} onOpen={setOpenCourse} />}
             </main>
             <CourseDetail courseId={openCourse} onClose={() => setOpenCourse(null)} onUnauthorized={handleUnauthorized} onShowOwner={showCourses} />

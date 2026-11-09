@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trazo AI Integration | Running &amp; Cycling Routes in ChatGPT and Claude (MCP)</title>
+<meta name="description" content="Connect Trazo, a running and cycling route planner for South Korea, to ChatGPT and Claude via MCP. Your AI reads real distance, elevation, gradient and location data to recommend routes and check them against your training plan.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://trazo.runvia.app/en/ai/">
+<link rel="alternate" hreflang="ko" href="https://trazo.runvia.app/ai/">
+<link rel="alternate" hreflang="en" href="https://trazo.runvia.app/en/ai/">
+<link rel="alternate" hreflang="x-default" href="https://trazo.runvia.app/en/ai/">
+<link rel="icon" href="/favicon.svg">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Trazo">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Trazo AI Integration | Running & Cycling Routes in ChatGPT and Claude">
+<meta property="og:description" content="Connect your running and cycling routes to ChatGPT and Claude. Get route recommendations and training advice grounded in real route data.">
+<meta property="og:url" content="https://trazo.runvia.app/en/ai/">
+<meta property="og:image" content="https://trazo.runvia.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "name": "Trazo",
+      "url": "https://trazo.runvia.app/",
+      "applicationCategory": "SportsApplication",
+      "operatingSystem": "Web",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" },
+      "description": "Running and cycling route planner for South Korea with an MCP server for ChatGPT and Claude."
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "What is the Trazo MCP server?", "acceptedAnswer": { "@type": "Answer", "text": "MCP (Model Context Protocol) is a standard that lets AI assistants read data from other services. Connecting Trazo lets ChatGPT or Claude look up your running and cycling routes and public community routes during a conversation." } },
+        { "@type": "Question", "name": "Can the AI change or delete my routes?", "acceptedAnswer": { "@type": "Answer", "text": "No. The Trazo MCP server is read-only." } },
+        { "@type": "Question", "name": "Which AI assistants are supported?", "acceptedAnswer": { "@type": "Answer", "text": "Claude and ChatGPT, plus other tools that support remote MCP servers with OAuth sign-in. Connector availability depends on your AI plan." } }
+      ]
+    }
+  ]
+}
+</script>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#F3F5F6;color:#15262C;margin:0;line-height:1.7}
+main{max-width:860px;margin:auto;padding:32px 20px 56px}
+nav{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:24px}
+a{color:#0B4F57}
+h1{font-size:34px;line-height:1.25;letter-spacing:-.5px}
+.badge{display:inline-block;background:#8FCE3A;color:#083C42;font-weight:800;font-size:13px;padding:3px 12px;border-radius:999px}
+.url{display:inline-block;font:600 15px ui-monospace,Menlo,monospace;background:#fff;border:1px solid #E2E7E9;padding:10px 14px;border-radius:10px;color:#0B4F57}
+.card{background:#fff;border:1px solid #E2E7E9;border-radius:16px;padding:18px 20px;margin:12px 0}
+q{display:block;color:#083C42;font-weight:600}
+.start{display:inline-block;background:#0B4F57;color:#fff;padding:10px 22px;border-radius:12px;text-decoration:none;font-weight:700}
+section{margin:36px 0}
+footer{border-top:1px solid #E2E7E9;padding-top:18px;font-size:14px}
+</style>
+<script defer src="/ga.js"></script>
+</head>
+<body><main>
+<nav aria-label="Language"><a href="/">Trazo</a><a href="/en/guide/">Guide</a><a href="/ai/" lang="ko">한국어</a><a href="/en/ai/">English</a></nav>
+<span class="badge">ChatGPT · Claude · MCP</span>
+<h1>Ask your AI for a running route — and get an answer based on real route data</h1>
+<p>Trazo is a running and cycling route planner for South Korea. Connect it to ChatGPT or Claude and your assistant can read your saved routes and public community routes, including distance, elevation gain, gradient breakdown, climbs, per-kilometre elevation and start/end locations.</p>
+<a class="start" href="/connect">Connect now</a>
+<section>
+<h2>What you can ask</h2>
+<div class="card"><q>Recommend a flat 10 km running route along the Han River</q>The AI looks up the place, searches routes passing nearby, and filters by distance and climbing.</div>
+<div class="card"><q>Is my Namsan route good for hill repeats?</q>It reads the climbs and gradient distribution of your route and explains which segment to use.</div>
+<div class="card"><q>Find a 40 km cycling loop starting near Yeouido</q>It compares public cycling routes by distance, elevation and route type (loop, out-and-back, point-to-point).</div>
+</section>
+<section>
+<h2>How to connect</h2>
+<p><span class="url">https://trazo.runvia.app/mcp</span></p>
+<ol>
+<li><strong>Claude:</strong> Settings → Connectors → Add custom connector, then paste the URL.</li>
+<li><strong>ChatGPT:</strong> Settings → Apps → Advanced settings → enable Developer mode → Create, paste the URL and choose OAuth.</li>
+<li>Sign in to Trazo with Google in the window that opens and click Allow.</li>
+</ol>
+<p>The connection is read-only, and you can disconnect at any time from the <a href="/connect">Trazo connection center</a>. The Trazo app is currently in Korean.</p>
+</section>
+<footer>Trazo · <a href="/en/guide/">English guide</a> · <a href="/ai/" lang="ko">AI 연동 (한국어)</a> · <a href="/en/privacy/">Privacy</a></footer>
+</main></body></html>

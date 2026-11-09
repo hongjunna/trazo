@@ -6,6 +6,7 @@ import { SPORTS, SPORT_IDS } from '../sports';
 import { courseStats, flattenCourse } from '../utils/course';
 import { VISIBILITY, visibilityOf } from '../utils/share';
 import Dialog from './ui/Dialog';
+import PageFrame from './PageFrame';
 import Button from './ui/Button';
 import Icon from './ui/Icon';
 import MenuButton from './ui/MenuButton';
@@ -116,7 +117,10 @@ const CourseCard = ({ course, folderName, isCurrent, onLoad, onRename, onShare, 
     );
 };
 
-const CourseLibrary = ({ onClose, currentId, onLoad, onUpdated, onDeleted }) => {
+// variant: 'dialog'(대화상자) | 'page'(상단 메뉴의 내 코스 화면)
+const CourseLibrary = ({ onClose, currentId, onLoad, onUpdated, onDeleted, variant = 'dialog' }) => {
+    const isPage = variant === 'page';
+    const Frame = isPage ? PageFrame : Dialog;
     const { toast, confirm } = useFeedback();
     const [courses, setCourses] = useState(null);
     const [folders, setFolders] = useState([]);
@@ -331,7 +335,7 @@ const CourseLibrary = ({ onClose, currentId, onLoad, onUpdated, onDeleted }) => 
     );
 
     return (
-        <Dialog
+        <Frame
             open
             onClose={onClose}
             title="내 코스"
@@ -339,7 +343,7 @@ const CourseLibrary = ({ onClose, currentId, onLoad, onUpdated, onDeleted }) => 
             size="lg"
             initialFocus="dialog"
         >
-            <div className="library__toolbar" style={{ margin: '0 -20px 14px' }}>
+            <div className="library__toolbar" style={isPage ? { margin: '0 0 14px', padding: '0 0 12px' } : { margin: '0 -20px 14px' }}>
                 <div className="folder-bar" role="group" aria-label="폴더">
                     {folderChip('all', '전체')}
                     {folders.map(item => folderChip(item.id, item.name, 'folder'))}
@@ -404,7 +408,7 @@ const CourseLibrary = ({ onClose, currentId, onLoad, onUpdated, onDeleted }) => 
                     onClose={() => setFolderPrompt(null)}
                 />
             )}
-        </Dialog>
+        </Frame>
     );
 };
 

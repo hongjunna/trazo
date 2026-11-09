@@ -1,5 +1,5 @@
 // src/components/AccountButton.jsx
-// 로그인 전: 구글 로그인 버튼 / 로그인 후: 프로필 사진을 누르면 내 코스·커뮤니티·닉네임 변경·로그아웃 메뉴
+// 로그인 전: 구글 로그인 버튼 / 로그인 후: 프로필 사진을 누르면 내 코스·커뮤니티·연동센터·닉네임 변경·로그아웃 메뉴
 import { useEffect, useRef, useState } from 'react';
 import Icon from './ui/Icon';
 
@@ -12,7 +12,7 @@ const GoogleMark = () => (
     </svg>
 );
 
-const AccountButton = ({ user, nickname, configured, loading, busy, onLogin, onLogout, onOpenLibrary, onOpenCommunity, onEditNickname, compact = false }) => {
+const AccountButton = ({ user, nickname, configured, loading, busy, onLogin, onLogout, onOpenLibrary, onOpenCommunity, onOpenConnect, onEditNickname, compact = false }) => {
     const [open, setOpen] = useState(false);
     const rootRef = useRef(null);
 
@@ -69,6 +69,9 @@ const AccountButton = ({ user, nickname, configured, loading, busy, onLogin, onL
                     </button>
                     <button type="button" role="menuitem" className="menu__item" onClick={() => { setOpen(false); onOpenCommunity(); }}>
                         <Icon name="users" /> 커뮤니티
+                    </button>
+                    <button type="button" role="menuitem" className="menu__item" onClick={() => { setOpen(false); onOpenConnect(); }}>
+                        <Icon name="link" /> 연동센터 (ChatGPT·Claude)
                     </button>
                     <button type="button" role="menuitem" className="menu__item" disabled={!nickname} onClick={() => { setOpen(false); onEditNickname(); }}>
                         <Icon name="pencil" /> 닉네임 변경

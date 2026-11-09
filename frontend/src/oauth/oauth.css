@@ -1,0 +1,125 @@
+/* src/oauth/oauth.css
+ * AI 서비스 로그인 동의 화면(/oauth/authorize). 색·간격은 index.css의 디자인 토큰을 그대로 씁니다.
+ * 코스 편집 화면과 달리 페이지 전체가 스크롤됩니다.
+ */
+body { overflow: auto; }
+
+.ai-page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.ai-brand {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--c-primary);
+  text-decoration: none;
+}
+
+.ai-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 4px 16px 40px;
+}
+
+.ai-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 20px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  line-height: 1.6;
+}
+
+.ai-card--center {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-2);
+}
+
+.ai-card h1,
+.ai-card h2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.ai-card h1 { font-size: 20px; color: var(--c-text); }
+.ai-card h1 > svg { color: var(--c-primary); }
+.ai-card h2 { font-size: 16px; margin-top: 4px; }
+.ai-card p { margin: 0; }
+
+.ai-client { color: var(--c-primary); }
+.ai-muted { color: var(--c-text-2); }
+.ai-small { font-size: 13px; }
+
+.ai-card code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.ai-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ai-account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+  font-size: 14px;
+  color: var(--c-text-2);
+}
+
+.ai-account__email {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.ai-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}

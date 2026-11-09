@@ -1,5 +1,7 @@
 // src/App.jsx
-// 화면 구성: 데스크톱은 왼쪽 사이드바 + 지도 + 아래 고도 패널, 모바일은 전체 화면 지도 + 위쪽 바 + 아래 시트입니다.
+// 화면 구성: 맨 위 가로 메뉴(코스 생성 · 코스 지도 · 내 코스 · 커뮤니티 · 연동센터 · 계정) 아래에 각 화면을 보여줍니다.
+// 코스 생성 화면은 데스크톱에서 왼쪽 사이드바 + 지도 + 아래 고도 패널, 모바일에서 전체 지도 + 아래 시트입니다.
+// 다른 화면으로 옮겨도 만들던 코스가 사라지지 않도록 코스 생성 화면은 숨겨 두기만 합니다.
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -17,6 +19,7 @@ import { importCourseFile } from './utils/importCourse';
 import { WAYPOINT_MAX, waypointIconUri, waypointLabel } from './waypoints';
 import { readStored, writeStored } from './utils/storage';
 import { shareTokenFromPath, visibilityOf } from './utils/share';
+import { PAGES, pageFromPath } from './utils/pages';
 import { COLORS } from './styles/theme';
 
 import AccountButton from './components/AccountButton';
@@ -31,6 +34,10 @@ import SaveCourseDialog from './components/SaveCourseDialog';
 import ShareDialog from './components/ShareDialog';
 import SharedCourseDialog from './components/SharedCourseDialog';
 import CommunityDialog from './components/CommunityDialog';
+import ConnectCenter from './components/ConnectCenter';
+import CourseExplorer from './components/CourseExplorer';
+import PageFrame from './components/PageFrame';
+import TopNav from './components/TopNav';
 import NicknameDialog from './components/NicknameDialog';
 import SportPicker from './components/SportPicker';
 import WaypointDialog from './components/WaypointDialog';
@@ -38,7 +45,6 @@ import Button from './components/ui/Button';
 import Icon from './components/ui/Icon';
 import SegmentedControl from './components/ui/SegmentedControl';
 import { useFeedback } from './components/ui/feedbackContext';
-import trazoMark from './assets/trazo-mark.svg';
 
 const storedSport = readStored('trazo:sport', null);
 const storedView = readStored('trazo:view', null);
@@ -117,19 +123,6 @@ const downloadBlob = (blob, fileName) => {
   window.URL.revokeObjectURL(url);
 };
 
-const Brand = ({ compact = false }) => (
-  <div className="brand">
-    <span className="brand__mark"><img src={trazoMark} alt="" /></span>
-    {!compact && (
-      <span className="brand__text">
-        <span className="brand__name">Trazo</span>
-        <span className="brand__tagline">점을 찍어 그리는 나만의 코스</span>
-      </span>
-    )}
-    {compact && <span className="sr-only">Trazo</span>}
-  </div>
-);
-
 function App() {
   const { toast, confirm } = useFeedback();
   const isMobile = useIsMobile();
@@ -141,8 +134,26 @@ function App() {
   const { nickname, nicknameRef, setNickname, loadNickname } = useNickname();
   const [isNicknameEditOpen, setIsNicknameEditOpen] = useState(false);
 
+  // --- 화면 (상단 메뉴) ---
+  const [page, setPage] = useState(() => pageFromPath(window.location.pathname));
+  const baseTitleRef = useRef(document.title);
+  const navigate = useCallback((next) => {
+    setPage(next);
+    setSheetExpanded(false);
+    if (pageFromPath(window.location.pathname) !== next || (next === 'create' && window.location.pathname !== '/')) {
+      window.history.pushState({ page: next }, '', PAGES[next].path);
+    }
+  }, []);
+  useEffect(() => {
+    const onPopState = () => setPage(pageFromPath(window.location.pathname));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+  useEffect(() => {
+    document.title = page === 'create' ? baseTitleRef.current : `${PAGES[page].label} | Trazo`;
+  }, [page]);
+
   // --- 커뮤니티 · 공유 ---
-  const [isCommunityOpen, setIsCommunityOpen] = useState(false);
   const [sharedToken, setSharedToken] = useState(INITIAL_SHARE_TOKEN);
   const [shareTarget, setShareTarget] = useState(null); // 저장 직후 공유 설정을 보여줄 코스
 
@@ -191,7 +202,6 @@ function App() {
     || (Boolean(currentId) && title !== savedState.title);
 
   // --- 화면 상태 ---
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isSaveOpen, setIsSaveOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isElevationOpen, setIsElevationOpen] = useState(() => readStored('trazo:elevationOpen', true));
@@ -554,7 +564,6 @@ function App() {
     return onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setAuthLoading(false);
-      setIsLibraryOpen(false);
       setIsNicknameEditOpen(false);
       setShareTarget(null);
       setCurrentId(null);
@@ -604,10 +613,7 @@ function App() {
     toast(isFirst ? `${next}님, 환영해요!` : '닉네임을 바꿨어요.', { tone: 'success' });
   };
 
-  const handleOpenCommunity = () => {
-    setSheetExpanded(false);
-    setIsCommunityOpen(true);
-  };
+  const handleOpenCommunity = () => navigate('community');
 
   // --- 저장 · 불러오기 ---
   const handleOpenSave = async () => {
@@ -645,7 +651,7 @@ function App() {
 
   const handleOpenLibrary = async () => {
     if (!(await requireLogin('저장한 코스를 보려면 구글 계정으로 로그인하세요.'))) return;
-    setIsLibraryOpen(true);
+    navigate('library');
   };
 
   // 불러왔으면 true를 돌려줍니다.
@@ -668,7 +674,8 @@ function App() {
       const loadedSport = isSport(course.sport) ? course.sport : 'bike';
       cancelRoute();
       reset(loaded);
-      setIsLibraryOpen(false);
+      // 내 코스·커뮤니티에서 불러온 코스는 코스 생성 화면에서 엽니다.
+      navigate('create');
       setSport(loadedSport);
       writeStored('trazo:sport', loadedSport);
       setHasPickedSport(true);
@@ -691,7 +698,6 @@ function App() {
   const handleOpenCopiedCourse = async (course) => {
     if (!(await handleLoadCourse(course))) return;
     setSharedToken(null);
-    setIsCommunityOpen(false);
   };
 
   // 내 코스나 공유 설정에서 이름·폴더·공개 범위를 바꾼 코스가 지금 편집 중인 코스면 함께 반영합니다.
@@ -1163,8 +1169,9 @@ function App() {
       onLogout={handleLogout}
       onOpenLibrary={handleOpenLibrary}
       onOpenCommunity={handleOpenCommunity}
+      onOpenConnect={() => navigate('connect')}
       onEditNickname={() => setIsNicknameEditOpen(true)}
-      compact
+      compact={isMobile}
     />
   );
 
@@ -1269,81 +1276,97 @@ function App() {
   const hasPolylines = currentPolylines.length > 0;
   const rootStyle = { '--sport': currentSport.color, '--on-sport': currentSport.onColor, '--sheet-peek': `${sheetPeek}px` };
 
+  const createHidden = page !== 'create';
+  const editor = isMobile ? (
+    <div className={`app app--mobile ${createHidden ? 'is-hidden' : ''}`} style={rootStyle} aria-hidden={createHidden || undefined}>
+      <main className="workspace">{mapArea}</main>
+      <div className="topbar">{sportSwitch()}</div>
+      <BottomSheet
+        label="코스 정보"
+        peek={summary}
+        expanded={sheetExpanded}
+        onExpandedChange={setSheetExpanded}
+        onPeekHeightChange={setSheetPeek}
+      >
+        {hasPolylines && (
+          <ElevationPanel variant="inline" polylines={currentPolylines} waypoints={locatedWaypoints} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} hoverSource={hoverBus} />
+        )}
+        {settings}
+        <div className="tool-grid tool-grid--3">
+          <Button variant="secondary" icon="folder" onClick={handleOpenLibrary}>내 코스</Button>
+          <Button variant="secondary" icon="map" onClick={() => navigate('explore')}>코스 지도</Button>
+          <Button variant="ghost" icon="help" onClick={() => setIsHelpOpen(true)}>도움말</Button>
+        </div>
+      </BottomSheet>
+    </div>
+  ) : (
+    <div className={`app ${createHidden ? 'is-hidden' : ''}`} style={rootStyle} aria-hidden={createHidden || undefined}>
+      <aside className="sidebar">
+        <div className="sidebar__body">
+          {sportSwitch('lg')}
+          {summary}
+          {settings}
+        </div>
+        <footer className="sidebar__footer">
+          <span>지도 데이터 © OpenStreetMap 기여자</span>
+          <button type="button" className="link-btn" onClick={() => setIsHelpOpen(true)}>사용법</button>
+        </footer>
+      </aside>
+      <main className="workspace">
+        {mapArea}
+        {hasPolylines && (
+          <ElevationPanel
+            variant="dock"
+            open={isElevationOpen}
+            onToggle={handleToggleElevation}
+            polylines={currentPolylines}
+            waypoints={locatedWaypoints}
+            zones={currentSport.gradeZones}
+            onHoverPoint={updateHoverMarker}
+            hoverSource={hoverBus}
+          />
+        )}
+      </main>
+    </div>
+  );
+
   return (
     <>
-      {isMobile ? (
-        <div className="app app--mobile" style={rootStyle}>
-          <main className="workspace">{mapArea}</main>
-          <header className="topbar">
-            <Brand compact />
-            {sportSwitch()}
-            {account}
-          </header>
-          <BottomSheet
-            label="코스 정보"
-            peek={summary}
-            expanded={sheetExpanded}
-            onExpandedChange={setSheetExpanded}
-            onPeekHeightChange={setSheetPeek}
-          >
-            {hasPolylines && (
-              <ElevationPanel variant="inline" polylines={currentPolylines} waypoints={locatedWaypoints} zones={currentSport.gradeZones} onHoverPoint={updateHoverMarker} hoverSource={hoverBus} />
-            )}
-            {settings}
-            <div className="tool-grid tool-grid--3">
-              <Button variant="secondary" icon="folder" onClick={handleOpenLibrary}>내 코스</Button>
-              <Button variant="secondary" icon="users" onClick={handleOpenCommunity}>커뮤니티</Button>
-              <Button variant="ghost" icon="help" onClick={() => setIsHelpOpen(true)}>도움말</Button>
-            </div>
-          </BottomSheet>
+      <div className="shell" style={{ '--sport': currentSport.color, '--on-sport': currentSport.onColor }}>
+        <TopNav page={page} onNavigate={navigate} loggedIn={Boolean(user)} account={account} />
+        <div className="shell__body">
+          {editor}
+          {page === 'explore' && <CourseExplorer onOpenCourse={setSharedToken} />}
+          {page === 'library' && (user ? (
+            <CourseLibrary
+              key={user.uid}
+              variant="page"
+              currentId={currentId}
+              onLoad={handleLoadCourse}
+              onUpdated={handleCourseUpdated}
+              onDeleted={handleCourseDeleted}
+            />
+          ) : (
+            <PageFrame title="내 코스" description="저장한 코스를 폴더별로 정리하고 다시 불러와요.">
+              <div className="empty">
+                <Icon name="folder" size={32} />
+                <span className="empty__title">{authLoading ? '로그인 상태를 확인하는 중…' : '로그인하면 내 코스를 볼 수 있어요'}</span>
+                {!authLoading && <Button variant="primary" icon="user" onClick={handleLogin} disabled={!auth || authBusy}>구글 로그인</Button>}
+              </div>
+            </PageFrame>
+          ))}
+          {page === 'community' && (
+            <CommunityDialog
+              variant="page"
+              userId={user?.uid ?? null}
+              ensureMember={ensureMember}
+              onOpenCourse={handleOpenCopiedCourse}
+            />
+          )}
+          {page === 'connect' && <ConnectCenter user={user} onLogin={handleLogin} />}
         </div>
-      ) : (
-        <div className="app" style={rootStyle}>
-          <aside className="sidebar">
-            <header className="sidebar__header">
-              <Brand />
-              <Button variant="ghost" icon="users" iconSize={20} onClick={handleOpenCommunity} aria-label="커뮤니티" title="커뮤니티" />
-              {user && <Button variant="ghost" icon="folder" iconSize={20} onClick={handleOpenLibrary} aria-label="내 코스" title="내 코스" />}
-              {account}
-            </header>
-            <div className="sidebar__body">
-              {sportSwitch('lg')}
-              {summary}
-              {settings}
-            </div>
-            <footer className="sidebar__footer">
-              <span>지도 데이터 © OpenStreetMap 기여자</span>
-              <button type="button" className="link-btn" onClick={() => setIsHelpOpen(true)}>사용법</button>
-            </footer>
-          </aside>
-          <main className="workspace">
-            {mapArea}
-            {hasPolylines && (
-              <ElevationPanel
-                variant="dock"
-                open={isElevationOpen}
-                onToggle={handleToggleElevation}
-                polylines={currentPolylines}
-                waypoints={locatedWaypoints}
-                zones={currentSport.gradeZones}
-                onHoverPoint={updateHoverMarker}
-                hoverSource={hoverBus}
-              />
-            )}
-          </main>
-        </div>
-      )}
+      </div>
 
-      {isLibraryOpen && (
-        <CourseLibrary
-          key={user?.uid}
-          onClose={() => setIsLibraryOpen(false)}
-          currentId={currentId}
-          onLoad={handleLoadCourse}
-          onUpdated={handleCourseUpdated}
-          onDeleted={handleCourseDeleted}
-        />
-      )}
       {isSaveOpen && (
         <SaveCourseDialog
           open
@@ -1361,14 +1384,6 @@ function App() {
           course={shareTarget}
           onUpdated={(course) => { setShareTarget(course); handleCourseUpdated(course); }}
           onClose={() => setShareTarget(null)}
-        />
-      )}
-      {isCommunityOpen && (
-        <CommunityDialog
-          userId={user?.uid ?? null}
-          ensureMember={ensureMember}
-          onOpenCourse={handleOpenCopiedCourse}
-          onClose={() => setIsCommunityOpen(false)}
         />
       )}
       {sharedToken && (
@@ -1408,7 +1423,7 @@ function App() {
       )}
       <RoutingHelpDialog open={isHelpOpen} onClose={() => setIsHelpOpen(false)} sport={sport} />
       <SportPicker
-        open={isSportPickerOpen}
+        open={isSportPickerOpen && page === 'create'}
         onSelect={handlePickSport}
         onClose={() => setIsSportPickerOpen(false)}
         isFirstVisit={!hasPickedSport}

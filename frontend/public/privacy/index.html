@@ -4,9 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>개인정보처리방침 | Trazo (트라소)</title>
-<meta name="description" content="Trazo(트라소)가 수집하는 개인정보 항목과 이용 목적, 보유 기간, 국외 이전, 방문 통계(Google Analytics) 거부 방법을 안내합니다.">
+<meta name="description" content="Trazo(트라소)가 수집하는 개인정보 항목과 이용 목적, 보유 기간, AI 서비스(MCP)·Garmin Connect 연동 시 처리되는 정보, 국외 이전, 방문 통계(Google Analytics) 거부 방법을 안내합니다.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://trazo.runvia.app/privacy/">
+<link rel="alternate" hreflang="ko" href="https://trazo.runvia.app/privacy/">
+<link rel="alternate" hreflang="en" href="https://trazo.runvia.app/en/privacy/">
 <link rel="icon" href="/favicon.svg">
 <style>
 body{font-family:system-ui,sans-serif;background:#f5f8f7;color:#173b3e;margin:0;line-height:1.8}
@@ -27,10 +29,10 @@ th{background:#e7efed}
 </head>
 <body>
 <main>
-<nav aria-label="Trazo"><a href="/">Trazo</a><a href="/guide/">사용 안내</a><a href="#en" lang="en">English</a></nav>
+<nav aria-label="Trazo"><a href="/">Trazo</a><a href="/guide/">사용 안내</a><a href="/en/privacy/" lang="en">English</a></nav>
 <h1>개인정보처리방침</h1>
 <p>Junlab(이하 “운영자”)은 Trazo(트라소, https://trazo.runvia.app, 이하 “서비스”)를 운영하며 「개인정보 보호법」 등 관련 법령에 따라 이용자의 개인정보를 보호합니다. 이 방침은 서비스가 어떤 정보를 왜 처리하는지, 얼마나 보관하는지, 이용자가 어떻게 권리를 행사할 수 있는지 안내합니다.</p>
-<p class="muted">시행일: 2026년 10월 20일</p>
+<p class="muted">시행일: 2026년 11월 9일 (이전 버전: 2026년 10월 20일)</p>
 
 <section>
 <h2>1. 처리하는 개인정보와 이용 목적</h2>
@@ -41,16 +43,21 @@ th{background:#e7efed}
 <tr><td>구글 로그인(선택)</td><td>Google 계정 식별자(Firebase UID). 이메일·이름·프로필 사진은 Google(Firebase 인증)이 보관하며, 서비스 서버에는 저장하지 않고 화면의 계정 메뉴에만 표시합니다.</td><td>회원 식별, 내 코스 저장</td></tr>
 <tr><td>회원이 입력·생성한 정보</td><td>닉네임, 코스 제목·설명·경로와 웨이포인트 좌표·종목·공개 범위, 폴더 이름, 댓글, 좋아요·코스 담기 기록, 작성·수정 시각</td><td>코스 저장·공유, 커뮤니티 기능 제공</td></tr>
 <tr><td>자동으로 생성되는 정보</td><td>IP 주소, 브라우저·기기 정보(User-Agent), 접속 시각, 요청한 주소, 오류 기록</td><td>서비스 제공·보안, 장애 대응</td></tr>
-<tr><td>방문 통계</td><td>아래 <a href="#analytics">7. 방문 통계(행태정보)</a> 참고</td><td>이용 현황 분석, 서비스 개선</td></tr>
+<tr><td>AI 서비스 연동(선택)</td><td>연결한 AI 서비스의 이름과 돌아갈 주소(클라이언트 정보), 연결용 액세스·갱신 토큰(해시값으로만 저장), 연결·갱신 시각</td><td>ChatGPT·Claude 등 이용자가 연결한 AI 서비스가 이용자의 코스를 읽도록 허용, 연결 관리</td></tr>
+<tr><td>Garmin Connect 연동(선택, 제공 시)</td><td>아래 <a href="#garmin">6. Garmin Connect 연동</a> 참고</td><td>Garmin 활동 기록 가져오기, Trazo 코스를 Garmin 기기로 보내기</td></tr>
+<tr><td>방문 통계</td><td>아래 <a href="#analytics">8. 방문 통계(행태정보)</a> 참고</td><td>이용 현황 분석, 서비스 개선</td></tr>
 </tbody>
 </table></div>
 <p>‘내 위치’ 버튼을 누르면 브라우저가 현재 위치를 알려 주지만, 지도를 이동하는 데에만 쓰고 서버로 보내거나 저장하지 않습니다. 길찾기를 위해 보내는 지점 좌표는 경로 계산에만 쓰고, 코스를 저장하지 않으면 보관하지 않습니다. 화면 설정(종목, 위성 지도 등)은 이용자의 브라우저(localStorage)에만 저장됩니다.</p>
+<p>코스의 지역 이름(예: 서울 영등포구 여의도동)을 알려 주기 위해 코스 경로 위 일부 지점의 좌표를 카카오 로컬 API로 보내 지역 이름으로 바꿉니다. 이때 회원을 식별할 수 있는 정보는 함께 보내지 않습니다.</p>
 </section>
 
 <section>
 <h2>2. 보유 및 이용 기간</h2>
 <ul>
 <li><b>회원 정보와 코스·댓글 등 회원이 만든 정보</b>: 회원이 삭제를 요청할 때까지 보관합니다. 화면에서 삭제한 코스는 바로 보이지 않게 되며, 서버에서 완전히 지우려면 아래 연락처로 요청해 주세요.</li>
+<li><b>AI 서비스 연동 정보</b>: 이용자가 연동센터에서 연결을 끊거나 회원 정보 삭제를 요청할 때까지. 액세스 토큰은 1시간, 갱신 토큰은 60일 동안 쓰지 않으면 효력을 잃습니다.</li>
+<li><b>Garmin Connect 연동 정보</b>: 이용자가 연동을 해제하거나 삭제를 요청할 때까지. 연동을 해제하면 Garmin에서 받은 토큰을 즉시 지우고, 가져온 활동 기록은 이용자가 함께 삭제를 선택하거나 요청하면 지웁니다.</li>
 <li><b>서버 접속 기록</b>: 서비스 제공과 보안 목적이 끝나면 지체 없이 파기하며, 서버 로그 회전 정책에 따라 삭제합니다.</li>
 <li><b>runvia 방문 통계 원본 기록</b>: 720일</li>
 <li><b>Google Analytics 데이터</b>: 2개월(Google Analytics 데이터 보관 설정)</li>
@@ -65,7 +72,13 @@ th{background:#e7efed}
 
 <section>
 <h2>4. 제3자 제공</h2>
-<p>운영자는 이용자의 개인정보를 제3자에게 제공하지 않습니다. 다만 법령에 따라 수사기관 등이 요청하는 경우는 예외로 합니다. ‘링크 공유’나 ‘전체 공개’로 설정한 코스의 제목·설명·경로와 작성자 닉네임, 공개 코스의 댓글은 이용자가 선택한 범위에서 다른 사람에게 보입니다.</p>
+<p>운영자는 이용자의 개인정보를 판매하지 않으며, 제3자에게 제공하지 않습니다. 다만 아래 경우는 예외로 합니다.</p>
+<ul>
+<li><b>이용자가 직접 연결한 AI 서비스</b>: 이용자가 ChatGPT(OpenAI), Claude(Anthropic) 등 AI 서비스에 Trazo를 연결하고 허용하면, 그 AI 서비스가 이용자의 요청에 따라 이용자의 코스(비공개·링크 공유 포함)와 폴더 이름, 공개 코스 정보를 읽어 갑니다. 이메일, 좋아요·댓글 기록은 제공하지 않습니다. 전달된 정보는 해당 AI 서비스의 개인정보 처리방침에 따라 처리되며, 이용자는 연동센터(<a href="/connect">/connect</a>)에서 언제든 연결을 끊을 수 있습니다.</li>
+<li><b>이용자가 직접 연결한 Garmin Connect</b>: 이용자가 요청한 코스를 이용자의 Garmin Connect 계정으로 보냅니다.</li>
+<li>법령에 따라 수사기관 등이 요청하는 경우</li>
+</ul>
+<p> ‘링크 공유’나 ‘전체 공개’로 설정한 코스의 제목·설명·경로와 작성자 닉네임, 공개 코스의 댓글은 이용자가 선택한 범위에서 다른 사람에게 보입니다.</p>
 </section>
 
 <section>
@@ -77,19 +90,39 @@ th{background:#e7efed}
 <tr><td>Google LLC(미국)<br>Firebase Authentication</td><td>Google 계정 식별자, 이메일, 이름, 프로필 사진, 로그인 기록</td><td>구글 로그인</td><td>회원 탈퇴(삭제 요청) 시까지</td></tr>
 <tr><td>Google LLC(미국)<br>Google Analytics</td><td>쿠키 식별자, 방문 페이지, 기기·브라우저 정보, IP 기반 대략적 위치</td><td>방문 통계</td><td>2개월</td></tr>
 <tr><td>Cloudflare, Inc.(미국)</td><td>IP 주소, 요청 정보</td><td>HTTPS 연결, 보안·전송</td><td>Cloudflare 정책에 따름</td></tr>
-<tr><td>Kakao Corp.(대한민국)</td><td>IP 주소, 지도 요청 정보</td><td>지도 표시</td><td>카카오 정책에 따름</td></tr>
+<tr><td>Kakao Corp.(대한민국)</td><td>IP 주소, 지도 요청 정보, 코스 경로 위 일부 지점 좌표(회원 식별 정보 제외)</td><td>지도 표시, 좌표의 지역 이름 변환과 장소 검색</td><td>카카오 정책에 따름</td></tr>
+<tr><td>Garmin Ltd. 및 계열사(스위스·미국)<br>Garmin Connect (연동 제공 시)</td><td>Garmin 사용자 식별자, 연동 토큰, 이용자가 보내기로 한 코스, 이용자가 가져오기로 동의한 활동 기록</td><td>Garmin 기기·계정과의 코스·활동 기록 연동</td><td>이용자가 연동을 해제할 때까지</td></tr>
 </tbody>
 </table></div>
 </section>
 
+<section id="garmin">
+<h2>6. Garmin Connect 연동</h2>
+<p>Trazo는 Garmin Connect Developer Program을 통해 Garmin 계정 연동을 제공할 수 있습니다. 연동은 이용자가 직접 선택한 경우에만 이루어지며, Garmin의 로그인·동의 화면(OAuth)에서 허용한 범위의 정보만 처리합니다.</p>
+<div class="table"><table>
+<thead><tr><th>정보</th><th>항목</th><th>목적</th></tr></thead>
+<tbody>
+<tr><td>연동 정보</td><td>Garmin 사용자 식별자, 액세스·갱신 토큰, 허용한 권한, 연동 시각</td><td>연동 유지와 해제</td></tr>
+<tr><td>활동 기록(Activity)</td><td>종목, 시작 시각과 시간대, 운동 시간, 거리, 속도·페이스, GPS 경로, 고도, 랩, 기기가 기록한 경우 심박수·케이던스·파워, 기기 이름</td><td>Trazo에서 활동 기록과 경로 보기, 활동 경로를 코스로 만들기, 계획한 코스와 실제 기록 비교</td></tr>
+<tr><td>코스(Course)</td><td>이용자가 Garmin으로 보내기로 한 Trazo 코스의 이름, 경로, 고도, 코스 포인트</td><td>Garmin Connect와 호환 기기로 코스 보내기</td></tr>
+</tbody>
+</table></div>
+<ul>
+<li>Garmin에서 받은 정보는 위 목적으로만 쓰며, 판매하거나 광고에 사용하지 않습니다.</li>
+<li>가져온 활동 기록은 기본적으로 비공개이며, 이용자가 직접 공개하기 전에는 다른 사람에게 보이지 않습니다.</li>
+<li>이용자는 Trazo 화면 또는 Garmin Connect의 연결된 앱 설정에서 언제든 연동을 해제할 수 있습니다. 해제하면 Garmin 토큰을 즉시 삭제하고 이후 새 정보를 받지 않으며, 가져온 활동 기록의 삭제를 요청하면 지체 없이 지웁니다.</li>
+<li>Garmin이 처리하는 정보는 <a href="https://www.garmin.com/privacy/" rel="noopener">Garmin 개인정보처리방침</a>을 따릅니다.</li>
+</ul>
+</section>
+
 <section>
-<h2>6. 이용자의 권리와 행사 방법</h2>
+<h2>7. 이용자의 권리와 행사 방법</h2>
 <p>이용자는 언제든지 자신의 개인정보 열람, 정정, 삭제, 처리 정지를 요청할 수 있습니다. 닉네임과 코스는 서비스 화면에서 직접 고치거나 지울 수 있으며, 계정과 모든 데이터의 삭제는 아래 연락처로 요청해 주세요. 운영자는 요청을 받은 날부터 10일 이내에 처리 결과를 알려 드립니다.</p>
 <p>서비스는 만 14세 미만 아동을 대상으로 하지 않으며, 만 14세 미만 아동의 개인정보임을 알게 되면 지체 없이 삭제합니다.</p>
 </section>
 
 <section id="analytics">
-<h2>7. 방문 통계(행태정보)와 거부 방법</h2>
+<h2>8. 방문 통계(행태정보)와 거부 방법</h2>
 <p>서비스는 이용 현황을 파악해 개선하기 위해 아래 두 가지 방문 통계를 사용합니다. 광고나 맞춤형 광고에는 사용하지 않습니다.</p>
 <h3>runvia 방문 통계 (쿠키 없음)</h3>
 <p>운영자가 직접 운영하는 통계 도구(runvia.app)입니다. 방문 페이지, 유입 경로, 누른 메뉴·버튼, 체류 시간, 국가·기기·브라우저, 화면 크기, 자바스크립트 오류와 직전 화면 조작 기록을 수집합니다. 쿠키를 쓰지 않으며, 방문자는 날짜·IP·브라우저를 합친 해시값으로 하루 단위로만 구분합니다.</p>
@@ -103,12 +136,12 @@ th{background:#e7efed}
 </section>
 
 <section>
-<h2>8. 개인정보의 안전성 확보 조치</h2>
-<p>모든 통신은 HTTPS로 암호화합니다. 로그인한 요청은 서버에서 Google 로그인 토큰의 서명과 만료를 확인한 뒤 처리하며, 데이터베이스는 외부에서 직접 접속할 수 없도록 운영합니다. 개인정보에 접근할 수 있는 사람은 운영자로 제한합니다.</p>
+<h2>9. 개인정보의 안전성 확보 조치</h2>
+<p>모든 통신은 HTTPS로 암호화합니다. 로그인한 요청은 서버에서 Google 로그인 토큰의 서명과 만료를 확인한 뒤 처리하며, AI 서비스 연동 토큰은 원문 대신 해시값만 저장하고 읽기 전용 권한만 부여합니다. 데이터베이스는 외부에서 직접 접속할 수 없도록 운영합니다. 개인정보에 접근할 수 있는 사람은 운영자로 제한합니다.</p>
 </section>
 
 <section>
-<h2>9. 개인정보 보호책임자</h2>
+<h2>10. 개인정보 보호책임자</h2>
 <ul>
 <li>개인정보 보호책임자: Junlab 개인정보 담당자</li>
 <li>이메일: <a href="mailto:trazo@junlab.xyz">trazo@junlab.xyz</a></li>
@@ -123,21 +156,16 @@ th{background:#e7efed}
 </section>
 
 <section>
-<h2>10. 방침의 변경</h2>
+<h2>11. 방침의 변경</h2>
 <p>이 방침의 내용이 바뀌면 시행 전에 이 페이지에 알립니다.</p>
 </section>
 
 <section id="en" lang="en">
-<h2>Privacy policy (English summary)</h2>
-<p>Trazo is operated by Junlab. Planning routes, exporting files and browsing shared courses work without an account. If you sign in with Google, we store your Firebase account ID and the content you create (nickname, courses, folders, comments, likes). Your email, name and profile photo stay with Google (Firebase Authentication) and are only displayed in your account menu. Our servers log IP addresses and request details for security and operations. Location from the “my location” button never leaves your browser.</p>
-<p><b>Analytics.</b> We use runvia, our own cookie-free analytics, and Google Analytics 4, which sets <code>_ga</code> cookies. We remove shared-course link tokens and course titles before sending data, and we do not use Google signals or advertising features. Visitors whose browser time zone is in Europe see a consent banner, and Google Analytics does not load until they accept. You can change your choice at any time with the buttons in section 7 above (허용 = Accept, 거부 = Decline).</p>
-<p><b>Legal bases (GDPR).</b> Performing the service you request (account and courses), our legitimate interest in security and cookie-free analytics, and your consent for Google Analytics.</p>
-<p><b>Transfers and processors.</b> Google LLC (USA; sign-in, analytics), Cloudflare, Inc. (USA; HTTPS delivery and security), Kakao Corp. (South Korea; maps).</p>
-<p><b>Retention.</b> Account data: until you ask us to delete it. runvia analytics: 720 days. Google Analytics: 2 months.</p>
-<p><b>Your rights.</b> You may request access, correction, deletion, restriction or portability of your data, withdraw consent, or object to processing by emailing <a href="mailto:trazo@junlab.xyz">trazo@junlab.xyz</a>. You also have the right to lodge a complaint with your local data protection authority.</p>
+<h2>English</h2>
+<p>Read the full English version of this policy: <a href="/en/privacy/">Privacy Policy (English)</a>.</p>
 </section>
 
-<footer>Trazo · <a href="/">코스 만들기</a> · <a href="/guide/">사용 안내</a> · <a href="/en/guide/" lang="en">English guide</a></footer>
+<footer>Trazo · <a href="/">코스 만들기</a> · <a href="/guide/">사용 안내</a> · <a href="/ai/">AI 연동</a> · <a href="/en/privacy/" lang="en">Privacy Policy (English)</a></footer>
 </main>
 <script>
 (function () {

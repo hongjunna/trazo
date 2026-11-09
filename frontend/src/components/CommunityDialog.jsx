@@ -5,6 +5,7 @@ import { getCommunity } from '../api/courseApi';
 import { SPORTS, SPORT_IDS } from '../sports';
 import { timeAgo } from '../utils/share';
 import Dialog from './ui/Dialog';
+import PageFrame from './PageFrame';
 import Button from './ui/Button';
 import Icon from './ui/Icon';
 import SegmentedControl from './ui/SegmentedControl';
@@ -48,7 +49,10 @@ const CommunityCard = ({ item, onOpen }) => {
     );
 };
 
-const CommunityDialog = ({ userId, ensureMember, onOpenCourse, onClose }) => {
+// variant: 'dialog'(대화상자) | 'page'(상단 메뉴의 커뮤니티 화면)
+const CommunityDialog = ({ userId, ensureMember, onOpenCourse, onClose, variant = 'dialog' }) => {
+    const isPage = variant === 'page';
+    const Frame = isPage ? PageFrame : Dialog;
     const [query, setQuery] = useState('');
     const [keyword, setKeyword] = useState('');
     const [sport, setSport] = useState('all');
@@ -146,7 +150,7 @@ const CommunityDialog = ({ userId, ensureMember, onOpenCourse, onClose }) => {
     }
 
     return (
-        <Dialog
+        <Frame
             open
             onClose={onClose}
             title="커뮤니티"
@@ -154,7 +158,7 @@ const CommunityDialog = ({ userId, ensureMember, onOpenCourse, onClose }) => {
             size="lg"
             initialFocus="dialog"
         >
-            <div className="library__toolbar" style={{ margin: '0 -20px 14px' }}>
+            <div className="library__toolbar" style={isPage ? { margin: '0 0 14px', padding: '0 0 12px' } : { margin: '0 -20px 14px' }}>
                 <div className="input-wrap">
                     <Icon name="search" size={16} />
                     <input className="input" type="search" placeholder="코스 이름이나 닉네임 검색" aria-label="코스 이름이나 닉네임 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -183,7 +187,7 @@ const CommunityDialog = ({ userId, ensureMember, onOpenCourse, onClose }) => {
                     onClose={() => setOpenToken(null)}
                 />
             )}
-        </Dialog>
+        </Frame>
     );
 };
 

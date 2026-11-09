@@ -30,6 +30,12 @@ export const getUsers = (params, signal) => client.get('/users', { params, signa
 // params: { q, uid, sport, visibility, deleted, sort, offset, limit }
 export const getCourses = (params, signal) => client.get('/courses', { params, signal });
 export const getCourse = (courseId) => client.get(`/courses/${courseId}`);
+// 가상 계정: 운영 계정이 공개한 코스의 작성자로 보이고, 좋아요 봇이 좋아요를 누르는 계정
+export const getVirtualAccounts = () => client.get('/virtual-accounts');
+export const createVirtualAccounts = (nicknames) => client.post('/virtual-accounts', { nicknames });
+export const deleteVirtualAccount = (uid) => client.delete(`/virtual-accounts/${encodeURIComponent(uid)}`);
+// mode: 'unassigned'(아직 배정 안 된 코스만) | 'all'(모두 다시 섞기)
+export const assignVirtualAccounts = (mode) => client.post('/virtual-accounts/assign', { mode });
 
 export const isUnauthorized = (error) => error.response?.status === 401;
 

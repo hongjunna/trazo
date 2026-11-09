@@ -331,3 +331,48 @@ body { overflow: auto; }
   .admin-courses { grid-template-columns: 1fr; }
   .admin-search { max-width: none; }
 }
+
+/* ───────── 가상 계정 ───────── */
+.admin-virtual {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.admin-panel .admin-subtitle { margin: 0; }
+.admin-panel p { margin: 0; font-size: 13px; }
+
+.admin-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.admin-table td .admin-tag { margin-left: 6px; background: var(--c-primary-soft); color: var(--c-primary); }

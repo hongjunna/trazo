@@ -1,0 +1,18 @@
+# Trazo (트라소)
+
+> Trazo is a running and cycling route planner for South Korea (https://trazo.runvia.app). Users draw routes on a map, check distance/elevation/gradient, export GPX·FIT·TCX, and share routes with the community. Trazo provides a remote MCP server so AI assistants such as ChatGPT and Claude can read a user's routes and public community routes.
+
+## AI integration (MCP)
+
+- MCP server (Streamable HTTP, OAuth 2.1 sign-in, read-only): https://trazo.runvia.app/mcp
+- Tools: `search_courses` (filter by sport, distance, elevation gain, loop/out-and-back, or radius around coordinates), `get_course` (elevation, gradient distribution, climbs, per-km splits, waypoints, areas passed), `find_place` (Korean place name → coordinates)
+- Overview (Korean): https://trazo.runvia.app/ai/
+- Overview (English): https://trazo.runvia.app/en/ai/
+- Connect and manage connections: https://trazo.runvia.app/connect
+
+## Guides
+
+- Korean guide: https://trazo.runvia.app/guide/
+- English guide: https://trazo.runvia.app/en/guide/
+- Privacy policy (Korean): https://trazo.runvia.app/privacy/
+- Privacy policy (English): https://trazo.runvia.app/en/privacy/

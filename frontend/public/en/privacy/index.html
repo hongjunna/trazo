@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy | Trazo</title>
+<meta name="description" content="How Trazo collects, uses, stores and shares personal data, including Google sign-in, AI assistant (MCP) connections, Garmin Connect integration, analytics, and your rights.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://trazo.runvia.app/en/privacy/">
+<link rel="alternate" hreflang="ko" href="https://trazo.runvia.app/privacy/">
+<link rel="alternate" hreflang="en" href="https://trazo.runvia.app/en/privacy/">
+<link rel="icon" href="/favicon.svg">
+<style>
+body{font-family:system-ui,sans-serif;background:#f5f8f7;color:#173b3e;margin:0;line-height:1.8}
+main{max-width:820px;margin:auto;padding:40px 24px}
+h1{line-height:1.3}h2{margin-top:40px;line-height:1.4}h3{margin-bottom:4px}
+a{color:#0b616a}nav{display:flex;gap:24px;flex-wrap:wrap}
+section{margin:32px 0}footer{border-top:1px solid #cbd9d6;padding-top:20px}
+.table{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:15px;background:#fff}
+th,td{border:1px solid #cbd9d6;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#e7efed}
+.muted{color:#4d6a6c;font-size:15px}
+.settings{background:#fff;border:1px solid #cbd9d6;border-radius:12px;padding:16px 20px}
+.settings button{margin:4px 8px 4px 0;padding:8px 18px;border:1px solid #0b4f57;border-radius:10px;background:#fff;color:#0b4f57;font:600 15px system-ui,sans-serif;cursor:pointer}
+.settings button[aria-pressed="true"]{background:#0b4f57;color:#fff}
+</style>
+<script defer src="/ga.js"></script>
+</head>
+<body>
+<main>
+<nav aria-label="Trazo"><a href="/">Trazo</a><a href="/en/guide/">Guide</a><a href="/privacy/" lang="ko">한국어</a></nav>
+<h1>Privacy Policy</h1>
+<p>Junlab (“we”, “us”) operates Trazo (https://trazo.runvia.app, the “Service”), a running and cycling route planner. This policy explains what personal data we process, why, how long we keep it, who we share it with, and how you can exercise your rights. We comply with the Personal Information Protection Act of the Republic of Korea and, where applicable, the EU/UK General Data Protection Regulation (GDPR).</p>
+<p class="muted">Effective date: November 9, 2026 (previous version: October 20, 2026). The Korean version is available at <a href="/privacy/" lang="ko">/privacy/</a>; if the two versions differ, the Korean version prevails to the extent permitted by law.</p>
+
+<section>
+<h2>1. Data we process and why</h2>
+<p>Planning routes, routing, exporting files and browsing shared or community courses work without an account. If you do not sign in, we only process the automatically generated data listed below.</p>
+<div class="table"><table>
+<thead><tr><th>Category</th><th>Data</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>Google sign-in (optional)</td><td>Google account identifier (Firebase UID). Your email, name and profile photo are kept by Google (Firebase Authentication); our servers do not store them and only display them in your account menu.</td><td>Identifying your account, saving your courses</td></tr>
+<tr><td>Content you create</td><td>Nickname, course titles, descriptions, routes and waypoint coordinates, sport, visibility, folder names, comments, likes and saved-course records, creation and update times</td><td>Saving and sharing courses, community features</td></tr>
+<tr><td>AI assistant connection (optional)</td><td>Name and redirect address of the AI service you connect (client information), access and refresh tokens (stored only as hashes), connection and refresh times</td><td>Letting an AI assistant you connect (such as ChatGPT or Claude) read your courses; managing connections</td></tr>
+<tr><td>Garmin Connect integration (optional, when offered)</td><td>See <a href="#garmin">section 6</a></td><td>Importing Garmin activities; sending Trazo courses to Garmin devices</td></tr>
+<tr><td>Automatically generated data</td><td>IP address, browser and device information (User-Agent), access time, requested URL, error logs</td><td>Operating and securing the Service, troubleshooting</td></tr>
+<tr><td>Analytics</td><td>See <a href="#analytics">section 8</a></td><td>Understanding usage and improving the Service</td></tr>
+</tbody>
+</table></div>
+<p>When you press “my location”, your browser provides your current position only to move the map; it is not sent to or stored on our servers. Points sent for routing are used only to compute the route and are not kept unless you save the course. Display settings are stored only in your browser (localStorage).</p>
+<p>To show area names for courses (for example, “Yeouido-dong, Yeongdeungpo-gu, Seoul”), we send the coordinates of a few points along a course to the Kakao Local API. No information that identifies you is sent with them.</p>
+<p><b>Legal bases (GDPR).</b> Performance of the service you request (account, courses, connections you set up), our legitimate interests (security, cookie-free analytics, operating the Service), and your consent (Google Analytics, AI assistant and Garmin connections, which you can withdraw at any time).</p>
+</section>
+
+<section>
+<h2>2. Retention</h2>
+<ul>
+<li><b>Account data and content you create</b>: until you ask us to delete it. Courses you delete in the app are hidden immediately; to erase them from our servers completely, contact us.</li>
+<li><b>AI assistant connection data</b>: until you disconnect in the Connection Center or ask us to delete your data. Access tokens expire after 1 hour and refresh tokens after 60 days of non-use.</li>
+<li><b>Garmin Connect integration data</b>: until you disconnect or ask us to delete it. When you disconnect, we delete your Garmin tokens immediately; imported activities are deleted when you choose to delete them or ask us to.</li>
+<li><b>Server access logs</b>: deleted once no longer needed for operations and security, according to our log rotation.</li>
+<li><b>runvia analytics raw records</b>: 720 days.</li>
+<li><b>Google Analytics data</b>: 2 months.</li>
+</ul>
+<p>Where another law requires us to keep data for longer, we keep it for that period only.</p>
+</section>
+
+<section>
+<h2>3. Deletion</h2>
+<p>When the retention period ends or the purpose is fulfilled, we delete personal data without delay. Electronic files are deleted in a way that cannot be recovered.</p>
+</section>
+
+<section>
+<h2>4. Sharing with third parties</h2>
+<p>We do not sell your personal data and do not share it with third parties, except:</p>
+<ul>
+<li><b>AI assistants you connect.</b> If you connect Trazo to an AI service such as ChatGPT (OpenAI) or Claude (Anthropic) and approve access, that service can read, at your request, your courses (including private and link-shared ones), folder names and public course information. We never provide your email address or your like and comment history. Data sent to the AI service is processed under that service’s privacy policy. You can disconnect at any time in the <a href="/connect">Connection Center</a>.</li>
+<li><b>Garmin Connect, if you connect it.</b> We send the courses you choose to your Garmin Connect account.</li>
+<li><b>Legal requirements.</b> When required by law, for example at the request of investigative authorities.</li>
+</ul>
+<p>Courses you set to “link sharing” or “public”, together with your nickname, and comments on public courses, are visible to others within the scope you choose.</p>
+</section>
+
+<section>
+<h2>5. Service providers and international transfers</h2>
+<p>We use the following providers to run the Service. Your data may be transferred outside your country when you access the Service or use the relevant feature.</p>
+<div class="table"><table>
+<thead><tr><th>Provider (country)</th><th>Data</th><th>Purpose</th><th>Retention</th></tr></thead>
+<tbody>
+<tr><td>Google LLC (USA)<br>Firebase Authentication</td><td>Google account identifier, email, name, profile photo, sign-in records</td><td>Google sign-in</td><td>Until account deletion</td></tr>
+<tr><td>Google LLC (USA)<br>Google Analytics</td><td>Cookie identifier, pages visited, device and browser information, approximate location derived from IP</td><td>Analytics</td><td>2 months</td></tr>
+<tr><td>Cloudflare, Inc. (USA)</td><td>IP address, request information</td><td>HTTPS delivery and security</td><td>Per Cloudflare’s policy</td></tr>
+<tr><td>Kakao Corp. (South Korea)</td><td>IP address, map requests, coordinates of points along courses (without identifying information)</td><td>Maps, area names for coordinates, place search</td><td>Per Kakao’s policy</td></tr>
+<tr><td>Garmin Ltd. and affiliates (Switzerland, USA)<br>Garmin Connect (when offered)</td><td>Garmin user identifier, integration tokens, courses you send, activities you agree to import</td><td>Course and activity integration with your Garmin account and devices</td><td>Until you disconnect</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<section id="garmin">
+<h2>6. Garmin Connect integration</h2>
+<p>Trazo may offer integration with Garmin Connect through the Garmin Connect Developer Program. The integration happens only if you choose to connect, and we process only the data you authorize on Garmin’s sign-in and consent screen (OAuth).</p>
+<div class="table"><table>
+<thead><tr><th>Data</th><th>Details</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>Connection data</td><td>Garmin user identifier, access and refresh tokens, granted permissions, connection time</td><td>Maintaining and ending the connection</td></tr>
+<tr><td>Activities</td><td>Sport type, start time and time zone, duration, distance, speed or pace, GPS track, elevation, laps, and—if recorded by your device—heart rate, cadence and power, device name</td><td>Showing your activities and routes in Trazo, turning an activity track into a course, comparing planned courses with actual activities</td></tr>
+<tr><td>Courses</td><td>Name, route, elevation and course points of the Trazo courses you choose to send</td><td>Sending courses to Garmin Connect and compatible devices</td></tr>
+</tbody>
+</table></div>
+<ul>
+<li>We use data received from Garmin only for the purposes above. We do not sell it or use it for advertising.</li>
+<li>Imported activities are private by default and are never shown to other people unless you choose to share them.</li>
+<li>You can disconnect at any time in Trazo or in the connected apps settings of Garmin Connect. When you disconnect, we delete your Garmin tokens immediately and stop receiving new data; imported activities are deleted without delay when you ask us to.</li>
+<li>Data processed by Garmin is governed by the <a href="https://www.garmin.com/privacy/" rel="noopener">Garmin Privacy Policy</a>.</li>
+</ul>
+</section>
+
+<section>
+<h2>7. Your rights</h2>
+<p>You may request access to, correction, deletion, restriction or portability of your personal data, object to processing, or withdraw consent at any time. You can edit or delete your nickname and courses directly in the app; to delete your account and all data, email us at the address below. We respond within 10 days of receiving your request (and in any case within the period required by applicable law). You also have the right to lodge a complaint with your local data protection authority.</p>
+<p>The Service is not directed to children under 14. If we learn that we hold personal data of a child under 14, we delete it without delay.</p>
+</section>
+
+<section id="analytics">
+<h2>8. Analytics and how to opt out</h2>
+<p>We use the two analytics tools below to understand usage and improve the Service. We do not use them for advertising or personalized ads.</p>
+<h3>runvia analytics (no cookies)</h3>
+<p>A self-hosted analytics tool (runvia.app). It records pages visited, referrer, menus and buttons used, time on page, country, device and browser, screen size, JavaScript errors and the preceding interactions. It sets no cookies and distinguishes visitors only per day using a hash of the date, IP address and browser.</p>
+<h3>Google Analytics 4 (uses cookies)</h3>
+<p>Google Analytics stores cookies starting with <code>_ga</code> and collects pages visited, visit time and duration, referrer, device and browser information, and approximate location derived from your IP address. We remove shared-course link tokens and course titles before sending data, and we do not use Google signals or advertising features. Visitors whose browser time zone is in Europe see a consent banner, and Google Analytics does not load until they accept.</p>
+<div class="settings" id="analytics-settings">
+<p><b>Google Analytics setting</b> — <span id="analytics-status">Checking this browser’s setting…</span></p>
+<button type="button" data-choice="granted">Accept</button><button type="button" data-choice="denied">Decline</button>
+<p class="muted">If you decline, Google Analytics is not loaded in this browser and existing GA cookies are removed. A Global Privacy Control (GPC) signal is also treated as declining. You can also block cookies in your browser or install the <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener">Google Analytics Opt-out Browser Add-on</a>.</p>
+</div>
+</section>
+
+<section>
+<h2>9. Security</h2>
+<p>All traffic is encrypted with HTTPS. Signed-in requests are processed only after we verify the signature and expiry of the Google sign-in token. AI assistant connection tokens are stored only as hashes and grant read-only access. The database cannot be reached directly from outside, and access to personal data is limited to the operator.</p>
+</section>
+
+<section>
+<h2>10. Contact</h2>
+<ul>
+<li>Data protection officer: Junlab Privacy Officer</li>
+<li>Email: <a href="mailto:trazo@junlab.xyz">trazo@junlab.xyz</a></li>
+</ul>
+</section>
+
+<section>
+<h2>11. Changes to this policy</h2>
+<p>If we change this policy, we will announce the change on this page before it takes effect.</p>
+</section>
+
+<footer>Trazo · <a href="/">Plan a route</a> · <a href="/en/guide/">English guide</a> · <a href="/en/ai/">AI integration</a> · <a href="/privacy/" lang="ko">개인정보처리방침 (한국어)</a></footer>
+</main>
+<script>
+(function () {
+  var KEY = 'trazo:analytics';
+  var status = document.getElementById('analytics-status');
+  var buttons = document.querySelectorAll('#analytics-settings button');
+  function read() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function render() {
+    var choice = read();
+    status.textContent = choice === 'granted' ? 'You have accepted.'
+      : choice === 'denied' ? 'You have declined.'
+      : 'Not chosen yet. Analytics runs outside European time zones; in European time zones it waits for your consent.';
+    Array.prototype.forEach.call(buttons, function (button) {
+      button.setAttribute('aria-pressed', String(button.getAttribute('data-choice') === choice));
+    });
+  }
+  Array.prototype.forEach.call(buttons, function (button) {
+    button.addEventListener('click', function () {
+      try { localStorage.setItem(KEY, button.getAttribute('data-choice')); } catch (e) {
+        status.textContent = 'This browser cannot save the setting. Please use your browser’s cookie blocking instead.';
+        return;
+      }
+      location.reload();
+    });
+  });
+  render();
+})();
+</script>
+</body>
+</html>

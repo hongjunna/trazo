@@ -88,6 +88,12 @@ export const updateComment = (commentId, body) => courseClient.put(`/comments/${
 export const deleteComment = (commentId) => courseClient.delete(`/comments/${commentId}`);
 // params: { sport, sort: 'recent' | 'popular' | 'likes', q, offset, limit }
 export const getCommunity = (params, signal) => publicClient.get('/community', { params, signal });
+// 코스 지도: 지도에 보이는 범위(south·west·north·east)와 겹치는 전체 공개 코스와 줄인 경로
+export const getCourseMap = (params, signal) => publicClient.get('/community/map', { params, signal });
+
+// 연동센터: 내 계정에 연결된 AI 서비스(MCP)
+export const getAiConnections = () => courseClient.get('/oauth/connections');
+export const deleteAiConnection = (clientId) => courseClient.delete(`/oauth/connections/${encodeURIComponent(clientId)}`);
 
 // 서버 응답에 맞춰 화면에 보여줄 안내 문구를 고릅니다.
 export const apiErrorMessage = (error, fallback) => {

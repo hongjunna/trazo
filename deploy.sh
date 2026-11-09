@@ -17,8 +17,8 @@ case "$mode" in
     compose=(docker compose -p toporider-dev -f docker-compose.yml -f docker-compose.dev.yml)
     ;;
   live)
-    # 운영에서만 지도 자동 업데이트(osm-updater)와 DB 백업(db-backup) 컨테이너를 함께 실행합니다.
-    compose=(docker compose -p toporider --profile osm-updater --profile db-backup -f docker-compose.yml)
+    # 운영에서만 지도 자동 업데이트(osm-updater), DB 백업(db-backup), 좋아요 봇(like-bot) 컨테이너를 함께 실행합니다.
+    compose=(docker compose -p toporider --profile osm-updater --profile db-backup --profile like-bot -f docker-compose.yml)
     ;;
   *) echo "사용법: ./deploy.sh [dev|live] [up|down|logs|status|backup]" >&2; exit 1 ;;
 esac

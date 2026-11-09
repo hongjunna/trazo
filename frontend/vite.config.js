@@ -28,15 +28,38 @@ function analytics() {
   }
 }
 
+// 개발 서버에서 /oauth/authorize 를 로그인 동의 화면으로, /ai/ 를 AI 연동 소개 페이지로 보여줍니다
+// (운영에서는 nginx.conf가 같은 일을 합니다. 상단 메뉴 화면 주소는 Vite가 index.html로 보여줍니다).
+function aiConnectPages() {
+  return {
+    name: 'trazo-ai-connect-pages',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const [path, search = ''] = req.url.split('?')
+        // AI 연동 소개 페이지는 public/ai/index.html 정적 파일입니다.
+        if (req.method === 'GET' && (path === '/ai' || path === '/ai/')) {
+          req.url = '/ai/index.html'
+        }
+        if (req.method === 'GET' && path === '/oauth/authorize') {
+          req.url = '/oauth/index.html' + (search ? `?${search}` : '')
+        }
+        next()
+      })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), analytics()],
+  plugins: [react(), analytics(), aiConnectPages()],
   // 관리자 페이지(/admin/)는 코스 편집 화면과 따로 빌드합니다.
   build: {
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         admin: fileURLToPath(new URL('./admin/index.html', import.meta.url)),
+        // AI 서비스 로그인 동의 화면(/oauth/authorize)
+        oauth: fileURLToPath(new URL('./oauth/index.html', import.meta.url)),
       },
     },
   },
@@ -54,6 +77,10 @@ export default defineConfig({
       '^/sitemap-courses-[0-9]+\\.xml$': {
         target: process.env.DEV_API_PROXY || 'http://localhost:8001',
         rewrite: (path) => path.replace(/^\/sitemap-courses-([0-9]+)\.xml$/, '/seo/sitemap-courses/$1.xml'),
+      },
+      // AI 서비스가 직접 호출하는 MCP 서버와 OAuth 주소
+      '^/(mcp$|\\.well-known/oauth-|oauth/(token|register|revoke)$)': {
+        target: process.env.DEV_API_PROXY || 'http://localhost:8001',
       },
       '/api': {
         target: process.env.DEV_API_PROXY || 'http://localhost:8001',
