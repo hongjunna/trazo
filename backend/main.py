@@ -2336,9 +2336,12 @@ def admin_assign_virtual_accounts(data: AssignRequest, session: Session = Depend
 LIKE_BOT_TOKEN = os.getenv("LIKE_BOT_TOKEN", "").strip()
 like_bot_logger = logging.getLogger("trazo.like_bot")
 
+# 봇은 Docker 내부에서 프록시를 거치지 않고 부릅니다. 프록시(Cloudflare·nginx)를 거친 외부 요청은 받지 않습니다.
+PROXY_HEADERS = ("x-real-ip", "x-forwarded-for", "cf-connecting-ip", "cf-ray")
+
 @app.post("/internal/like-bot/like")
-def like_bot_like(credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer), session: Session = Depends(get_session)):
-    if not LIKE_BOT_TOKEN:
+def like_bot_like(request: HTTPRequest, credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer), session: Session = Depends(get_session)):
+    if not LIKE_BOT_TOKEN or any(request.headers.get(name) for name in PROXY_HEADERS):
         raise HTTPException(status_code=404, detail="Not Found")
     if not credentials or not hmac.compare_digest(credentials.credentials.encode(), LIKE_BOT_TOKEN.encode()):
         raise HTTPException(status_code=401, detail="Invalid bot token")

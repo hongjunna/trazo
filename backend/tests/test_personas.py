@@ -150,6 +150,8 @@ class PersonaTests(unittest.TestCase):
         self.assertEqual(result['title'], '운영 코스')
         self.assertNotEqual(result['nickname'], persona)
         self.assertEqual(self.client.get('/admin/summary', headers=self.admin).json()['virtual_likes'], 3)
+        # 프록시를 거친 외부 요청은 토큰이 맞아도 받지 않습니다.
+        self.assertEqual(self.client.post('/internal/like-bot/like', headers={**bot, 'X-Real-IP': '1.2.3.4'}).status_code, 404)
         with patch.object(api, 'LIKE_BOT_TOKEN', ''):
             self.assertEqual(self.client.post('/internal/like-bot/like', headers=bot).status_code, 404)
 
