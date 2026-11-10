@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://trazo.runvia.app/</loc></url>
-  <url><loc>https://trazo.runvia.app/guide/</loc></url>
-  <url><loc>https://trazo.runvia.app/en/guide/</loc></url>
-  <url><loc>https://trazo.runvia.app/ai/</loc></url>
-  <url><loc>https://trazo.runvia.app/en/ai/</loc></url>
-  <url><loc>https://trazo.runvia.app/explore</loc></url>
-  <url><loc>https://trazo.runvia.app/community</loc></url>
-  <url><loc>https://trazo.runvia.app/privacy/</loc></url>
-  <url><loc>https://trazo.runvia.app/en/privacy/</loc></url>
-  <url><loc>https://trazo.runvia.app/terms/</loc></url>
-  <url><loc>https://trazo.runvia.app/en/terms/</loc></url>
-  <url><loc>https://trazo.runvia.app/support/</loc></url>
+  <url><loc>https://trazo.runvia.app/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/explore</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/community</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/connect</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/utility</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/utility/bike</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/guide/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/en/guide/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/ai/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/en/ai/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/privacy/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/en/privacy/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/terms/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/en/terms/</loc><lastmod>2026-11-10</lastmod></url>
+  <url><loc>https://trazo.runvia.app/support/</loc><lastmod>2026-11-10</lastmod></url>
 </urlset>

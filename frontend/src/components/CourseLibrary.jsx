@@ -34,8 +34,12 @@ const parseCourse = (course) => {
 const SORTS = {
     recent: { label: '최근 만든 순', compare: (a, b) => b.createdAt - a.createdAt },
     name: { label: '이름순', compare: (a, b) => a.title.localeCompare(b.title, 'ko') },
-    distance: { label: '거리 긴 순', compare: (a, b) => b.stats.distanceKm - a.stats.distanceKm },
     shared: { label: '많이 담긴 순', compare: (a, b) => (b.share_count || 0) - (a.share_count || 0) },
+    // 커뮤니티와 같은 거리·상승 고도 정렬
+    distance_desc: { label: '거리 긴 순', compare: (a, b) => b.stats.distanceKm - a.stats.distanceKm },
+    distance_asc: { label: '거리 짧은 순', compare: (a, b) => a.stats.distanceKm - b.stats.distanceKm },
+    ascent_desc: { label: '상승 고도 높은 순', compare: (a, b) => b.stats.ascentM - a.stats.ascentM },
+    ascent_asc: { label: '상승 고도 낮은 순', compare: (a, b) => a.stats.ascentM - b.stats.ascentM },
 };
 
 // 폴더 보기: 'all'(전체) · 'none'(폴더 없음) · 폴더 ID

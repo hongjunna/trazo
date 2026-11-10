@@ -132,6 +132,9 @@ class Course(SQLModel, table=True):
     published_at: Optional[str] = Field(default=None)
     # 다른 사람에게 보여줄 작성자. 운영 계정이 공개한 코스는 가상 계정 중 하나를 작성자로 보여줍니다 (비어 있으면 실제 작성자).
     display_uid: Optional[str] = Field(default=None)
+    # 커뮤니티 거리순·상승 고도순 정렬용. 경로를 저장할 때 계산해 둡니다 (course_summary와 같은 계산).
+    distance_m: Optional[float] = Field(default=None)
+    ascent_m: Optional[int] = Field(default=None)
 
 def utc_now() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -223,6 +226,8 @@ COURSE_MIGRATIONS = {
     "published_at": "VARCHAR",
     "waypoints_json": "TEXT",
     "display_uid": "VARCHAR(128)",
+    "distance_m": "DOUBLE PRECISION",
+    "ascent_m": "INTEGER",
 }
 
 TRACK_MIGRATIONS = {"info_json": "TEXT", "manual_info_json": "TEXT"}
@@ -240,6 +245,7 @@ async def lifespan(app: FastAPI):
         for name, definition in TRACK_MIGRATIONS.items():
             if name not in track_columns:
                 connection.execute(text(f"ALTER TABLE track ADD COLUMN {name} {definition}"))
+    backfill_route_stats()
     yield
 
 app = FastAPI(title="Trazo API", lifespan=lifespan)
@@ -585,6 +591,7 @@ def create_course(course_data: CreateCourseRequest, session: Session = Depends(g
         is_deleted=False
     )
     apply_visibility(session, new_course, course_data.visibility, user_id)
+    update_route_stats(new_course)
     session.add(new_course)
     session.commit()
     session.refresh(new_course)
@@ -612,6 +619,7 @@ def update_course(course_id: int, course_data: UpdateCourseRequest, session: Ses
         course.markers_json = json.dumps(course_data.markers)
     if course_data.polylines is not None:
         course.polylines_json = json.dumps(course_data.polylines)
+        update_route_stats(course)
     if course_data.waypoints is not None:
         course.waypoints_json = dump_waypoints(course_data.waypoints)
     if course_data.sport is not None:
@@ -776,6 +784,23 @@ def course_summary(course: Course) -> dict:
         "ascent_m": round(ascent),
         "preview": [{"lat": round(p["lat"], 5), "lng": round(p["lng"], 5)} for p in sampled],
     }
+
+def update_route_stats(course: Course) -> None:
+    summary = course_summary(course)
+    course.distance_m = round(summary["distance_km"] * 1000, 1)
+    course.ascent_m = summary["ascent_m"]
+
+def backfill_route_stats() -> None:
+    """거리·상승 고도 열이 생기기 전에 저장된 코스를 채웁니다."""
+    with Session(engine) as session:
+        while True:
+            courses = session.exec(select(Course).where(Course.distance_m == None).limit(200)).all()
+            if not courses:
+                break
+            for course in courses:
+                update_route_stats(course)
+                session.add(course)
+            session.commit()
 
 def get_shared_course(session: Session, token: str, public_only: bool = False) -> Course:
     course = session.exec(select(Course).where(Course.share_token == token)).first()
@@ -953,6 +978,8 @@ def copy_shared_course(token: str, data: CopyCourseRequest, session: Session = D
         user_id=0,
         folder_id=check_folder(session, data.folder_id, user_id),
         source_course_id=course.id,
+        distance_m=course.distance_m,
+        ascent_m=course.ascent_m,
     )
     new_course = Course(**copied)
     session.add(new_course)
@@ -1067,7 +1094,7 @@ def escape_like(keyword: str) -> str:
 @app.get("/community")
 def read_community(
     sport: Optional[Sport] = None,
-    sort: Literal["recent", "popular", "likes"] = "recent",
+    sort: Literal["recent", "popular", "likes", "distance_desc", "distance_asc", "ascent_desc", "ascent_asc"] = "recent",
     q: str = "",
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=50),
@@ -1091,6 +1118,10 @@ def read_community(
         "recent": (Course.published_at.desc(), Course.id.desc()),
         "popular": (Course.share_count.desc(), like_count.desc(), Course.id.desc()),
         "likes": (like_count.desc(), Course.share_count.desc(), Course.id.desc()),
+        "distance_desc": (Course.distance_m.desc().nulls_last(), Course.id.desc()),
+        "distance_asc": (Course.distance_m.asc().nulls_last(), Course.id.desc()),
+        "ascent_desc": (Course.ascent_m.desc().nulls_last(), Course.id.desc()),
+        "ascent_asc": (Course.ascent_m.asc().nulls_last(), Course.id.desc()),
     }[sort]
     rows = session.exec(statement.order_by(*order).offset(offset).limit(limit + 1)).all()
     page = rows[:limit]

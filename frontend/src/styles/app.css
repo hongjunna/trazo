@@ -2103,6 +2103,13 @@
   color: #fff;
 }
 
+/* 고른 폴더에 마우스를 올려도 흰 글씨가 보이도록 짙은 배경을 유지합니다 (위 :hover 규칙이 더 구체적이라 따로 지정). */
+.chip[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--c-primary-hover);
+  background: var(--c-primary-hover);
+  color: #fff;
+}
+
 .chip__label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3972,4 +3979,293 @@
   font-weight: 650;
   white-space: nowrap;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* ───────── 유틸리티 (러닝 페이스 계산기 · 자전거 준비 중) ───────── */
+.utility-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.utility-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--c-text-2);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.utility-tab:hover {
+  color: var(--c-text);
+}
+
+.utility-tab[aria-current='page'] {
+  border-bottom-color: var(--c-primary);
+  color: var(--c-primary);
+}
+
+.pace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.pace-card {
+  padding: 18px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+
+.pace-help {
+  grid-column: 1 / -1;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--c-text-2);
+}
+
+.pace-help h2 {
+  margin-bottom: 8px;
+  font-size: 16px;
+  color: var(--c-text);
+}
+
+.pace-help h3 {
+  margin: 14px 0 6px;
+  font-size: 15px;
+  color: var(--c-text);
+}
+
+.pace-help ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.pace-help dt {
+  margin-top: 8px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+.pace-help dd {
+  margin: 2px 0 0;
+}
+
+.pace-help a,
+.utility-soon a {
+  color: var(--c-primary);
+  text-decoration: underline;
+}
+
+.pace-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.pace-intro {
+  margin: 6px 0 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--c-text-2);
+}
+
+.pace-modes {
+  margin-bottom: 14px;
+}
+
+.pace-inputs {
+  display: grid;
+  gap: 14px;
+}
+
+.pace-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pace-group legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+.pace-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pace-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.pace-field input {
+  width: var(--w, 64px);
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text);
+}
+
+.pace-field input:focus {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}
+
+.pace-unit {
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.pace-presets {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.pace-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pace-result {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+
+.pace-result__label {
+  font-size: 12px;
+  color: var(--c-text-2);
+}
+
+.pace-result__value {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text);
+}
+
+.pace-result__sub {
+  font-size: 12px;
+  color: var(--c-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-subtitle {
+  margin: 18px 0 8px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.pace-subtitle span {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+
+.pace-table-wrap--splits {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.pace-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-table th,
+.pace-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+}
+
+.pace-table th {
+  position: sticky;
+  top: 0;
+  background: var(--c-surface);
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--c-text-2);
+}
+
+.pace-empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: 14px;
+}
+
+.utility-soon {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  text-align: center;
+}
+
+.utility-soon h2 {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.utility-soon p {
+  max-width: 420px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--c-text-2);
+}
+
+.utility-soon__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+
+@media (max-width: 767px) {
+  .pace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pace-modes .segmented__option,
+  .pace-modes button {
+    font-size: 12.5px;
+  }
 }

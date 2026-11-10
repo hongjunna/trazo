@@ -19,7 +19,8 @@ import { importCourseFile } from './utils/importCourse';
 import { WAYPOINT_MAX, waypointIconUri, waypointLabel } from './waypoints';
 import { readStored, writeStored } from './utils/storage';
 import { shareTokenFromPath, visibilityOf } from './utils/share';
-import { PAGES, pageFromPath } from './utils/pages';
+import { PAGES, UTILITY_SECTIONS, pageFromPath, utilitySectionFromPath } from './utils/pages';
+import { applyPageMeta } from './utils/seo';
 import { COLORS } from './styles/theme';
 
 import AccountButton from './components/AccountButton';
@@ -30,6 +31,7 @@ import CourseLibrary from './components/CourseLibrary';
 import ElevationPanel from './components/ElevationPanel';
 import { MapContextMenu, MapControls, MapHint, RouteStatus } from './components/MapOverlays';
 import { PlaceSearchMarkers, PlaceSearchPanel } from './components/PlaceSearch';
+import UtilityPage from './components/UtilityPage';
 import { usePlaceSearch } from './hooks/usePlaceSearch';
 import { applySmoothing, resmoothCourse, smoothNewSegments } from './utils/smoothing';
 import RoutingHelpDialog from './components/RoutingHelpDialog';
@@ -139,22 +141,33 @@ function App() {
 
   // --- 화면 (상단 메뉴) ---
   const [page, setPage] = useState(() => pageFromPath(window.location.pathname));
+  const [utilitySection, setUtilitySection] = useState(() => utilitySectionFromPath(window.location.pathname));
   const baseTitleRef = useRef(document.title);
-  const navigate = useCallback((next) => {
+  // path: 같은 화면 안의 다른 주소 (유틸리티의 자전거 섹션 등)
+  const navigate = useCallback((next, path = PAGES[next].path) => {
     setPage(next);
     setSheetExpanded(false);
-    if (pageFromPath(window.location.pathname) !== next || (next === 'create' && window.location.pathname !== '/')) {
-      window.history.pushState({ page: next }, '', PAGES[next].path);
+    if (next === 'utility') setUtilitySection(utilitySectionFromPath(path));
+    if (window.location.pathname.replace(/\/+$/, '') !== path.replace(/\/+$/, '') || (next === 'create' && window.location.pathname !== '/')) {
+      window.history.pushState({ page: next }, '', path);
     }
   }, []);
   useEffect(() => {
-    const onPopState = () => setPage(pageFromPath(window.location.pathname));
+    const onPopState = () => {
+      setPage(pageFromPath(window.location.pathname));
+      setUtilitySection(utilitySectionFromPath(window.location.pathname));
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
   useEffect(() => {
-    document.title = page === 'create' ? baseTitleRef.current : `${PAGES[page].label} | Trazo`;
-  }, [page]);
+    // 공유 코스 주소(/c/<토큰>)는 서버가 넣은 코스 제목을 그대로 둡니다.
+    if (page === 'create' && window.location.pathname !== '/') {
+      document.title = baseTitleRef.current;
+      return;
+    }
+    applyPageMeta(window.location.pathname);
+  }, [page, utilitySection]);
 
   // --- 커뮤니티 · 공유 ---
   const [sharedToken, setSharedToken] = useState(INITIAL_SHARE_TOKEN);
@@ -1393,6 +1406,7 @@ function App() {
             />
           )}
           {page === 'connect' && <ConnectCenter user={user} onLogin={handleLogin} />}
+          {page === 'utility' && <UtilityPage section={utilitySection} onSectionChange={(id) => navigate('utility', UTILITY_SECTIONS[id].path)} />}
         </div>
       </div>
 

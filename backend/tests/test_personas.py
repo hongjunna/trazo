@@ -92,6 +92,31 @@ class PersonaTests(unittest.TestCase):
         self.assertEqual(detail['nickname'], 'operator')
         self.assertIn(detail['display_nickname'], {'러너김', '자전거박'})
 
+    def test_community_sort_by_distance_and_ascent(self):
+        short = [[{'lat': 37.5, 'lng': 127.0, 'ele': 10}, {'lat': 37.501, 'lng': 127.0, 'ele': 60}]]
+        self.publish(self.user, '긴 코스', polylines=LOOP)
+        self.publish(self.user, '짧은 오르막', polylines=short)
+        self.publish(self.user, '부산', polylines=BUSAN)
+        def titles(sort):
+            return [item['title'] for item in self.client.get('/community', params={'sort': sort}).json()['items']]
+        self.assertEqual(titles('distance_desc'), ['부산', '긴 코스', '짧은 오르막'])
+        self.assertEqual(titles('distance_asc'), ['짧은 오르막', '긴 코스', '부산'])
+        self.assertEqual(titles('ascent_desc')[0], '짧은 오르막')
+        self.assertEqual(titles('ascent_asc')[0], '부산')
+        # 경로를 고치면 정렬 값도 다시 계산합니다.
+        course_id = next(c['id'] for c in self.client.get('/courses', headers=self.user).json() if c['title'] == '부산')
+        self.client.put(f'/courses/{course_id}', headers=self.user, json={'polylines': short})
+        self.assertEqual(titles('distance_desc')[0], '긴 코스')
+        # 열이 생기기 전 코스도 시작할 때 채웁니다.
+        with api.Session(api.engine) as session:
+            course = session.get(api.Course, course_id)
+            course.distance_m = None
+            session.add(course)
+            session.commit()
+        api.backfill_route_stats()
+        with api.Session(api.engine) as session:
+            self.assertIsNotNone(session.get(api.Course, course_id).distance_m)
+
     def test_series_courses_share_author(self):
         # 제목 머리말이 같은 시리즈([제주 3km], [제주 5km] …)는 거리와 상관없이 같은 작성자로 보입니다.
         self.add_personas(*[f'가상계정{i}' for i in range(12)])

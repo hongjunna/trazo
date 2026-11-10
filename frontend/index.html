@@ -16,32 +16,152 @@
   <!--# block name="og_fallback" -->
   <title>Trazo (트라소) | 자전거·러닝 코스 만들기</title>
   <meta name="robots" content="noindex, follow" /><!--# endblock -->
+  <!-- 주소별 검색 태그: scripts/seo-pages.mjs가 src/utils/pages.js의 PAGE_META로 만듭니다 (직접 고치지 마세요). -->
+  <!-- seo:head -->
   <!--# if expr="$request_uri = /^\/c\/([A-Za-z0-9_-]{6,64})(?:[\/?]|\z)/" -->
-
   <!--# include virtual="/api/og/c/$1" stub="og_fallback" -->
+  <!--# elif expr="$request_uri = /^\/explore\/?(?:\?|\z)/" -->
+  <title>코스 지도 | 공개 러닝·자전거 코스와 육상 트랙 지도 - Trazo</title>
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://trazo.runvia.app/explore" />
+  <meta name="description" content="다른 러너와 라이더가 공개한 러닝·자전거 코스, 전국 공공 육상 트랙을 지도에서 한눈에 보고 거리·상승 고도로 비교하세요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Trazo" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta property="og:url" content="https://trazo.runvia.app/explore" />
+  <meta property="og:title" content="코스 지도 | 공개 러닝·자전거 코스와 육상 트랙 지도 - Trazo" />
+  <meta property="og:description" content="다른 러너와 라이더가 공개한 러닝·자전거 코스, 전국 공공 육상 트랙을 지도에서 한눈에 보고 거리·상승 고도로 비교하세요." />
+  <meta property="og:image" content="https://trazo.runvia.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="900" />
+  <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="코스 지도 | 공개 러닝·자전거 코스와 육상 트랙 지도 - Trazo" />
+  <meta name="twitter:description" content="다른 러너와 라이더가 공개한 러닝·자전거 코스, 전국 공공 육상 트랙을 지도에서 한눈에 보고 거리·상승 고도로 비교하세요." />
+  <meta name="twitter:image" content="https://trazo.runvia.app/og-image.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"CollectionPage","name":"코스 지도","url":"https://trazo.runvia.app/explore","inLanguage":"ko"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Trazo","item":"https://trazo.runvia.app/"},{"@type":"ListItem","position":2,"name":"코스 지도","item":"https://trazo.runvia.app/explore"}]}]}</script>
+  <!--# elif expr="$request_uri = /^\/community\/?(?:\?|\z)/" -->
+  <title>커뮤니티 | 러닝·자전거 코스 공유 - Trazo</title>
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://trazo.runvia.app/community" />
+  <meta name="description" content="전국 러닝·자전거 코스를 최신순·인기순·거리순·상승 고도순으로 둘러보고 좋아요와 댓글을 남기세요. 마음에 드는 코스는 내 코스에 담아 GPX로 내려받을 수 있어요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Trazo" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta property="og:url" content="https://trazo.runvia.app/community" />
+  <meta property="og:title" content="커뮤니티 | 러닝·자전거 코스 공유 - Trazo" />
+  <meta property="og:description" content="전국 러닝·자전거 코스를 최신순·인기순·거리순·상승 고도순으로 둘러보고 좋아요와 댓글을 남기세요. 마음에 드는 코스는 내 코스에 담아 GPX로 내려받을 수 있어요." />
+  <meta property="og:image" content="https://trazo.runvia.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="900" />
+  <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="커뮤니티 | 러닝·자전거 코스 공유 - Trazo" />
+  <meta name="twitter:description" content="전국 러닝·자전거 코스를 최신순·인기순·거리순·상승 고도순으로 둘러보고 좋아요와 댓글을 남기세요. 마음에 드는 코스는 내 코스에 담아 GPX로 내려받을 수 있어요." />
+  <meta name="twitter:image" content="https://trazo.runvia.app/og-image.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"CollectionPage","name":"커뮤니티 코스","url":"https://trazo.runvia.app/community","inLanguage":"ko"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Trazo","item":"https://trazo.runvia.app/"},{"@type":"ListItem","position":2,"name":"커뮤니티","item":"https://trazo.runvia.app/community"}]}]}</script>
+  <!--# elif expr="$request_uri = /^\/connect\/?(?:\?|\z)/" -->
+  <title>연동센터 | ChatGPT·Claude로 러닝·자전거 코스 추천받기 - Trazo</title>
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://trazo.runvia.app/connect" />
+  <meta name="description" content="Trazo MCP 서버를 ChatGPT·Claude에 연결해 내 코스와 공개 코스를 근거로 코스 추천과 훈련 계획을 받아보세요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Trazo" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta property="og:url" content="https://trazo.runvia.app/connect" />
+  <meta property="og:title" content="연동센터 | ChatGPT·Claude로 러닝·자전거 코스 추천받기 - Trazo" />
+  <meta property="og:description" content="Trazo MCP 서버를 ChatGPT·Claude에 연결해 내 코스와 공개 코스를 근거로 코스 추천과 훈련 계획을 받아보세요." />
+  <meta property="og:image" content="https://trazo.runvia.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="900" />
+  <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="연동센터 | ChatGPT·Claude로 러닝·자전거 코스 추천받기 - Trazo" />
+  <meta name="twitter:description" content="Trazo MCP 서버를 ChatGPT·Claude에 연결해 내 코스와 공개 코스를 근거로 코스 추천과 훈련 계획을 받아보세요." />
+  <meta name="twitter:image" content="https://trazo.runvia.app/og-image.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"연동센터","url":"https://trazo.runvia.app/connect","inLanguage":"ko"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Trazo","item":"https://trazo.runvia.app/"},{"@type":"ListItem","position":2,"name":"연동센터","item":"https://trazo.runvia.app/connect"}]}]}</script>
+  <!--# elif expr="$request_uri = /^\/utility\/bike\/?(?:\?|\z)/" -->
+  <title>자전거 유틸리티 (준비 중) - Trazo</title>
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://trazo.runvia.app/utility/bike" />
+  <meta name="description" content="자전거 라이딩에 필요한 계산 도구를 준비하고 있어요. Trazo 코스 생성에서 자전거 코스를 만들고 예상 시간과 고도를 확인하세요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Trazo" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta property="og:url" content="https://trazo.runvia.app/utility/bike" />
+  <meta property="og:title" content="자전거 유틸리티 (준비 중) - Trazo" />
+  <meta property="og:description" content="자전거 라이딩에 필요한 계산 도구를 준비하고 있어요. Trazo 코스 생성에서 자전거 코스를 만들고 예상 시간과 고도를 확인하세요." />
+  <meta property="og:image" content="https://trazo.runvia.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="900" />
+  <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="자전거 유틸리티 (준비 중) - Trazo" />
+  <meta name="twitter:description" content="자전거 라이딩에 필요한 계산 도구를 준비하고 있어요. Trazo 코스 생성에서 자전거 코스를 만들고 예상 시간과 고도를 확인하세요." />
+  <meta name="twitter:image" content="https://trazo.runvia.app/og-image.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"자전거 유틸리티","url":"https://trazo.runvia.app/utility/bike","inLanguage":"ko"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Trazo","item":"https://trazo.runvia.app/"},{"@type":"ListItem","position":2,"name":"자전거 유틸리티","item":"https://trazo.runvia.app/utility/bike"}]}]}</script>
+  <!--# elif expr="$request_uri = /^\/utility\/?(?:\?|\z)/" -->
+  <title>러닝 페이스 계산기 | 페이스·완주 시간·거리·400m 트랙 랩 계산 - Trazo</title>
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://trazo.runvia.app/utility" />
+  <meta name="description" content="5km·10km·하프·풀코스 마라톤 목표 기록으로 1km 페이스와 속도, 완주 시간, 1km 구간 기록, 400m 트랙 한 바퀴 기록, 다른 거리 예상 기록을 계산하세요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Trazo" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta property="og:url" content="https://trazo.runvia.app/utility" />
+  <meta property="og:title" content="러닝 페이스 계산기 | 페이스·완주 시간·거리·400m 트랙 랩 계산 - Trazo" />
+  <meta property="og:description" content="5km·10km·하프·풀코스 마라톤 목표 기록으로 1km 페이스와 속도, 완주 시간, 1km 구간 기록, 400m 트랙 한 바퀴 기록, 다른 거리 예상 기록을 계산하세요." />
+  <meta property="og:image" content="https://trazo.runvia.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="900" />
+  <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="러닝 페이스 계산기 | 페이스·완주 시간·거리·400m 트랙 랩 계산 - Trazo" />
+  <meta name="twitter:description" content="5km·10km·하프·풀코스 마라톤 목표 기록으로 1km 페이스와 속도, 완주 시간, 1km 구간 기록, 400m 트랙 한 바퀴 기록, 다른 거리 예상 기록을 계산하세요." />
+  <meta name="twitter:image" content="https://trazo.runvia.app/og-image.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebApplication","name":"러닝 페이스 계산기","url":"https://trazo.runvia.app/utility","applicationCategory":"SportsApplication","operatingSystem":"Web","inLanguage":"ko","offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"페이스와 속도는 어떻게 바꾸나요?","acceptedAnswer":{"@type":"Answer","text":"속도(km/h) = 60 ÷ 페이스(분/km)입니다. 5:00/km는 12km/h, 6:00/km는 10km/h입니다."}},{"@type":"Question","name":"400m 트랙 한 바퀴 기록은 어떻게 계산하나요?","acceptedAnswer":{"@type":"Answer","text":"1km 페이스에 0.4를 곱합니다. 5:00/km는 400m 한 바퀴 2:00입니다. 1레인 기준이며 바깥 레인은 한 바퀴가 더 깁니다."}},{"@type":"Question","name":"다른 거리 예상 기록은 얼마나 정확한가요?","acceptedAnswer":{"@type":"Answer","text":"리겔 공식(T2 = T1 × (D2 ÷ D1)^1.06)으로 어림한 값입니다. 장거리 훈련량이 부족하면 하프·풀코스 실제 기록은 더 느릴 수 있습니다."}}]},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Trazo","item":"https://trazo.runvia.app/"},{"@type":"ListItem","position":2,"name":"러닝 페이스 계산기","item":"https://trazo.runvia.app/utility"}]}]}</script>
+  <!--# elif expr="$request_uri = /^\/my\/?(?:\?|\z)/" -->
+  <title>내 코스 - Trazo</title>
+  <meta name="robots" content="noindex, follow" />
+  <link rel="canonical" href="https://trazo.runvia.app/my" />
+  <meta name="description" content="저장한 러닝·자전거 코스를 폴더별로 관리하고 공유 설정을 바꾸세요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Trazo" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta property="og:url" content="https://trazo.runvia.app/my" />
+  <meta property="og:title" content="내 코스 - Trazo" />
+  <meta property="og:description" content="저장한 러닝·자전거 코스를 폴더별로 관리하고 공유 설정을 바꾸세요." />
+  <meta property="og:image" content="https://trazo.runvia.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="900" />
+  <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="내 코스 - Trazo" />
+  <meta name="twitter:description" content="저장한 러닝·자전거 코스를 폴더별로 관리하고 공유 설정을 바꾸세요." />
+  <meta name="twitter:image" content="https://trazo.runvia.app/og-image.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Trazo","item":"https://trazo.runvia.app/"},{"@type":"ListItem","position":2,"name":"내 코스","item":"https://trazo.runvia.app/my"}]}]}</script>
   <!--# else -->
   <title>Trazo (트라소) | 자전거·러닝 코스 만들기 · GPX 경로 플래너</title>
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <link rel="canonical" href="https://trazo.runvia.app/" />
-  <meta name="description"
-    content="지도 위에 점을 찍어 자전거·러닝 코스를 만드는 Trazo(트라소). 종목에 맞는 길찾기로 경로와 고도를 확인하고 GPX·FIT 파일로 내려받으세요." />
+  <meta name="description" content="지도 위에 점을 찍어 자전거·러닝 코스를 만드는 Trazo(트라소). 종목에 맞는 길찾기로 경로와 고도를 확인하고 GPX·FIT 파일로 내려받으세요." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Trazo" />
   <meta property="og:locale" content="ko_KR" />
   <meta property="og:url" content="https://trazo.runvia.app/" />
-  <meta property="og:title" content="Trazo (트라소) | 점을 찍어 그리는 나만의 코스" />
-  <meta property="og:description"
-    content="지도 위에 점을 찍어 그리는 나만의 자전거·러닝 코스. 종목에 맞는 길찾기로 경로와 고도를 확인하고 GPX·FIT 파일로 내려받으세요." />
+  <meta property="og:title" content="Trazo (트라소) | 자전거·러닝 코스 만들기 · GPX 경로 플래너" />
+  <meta property="og:description" content="지도 위에 점을 찍어 자전거·러닝 코스를 만드는 Trazo(트라소). 종목에 맞는 길찾기로 경로와 고도를 확인하고 GPX·FIT 파일로 내려받으세요." />
   <meta property="og:image" content="https://trazo.runvia.app/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="900" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Trazo (트라소) | 점을 찍어 그리는 나만의 코스" />
-  <meta name="twitter:image" content="https://trazo.runvia.app/og-image.png" />
-  <meta name="twitter:description" content="한국의 자전거·러닝 코스를 만들고 거리와 고도를 확인하세요. GPX·FIT·TCX 파일로 내보내기와 코스 공유를 지원합니다." />
   <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "Trazo", "alternateName": "트라소", "url": "https://trazo.runvia.app/", "inLanguage": "ko", "description": "한국의 자전거·러닝 코스를 만들고 고도를 확인하는 경로 플래너"}</script>
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Trazo (트라소) | 자전거·러닝 코스 만들기 · GPX 경로 플래너" />
+  <meta name="twitter:description" content="지도 위에 점을 찍어 자전거·러닝 코스를 만드는 Trazo(트라소). 종목에 맞는 길찾기로 경로와 고도를 확인하고 GPX·FIT 파일로 내려받으세요." />
+  <meta name="twitter:image" content="https://trazo.runvia.app/og-image.png" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","name":"Trazo","alternateName":"트라소","url":"https://trazo.runvia.app/","inLanguage":"ko","description":"한국의 자전거·러닝 코스를 만들고 고도를 확인하는 경로 플래너"},{"@type":"WebApplication","name":"Trazo 코스 플래너","url":"https://trazo.runvia.app/","applicationCategory":"SportsApplication","operatingSystem":"Web","inLanguage":"ko","offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Trazo","item":"https://trazo.runvia.app/"}]}]}</script>
   <!--# endif -->
+  <!-- /seo:head -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
@@ -55,9 +175,35 @@
 <body>
   <div id="root">
     <main>
+      <!-- 자바스크립트 없이도 읽히는 화면별 본문 (앱이 뜨면 바뀜). scripts/seo-pages.mjs가 만듭니다. -->
+      <!-- seo:body -->
+      <!--# if expr="$request_uri = /^\/c\//" -->
       <h1>Trazo (트라소) — 자전거·러닝 코스 만들기</h1>
-      <p>한국 지도에 점을 찍어 자전거와 러닝 경로를 계획하고 거리, 상승 고도, 경사도와 예상 시간을 확인하세요. GPX·FIT·TCX·KML·GeoJSON 파일을 불러와 편집하거나 내려받고, 구글 로그인으로 내 코스를 저장하고 공유할 수 있습니다.</p>
-      <p><a href="/guide/">서비스 소개와 사용 방법</a> · <a href="/ai/">ChatGPT·Claude AI 연동으로 러닝·자전거 코스 추천받기</a> · <a href="/en/guide/" lang="en">Cycling &amp; running route planner for South Korea — English guide</a></p>
+      <p>한국 지도에 점을 찍어 자전거와 러닝 경로를 계획하고 거리, 상승 고도, 경사도와 예상 시간을 확인하세요. GPX·FIT·TCX·KML·GeoJSON 파일을 불러와 편집하거나 내려받고, 구글 로그인으로 내 코스를 저장하고 공유할 수 있습니다. 길찾기가 안 되는 운동장 트랙은 직선 연결과 부드럽게 다듬기로 그릴 수 있습니다.</p>
+  <!--# elif expr="$request_uri = /^\/explore\/?(?:\?|\z)/" -->
+      <h1>코스 지도 — 공개 러닝·자전거 코스와 전국 육상 트랙</h1>
+      <p>Trazo 사용자가 전체 공개한 러닝·자전거 코스를 지도 위에 겹쳐 보고, 전체·자전거·러닝·트랙으로 걸러 볼 수 있습니다. 트랙 보기에서는 공원·경기장·체육시설의 공공 육상 트랙(400m 트랙 등)을 트랙 모양 그대로 보여주고 한 바퀴 거리·레인·노면·운영시간 정보와 카카오맵 길찾기를 제공합니다.</p>
+  <!--# elif expr="$request_uri = /^\/community\/?(?:\?|\z)/" -->
+      <h1>커뮤니티 — 러닝·자전거 코스 공유</h1>
+      <p>전국 러닝·자전거 공개 코스를 최신순, 많이 담긴 순, 좋아요 순, 거리 긴 순·짧은 순, 상승 고도 높은 순·낮은 순으로 둘러보세요. 코스 이름이나 닉네임으로 찾고, 좋아요와 댓글을 남기고, 마음에 드는 코스를 내 코스에 담아 GPX·FIT 파일로 내려받을 수 있습니다.</p>
+  <!--# elif expr="$request_uri = /^\/connect\/?(?:\?|\z)/" -->
+      <h1>연동센터 — ChatGPT·Claude로 러닝·자전거 코스 추천받기</h1>
+      <p>Trazo MCP 서버(https://trazo.runvia.app/mcp)를 ChatGPT·Claude에 커스텀 커넥터로 추가하면, AI가 내 코스와 커뮤니티 공개 코스의 거리·고도·경사·지나는 지역을 읽어 코스를 추천하고 훈련 계획을 도와줍니다. 읽기 전용이며 OAuth로 로그인합니다. 자세한 소개: <a href="/ai/">AI 연동 안내</a>.</p>
+  <!--# elif expr="$request_uri = /^\/utility\/bike\/?(?:\?|\z)/" -->
+      <h1>자전거 유틸리티 — 곧 새로운 기능으로 돌아올게요</h1>
+      <p>자전거 라이딩에 필요한 계산 도구를 준비하고 있습니다. 그동안 Trazo 코스 생성에서 자전거 코스를 만들고 예상 시간과 상승 고도를 확인하세요. 러닝 페이스 계산기는 <a href="/utility">유틸리티</a>에서 쓸 수 있습니다.</p>
+  <!--# elif expr="$request_uri = /^\/utility\/?(?:\?|\z)/" -->
+      <h1>러닝 페이스 계산기 — 페이스·완주 시간·거리·400m 트랙 랩</h1>
+      <p>목표 거리와 완주 시간으로 1km당 페이스와 속도를, 거리와 페이스로 완주 시간을, 달린 시간과 페이스로 거리를 계산합니다. 5km·10km·하프(21.0975km)·풀코스(42.195km) 거리 버튼, 1km 구간 누적 기록, 400m·200m 트랙 랩 기록, 리겔 공식으로 어림한 다른 거리 예상 기록을 함께 보여줍니다.</p><table><caption>페이스별 완주 시간표</caption><thead><tr><th>페이스(/km)</th><th>5km</th><th>10km</th><th>하프</th><th>풀코스</th><th>400m 한 바퀴</th></tr></thead><tbody><tr><td>4:00</td><td>20:00</td><td>40:00</td><td>1:24:23</td><td>2:48:47</td><td>1:36</td></tr><tr><td>4:30</td><td>22:30</td><td>45:00</td><td>1:34:56</td><td>3:09:53</td><td>1:48</td></tr><tr><td>5:00</td><td>25:00</td><td>50:00</td><td>1:45:29</td><td>3:30:59</td><td>2:00</td></tr><tr><td>5:30</td><td>27:30</td><td>55:00</td><td>1:56:02</td><td>3:52:04</td><td>2:12</td></tr><tr><td>6:00</td><td>30:00</td><td>1:00:00</td><td>2:06:35</td><td>4:13:10</td><td>2:24</td></tr><tr><td>6:30</td><td>32:30</td><td>1:05:00</td><td>2:17:08</td><td>4:34:16</td><td>2:36</td></tr><tr><td>7:00</td><td>35:00</td><td>1:10:00</td><td>2:27:41</td><td>4:55:22</td><td>2:48</td></tr></tbody></table><h2>자주 묻는 질문</h2><dl><dt>페이스와 속도는 어떻게 바꾸나요?</dt><dd>속도(km/h) = 60 ÷ 페이스(분/km)입니다. 5:00/km는 12km/h, 6:00/km는 10km/h입니다.</dd><dt>400m 트랙 한 바퀴 기록은 어떻게 계산하나요?</dt><dd>1km 페이스에 0.4를 곱합니다. 5:00/km는 400m 한 바퀴 2:00입니다. 1레인 기준이며 바깥 레인은 한 바퀴가 더 깁니다.</dd><dt>다른 거리 예상 기록은 얼마나 정확한가요?</dt><dd>리겔 공식(T2 = T1 × (D2 ÷ D1)^1.06)으로 어림한 값입니다. 장거리 훈련량이 부족하면 하프·풀코스 실제 기록은 더 느릴 수 있습니다.</dd></dl>
+  <!--# elif expr="$request_uri = /^\/my\/?(?:\?|\z)/" -->
+      <h1>내 코스</h1>
+      <p>저장한 러닝·자전거 코스를 폴더별로 관리합니다. 구글 계정으로 로그인해야 볼 수 있습니다.</p>
+  <!--# else -->
+      <h1>Trazo (트라소) — 자전거·러닝 코스 만들기</h1>
+      <p>한국 지도에 점을 찍어 자전거와 러닝 경로를 계획하고 거리, 상승 고도, 경사도와 예상 시간을 확인하세요. GPX·FIT·TCX·KML·GeoJSON 파일을 불러와 편집하거나 내려받고, 구글 로그인으로 내 코스를 저장하고 공유할 수 있습니다. 길찾기가 안 되는 운동장 트랙은 직선 연결과 부드럽게 다듬기로 그릴 수 있습니다.</p>
+  <!--# endif -->
+      <nav aria-label="Trazo 메뉴"><ul><li><a href="/">코스 만들기</a></li><li><a href="/explore">코스 지도·육상 트랙</a></li><li><a href="/community">커뮤니티 코스</a></li><li><a href="/utility">러닝 페이스 계산기</a></li><li><a href="/connect">ChatGPT·Claude 연동</a></li><li><a href="/guide/">사용 방법</a></li><li><a href="/en/guide/">English guide</a></li></ul></nav>
+      <!-- /seo:body -->
     </main>
   </div>
   <script type="module" src="/src/main.jsx"></script>

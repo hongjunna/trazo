@@ -10,6 +10,15 @@
 - Overview (English): https://trazo.runvia.app/en/ai/
 - Connect and manage connections: https://trazo.runvia.app/connect
 
+## Pages
+
+- Route planner (create a route): https://trazo.runvia.app/
+- Course map — public running/cycling routes and public athletics tracks across Korea on one map (filters: all / cycling / running / tracks): https://trazo.runvia.app/explore
+- Community — public routes sorted by newest, most saved, most liked, distance (long/short), elevation gain (high/low): https://trazo.runvia.app/community
+- Running pace calculator — pace, finish time and distance for 5K/10K/half/full marathon, per-km splits, 400 m track lap times, Riegel race-time predictions: https://trazo.runvia.app/utility
+- Cycling utilities (coming soon): https://trazo.runvia.app/utility/bike
+- AI connection center (ChatGPT/Claude): https://trazo.runvia.app/connect
+
 ## Guides
 
 - Korean guide: https://trazo.runvia.app/guide/

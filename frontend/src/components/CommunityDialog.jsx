@@ -1,6 +1,7 @@
 // src/components/CommunityDialog.jsx
-// 커뮤니티: 전체 공개된 코스를 최신순·많이 담긴 순·좋아요 순으로 둘러보고, 눌러서 전체 코스를 봅니다.
-import { useCallback, useEffect, useState } from 'react';
+// 커뮤니티: 전체 공개된 코스를 최신순·많이 담긴 순·좋아요 순·거리순·상승 고도순으로 둘러보고, 눌러서 전체 코스를 봅니다.
+// 목록 끝에 닿으면 다음 코스를 자동으로 불러오고(무한 스크롤), '더 보기' 버튼도 그대로 둡니다.
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCommunity } from '../api/courseApi';
 import { SPORTS, SPORT_IDS } from '../sports';
 import { timeAgo } from '../utils/share';
@@ -14,7 +15,15 @@ import SharedCourseDialog from './SharedCourseDialog';
 
 const PAGE_SIZE = 20;
 const SEARCH_DELAY_MS = 300;
-const SORTS = { recent: '최신순', popular: '많이 담긴 순', likes: '좋아요 순' };
+const SORTS = {
+    recent: '최신순',
+    popular: '많이 담긴 순',
+    likes: '좋아요 순',
+    distance_desc: '거리 긴 순',
+    distance_asc: '거리 짧은 순',
+    ascent_desc: '상승 고도 높은 순',
+    ascent_asc: '상승 고도 낮은 순',
+};
 
 const CommunityCard = ({ item, onOpen }) => {
     const sport = SPORTS[item.sport] ?? SPORTS.bike;
@@ -95,7 +104,7 @@ const CommunityDialog = ({ userId, ensureMember, onOpenCourse, onClose, variant 
                 if (prev?.key !== key) return prev;
                 // 그사이 새로 공개된 코스 때문에 같은 코스가 두 번 오면 한 번만 보여줍니다.
                 const seen = new Set(prev.items.map(item => item.token));
-                return { ...prev, items: [...prev.items, ...response.data.items.filter(item => !seen.has(item.token))], hasMore: response.data.has_more };
+                return { ...prev, items: [...prev.items, ...response.data.items.filter(item => !seen.has(item.token))], hasMore: response.data.has_more, moreError: false };
             });
         } catch {
             setPage(prev => ({ ...prev, moreError: true }));
@@ -103,6 +112,20 @@ const CommunityDialog = ({ userId, ensureMember, onOpenCourse, onClose, variant 
             setLoadingMore(false);
         }
     };
+
+    // 목록 끝의 '더 보기' 자리가 화면에 들어오면 자동으로 다음 쪽을 불러옵니다. 실패하면 멈추고 버튼으로 다시 시도합니다.
+    const loadMoreRef = useRef(loadMore);
+    useEffect(() => { loadMoreRef.current = loadMore; });
+    const canAutoLoad = Boolean(current?.hasMore && !current.moreError && !loadingMore);
+    const [sentinel, setSentinel] = useState(null);
+    useEffect(() => {
+        if (!sentinel || !canAutoLoad || typeof IntersectionObserver === 'undefined') return undefined;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some(entry => entry.isIntersecting)) loadMoreRef.current();
+        }, { rootMargin: '400px 0px' });
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [sentinel, canAutoLoad]);
 
     const handleChange = useCallback(({ token, ...changes }) => {
         setPage(prev => prev?.items
@@ -139,7 +162,7 @@ const CommunityDialog = ({ userId, ensureMember, onOpenCourse, onClose, variant 
                     {current.items.map(item => <CommunityCard key={item.token} item={item} onOpen={setOpenToken} />)}
                 </ul>
                 {current.hasMore && (
-                    <div className="load-more">
+                    <div className="load-more" ref={setSentinel}>
                         <Button variant="secondary" onClick={loadMore} loading={loadingMore}>
                             {current.moreError ? '다시 시도' : '더 보기'}
                         </Button>
