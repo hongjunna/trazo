@@ -65,7 +65,7 @@ export const PlaceSearchPanel = ({ search, compact }) => {
 
     let body = null;
     if (search.status === 'loading') body = <p className="place-search__note"><Icon name="loader" size={14} className="spin" />찾는 중…</p>;
-    else if (search.status === 'empty') body = <p className="place-search__note">'{search.query}' 검색 결과가 없어요.</p>;
+    else if (search.status === 'empty') body = <p className="place-search__note">'{search.searched}' 검색 결과가 없어요.</p>;
     else if (search.status === 'error') body = <p className="place-search__note">검색하지 못했어요. 잠시 후 다시 시도하세요.</p>;
     else if (search.results.length) {
         body = listOpen ? (

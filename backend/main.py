@@ -2678,13 +2678,10 @@ def import_osm_tracks(session: Session, data: Optional[dict] = None) -> dict:
         track.updated_at = utc_now()
         session.add(track)
     session.commit()
-    # OSM에서 사라진 트랙은 지우지 않고 숨깁니다 (관리자가 다시 보이게 할 수 있음).
-    gone = [track for ref, track in existing.items() if ref not in {item["osm_ref"] for item in parsed} and not track.hidden]
-    for track in gone:
-        track.hidden = True
-        session.add(track)
-    session.commit()
-    return {"found": len(parsed), "created": created, "updated": updated, "hidden": len(gone)}
+    # 이번 결과에 없는 트랙은 숨기지 않고 세기만 합니다. Overpass 미러마다 반영 시점이 달라, 한 번 빠졌다고 숨기면 멀쩡한 트랙이 사라집니다.
+    found = {item["osm_ref"] for item in parsed}
+    missing = sum(1 for ref, track in existing.items() if ref not in found and not track.hidden)
+    return {"found": len(parsed), "created": created, "updated": updated, "missing": missing}
 
 def run_track_import():
     try:

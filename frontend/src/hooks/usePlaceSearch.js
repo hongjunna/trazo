@@ -10,7 +10,7 @@ const placesService = () => (window.kakao?.maps?.services ? new window.kakao.map
 export const usePlaceSearch = (map) => {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
-    const [state, setState] = useState({ status: 'idle', results: [], query: '' });
+    const [state, setState] = useState({ status: 'idle', results: [], searched: '' });
     const [activeId, setActiveId] = useState(null);
     const requestRef = useRef(0);
 
@@ -19,7 +19,7 @@ export const usePlaceSearch = (map) => {
         const service = placesService();
         if (!keyword || !service) return;
         const request = ++requestRef.current;
-        setState(prev => ({ ...prev, status: 'loading', query: keyword }));
+        setState(prev => ({ ...prev, status: 'loading', searched: keyword }));
         const options = { size: MAX_RESULTS };
         // 지금 보고 있는 지도 가운데와 가까운 곳을 먼저 보여줍니다.
         if (map) options.location = map.getCenter();
@@ -35,7 +35,7 @@ export const usePlaceSearch = (map) => {
                     lat: Number(place.y),
                     lng: Number(place.x),
                 }));
-                setState({ status: 'done', results, query: keyword });
+                setState({ status: 'done', results, searched: keyword });
                 setActiveId(null);
                 if (map && results.length) {
                     const bounds = new window.kakao.maps.LatLngBounds();
@@ -43,7 +43,7 @@ export const usePlaceSearch = (map) => {
                     map.setBounds(bounds, 80, 80, 80, 80);
                 }
             } else {
-                setState({ status: status === Status.ZERO_RESULT ? 'empty' : 'error', results: [], query: keyword });
+                setState({ status: status === Status.ZERO_RESULT ? 'empty' : 'error', results: [], searched: keyword });
             }
         }, options);
     }, [map]);
@@ -59,7 +59,7 @@ export const usePlaceSearch = (map) => {
         requestRef.current += 1;
         setOpen(false);
         setQuery('');
-        setState({ status: 'idle', results: [], query: '' });
+        setState({ status: 'idle', results: [], searched: '' });
         setActiveId(null);
     }, []);
 

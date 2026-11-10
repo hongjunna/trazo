@@ -620,11 +620,11 @@ const TracksTab = ({ onUnauthorized }) => {
             <div className="admin-panel">
                 <h3 className="admin-subtitle">OpenStreetMap에서 가져오기</h3>
                 <p className="admin-muted">
-                    공원·경기장·체육시설 안의 육상 트랙과 이름이 있는 트랙을 가져와요 (학교 운동장은 빼요). 다시 가져오면 모양·거리는 새로 고치고, 직접 고친 이름과 숨김은 그대로 둬요.
+                    공원·경기장·체육시설 안의 육상 트랙과 이름이 있는 트랙을 가져와요 (학교 운동장은 빼요). 다시 가져오면 모양·거리는 새로 고치고, 직접 고친 이름·정보와 숨김은 그대로 둬요. 육상 트랙이 아닌 것(보행로·산책로 등)은 모양으로 걸러요.
                     지금 {data.total}개 · 숨김 {data.hidden}개
                 </p>
                 {status?.running && <p className="admin-muted"><Icon name="loader" size={12} className="spin" /> 가져오는 중… ({formatDate(status.started_at)} 시작)</p>}
-                {!status?.running && status?.result && <p className="admin-muted">마지막 결과: 찾음 {status.result.found} · 새로 추가 {status.result.created} · 갱신 {status.result.updated} · 사라져 숨김 {status.result.hidden}</p>}
+                {!status?.running && status?.result && <p className="admin-muted">마지막 결과: 찾음 {status.result.found} · 새로 추가 {status.result.created} · 갱신 {status.result.updated}{status.result.missing ? ` · 이번 결과에 없음 ${status.result.missing} (OSM에서 지워졌으면 직접 숨기세요)` : ''}</p>}
                 {!status?.running && status?.error && <p className="admin-error">실패: {status.error}</p>}
                 <div className="admin-actions">
                     <Button size="sm" variant="soft" onClick={startImport} disabled={status?.running}>지금 가져오기</Button>
