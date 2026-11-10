@@ -47,11 +47,6 @@
 </head>
 <body>
   <svg class="bg" width="1200" height="900" viewBox="0 0 1200 900" aria-hidden="true">
-    <defs>
-      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="10" />
-      </filter>
-    </defs>
     <!-- 등고선 -->
     <g fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="2">
       <path d="M760 120c120-40 300-10 360 90s20 230-90 290-260 40-330-40-60-300 60-340z" />
@@ -65,18 +60,6 @@
       <path d="M560 -40c90 10 170 70 160 150s-110 120-200 100-150-90-120-160 70-100 160-90z" />
       <path d="M570 0c62 8 118 50 110 104s-76 82-138 68-104-62-82-110 48-70 110-62z" />
     </g>
-    <!-- 점을 찍어 이은 코스 -->
-    <path d="M610 820 C 700 700, 690 600, 800 560 S 930 470, 960 380 S 1020 230, 1120 170"
-          fill="none" stroke="#8FCE3A" stroke-opacity="0.35" stroke-width="30" stroke-linecap="round" filter="url(#glow)" />
-    <path d="M610 820 C 700 700, 690 600, 800 560 S 930 470, 960 380 S 1020 230, 1120 170"
-          fill="none" stroke="#0A3B41" stroke-width="22" stroke-linecap="round" />
-    <path d="M610 820 C 700 700, 690 600, 800 560 S 930 470, 960 380 S 1020 230, 1120 170"
-          fill="none" stroke="#8FCE3A" stroke-width="13" stroke-linecap="round" />
-    <circle cx="800" cy="560" r="12" fill="#FFFFFF" stroke="#8FCE3A" stroke-width="6" />
-    <circle cx="960" cy="380" r="12" fill="#FFFFFF" stroke="#8FCE3A" stroke-width="6" />
-    <circle cx="610" cy="820" r="20" fill="#0B4F57" stroke="#FFFFFF" stroke-width="8" />
-    <circle cx="1120" cy="170" r="24" fill="#FFFFFF" />
-    <circle cx="1120" cy="170" r="10" fill="#C0392B" />
   </svg>
 
   <div class="content">

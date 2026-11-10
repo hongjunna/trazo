@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #333; font-family: Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  .slide { width: 1600px; height: 900px; position: relative; overflow: hidden; display: flex; align-items: center; padding: 0 0 0 96px; gap: 64px; background: #F3F5F6; color: #15262C; }
+  .slide.dark { background: radial-gradient(circle at 85% 20%, #11666F 0%, #0B4F57 45%, #083C42 100%); color: #fff; }
+  .copy { width: 440px; flex: none; }
+  .brand { position: absolute; left: 96px; top: 64px; display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 26px; letter-spacing: -0.02em; color: #0B4F57; }
+  .dark .brand { color: #fff; }
+  .brand img { width: 44px; height: 44px; }
+  .eyebrow { display: inline-block; font-size: 18px; font-weight: 700; color: #0B4F57; background: #E6F0F1; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; }
+  .dark .eyebrow { color: #0B4F57; background: #8FCE3A; }
+  h1 { font-size: 52px; line-height: 1.22; letter-spacing: -0.035em; font-weight: 800; }
+  h1 em { font-style: normal; color: #5E9B1C; }
+  .dark h1 em { color: #8FCE3A; }
+  .lead { margin-top: 22px; font-size: 21px; line-height: 1.6; color: #536269; }
+  .dark .lead { color: rgba(255,255,255,0.78); }
+  .points { list-style: none; padding: 0; margin-top: 28px; display: grid; gap: 14px; }
+  .points li { display: flex; gap: 12px; align-items: flex-start; font-size: 19px; line-height: 1.45; color: #15262C; }
+  .dark .points li { color: #fff; }
+  .points li::before { content: ''; flex: none; width: 22px; height: 22px; margin-top: 2px; border-radius: 50%; background: #8FCE3A url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%230B4F57' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+  .chip { font-size: 17px; font-weight: 700; padding: 9px 16px; border-radius: 12px; background: #fff; color: #0B4F57; border: 1px solid #E2E7E9; }
+  .dark .chip { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.22); }
+  .visual { position: relative; flex: 1; height: 100%; }
+  .frame { position: absolute; border-radius: 18px; overflow: hidden; background: #fff; box-shadow: 0 30px 80px rgba(8,40,46,0.28), 0 6px 18px rgba(8,40,46,0.12); }
+  .frame > img { display: block; width: 100%; }
+  .bar { height: 34px; background: #EEF2F3; display: flex; align-items: center; gap: 7px; padding: 0 14px; }
+  .bar i { width: 11px; height: 11px; border-radius: 50%; background: #CBD3D6; }
+  .bar span { margin-left: 14px; font-size: 13px; color: #869399; background: #fff; border-radius: 6px; padding: 3px 12px; }
+  .crop { position: absolute; border-radius: 16px; background-repeat: no-repeat; background-color: #fff; box-shadow: 0 24px 60px rgba(8,40,46,0.22), 0 4px 12px rgba(8,40,46,0.1); }
+  .label { position: absolute; font-size: 15px; font-weight: 700; padding: 7px 13px; border-radius: 10px; background: #0B4F57; color: #fff; box-shadow: 0 8px 20px rgba(8,40,46,0.25); }
+  .label.lime { background: #8FCE3A; color: #0B4F57; }
+</style></head><body>
+
+<!-- 1. 대표 -->
+<section class="slide dark" id="s1">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <div class="copy">
+    <span class="eyebrow">자전거 · 러닝 코스 플래너</span>
+    <h1>지도에 점을 찍으면<br><em>나만의 코스</em>가<br>됩니다</h1>
+    <p class="lead">종목에 맞는 길을 따라 자동으로 잇고, 거리·상승 고도·예상 시간을 바로 확인하세요.</p>
+    <div class="chips"><span class="chip">카카오 지도 기반</span><span class="chip">GPX · FIT · TCX</span><span class="chip">무료</span></div>
+  </div>
+  <div class="visual">
+    <div class="frame" style="left:0; top:118px; width:1060px;"><div class="bar"><i></i><i></i><i></i><span>trazo.runvia.app</span></div><img src="editor.png" alt=""></div>
+  </div>
+</section>
+
+<!-- 2. 길찾기와 고도 -->
+<section class="slide" id="s2">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <div class="copy">
+    <span class="eyebrow">코스 만들기</span>
+    <h1>오르막까지<br><em>미리 알고</em> 출발</h1>
+    <ul class="points">
+      <li>자전거는 자전거길로, 러닝은 공원·산책로로. 종목마다 다른 길찾기</li>
+      <li>큰 차도·계단·비포장·오르막 피하기 옵션</li>
+      <li>경사도별 색으로 보는 고도 그래프와 1km 거리 표시</li>
+      <li>출발점 복귀·왕복 코스를 한 번에</li>
+    </ul>
+  </div>
+  <div class="visual">
+    <!-- 요약 카드: 원본 (32,256)-(708,560) -->
+    <div class="crop" style="left:0; top:200px; width:420px; height:212px; background-image:url(editor.png); background-size:1788px 1118px; background-position:-20px -159px;"></div>
+    <!-- 지도 -->
+    <div class="crop" style="left:450px; top:160px; width:510px; height:300px; background-image:url(editor.png); background-size:1600px 1000px; background-position:-850px -100px;"></div>
+    <!-- 고도 그래프: 원본 (749,1325)-(2866,1800) -->
+    <div class="crop" style="left:0; top:490px; width:960px; height:215px; background-image:url(editor.png); background-size:1306px 816px; background-position:-340px -601px;"></div>
+    <span class="label lime" style="left:470px; top:140px;">러닝 길 따라 자동 연결</span>
+    <span class="label" style="left:24px; top:725px;">경사 구간을 색으로 · 최고 324m</span>
+  </div>
+</section>
+
+<!-- 3. 내보내기와 공유 -->
+<section class="slide dark" id="s3">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <div class="copy">
+    <span class="eyebrow">내보내기 · 공유</span>
+    <h1>만든 코스는<br><em>기기로, 친구에게</em></h1>
+    <ul class="points">
+      <li>가민·와후·스트라바에 바로 넣는 코스 파일</li>
+      <li>링크 하나로 공유하고, 받는 사람은 로그인 없이 보기</li>
+      <li>급수·정상·위험 지점 웨이포인트까지 함께</li>
+      <li>고도 그래프를 담은 인쇄용 코스 이미지</li>
+    </ul>
+    <div class="chips"><span class="chip">GPX</span><span class="chip">FIT</span><span class="chip">TCX</span><span class="chip">KML</span><span class="chip">GeoJSON</span></div>
+  </div>
+  <div class="visual">
+    <div class="frame" style="left:0; top:132px; width:1000px;"><div class="bar"><i></i><i></i><i></i><span>trazo.runvia.app/c/…</span></div><div style="height:600px; background:url(course.png) no-repeat; background-size:1252px 783px; background-position:-130px -143px;"></div></div>
+  </div>
+</section>
+
+<!-- 4. 코스 지도와 커뮤니티 -->
+<section class="slide" id="s4">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <div class="copy">
+    <span class="eyebrow">코스 지도 · 커뮤니티</span>
+    <h1>우리 동네<br><em>인기 코스</em>를<br>한눈에</h1>
+    <ul class="points">
+      <li>다른 러너·라이더가 공개한 코스를 지도 위에 겹쳐 보기</li>
+      <li>최신순·인기순·거리순·상승 고도순으로 둘러보기</li>
+      <li>마음에 드는 코스는 내 코스에 담아 바로 내려받기</li>
+      <li>좋아요와 댓글로 코스 정보 나누기</li>
+    </ul>
+  </div>
+  <div class="visual">
+    <div class="frame" style="left:0; top:90px; width:860px;"><div class="bar"><i></i><i></i><i></i><span>trazo.runvia.app/explore</span></div><img src="explore.png" alt=""></div>
+    <div class="frame" style="left:420px; top:470px; width:560px;"><div class="bar"><i></i><i></i><i></i><span>trazo.runvia.app/community</span></div><img src="community.png" alt="" style="height:330px; object-fit:cover; object-position:0 0;"></div>
+  </div>
+</section>
+
+<!-- 5. 훈련 -->
+<section class="slide dark" id="s5">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <div class="copy">
+    <span class="eyebrow">훈련 도구</span>
+    <h1>코스에서<br><em>훈련</em>까지<br>한 곳에서</h1>
+    <ul class="points">
+      <li>러닝 페이스 계산기: 목표 기록으로 페이스·구간 기록·예상 기록</li>
+      <li>400m 트랙 한 바퀴 기록으로 인터벌 훈련</li>
+      <li>전국 공공 육상 트랙 지도</li>
+      <li>ChatGPT·Claude와 연결해 코스 추천·훈련 계획</li>
+    </ul>
+  </div>
+  <div class="visual">
+    <div class="frame" style="left:0; top:118px; width:1060px;"><div class="bar"><i></i><i></i><i></i><span>trazo.runvia.app/utility</span></div><img src="utility.png" alt=""></div>
+  </div>
+</section>
+</body></html>
