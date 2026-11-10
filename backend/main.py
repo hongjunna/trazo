@@ -1585,8 +1585,8 @@ def admin_insights(
 
 class InsightReviewRequest(BaseModel):
     action: Literal["approve", "reject", "save"]
-    feature_ko: Optional[str] = PydanticField(default=None, max_length=course_insight.FEATURE_MAX)
-    route_ko: Optional[str] = PydanticField(default=None, max_length=course_insight.ROUTE_MAX)
+    feature_ko: Optional[str] = PydanticField(default=None, max_length=300)
+    route_ko: Optional[str] = PydanticField(default=None, max_length=300)
     themes: Optional[List[str]] = None
 
 def get_admin_insight(session: Session, course_id: int) -> tuple[CourseInsight, Course]:
