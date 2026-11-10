@@ -180,6 +180,30 @@ class SeedAccount(SQLModel, table=True):
     email: str
     created_at: str = Field(default_factory=utc_now)
 
+# 육상 트랙. OpenStreetMap에서 가져온 트랙(source=osm)과 관리자가 직접 넣은 트랙(source=manual)을 코스 지도에 보여줍니다.
+class Track(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    # 시군구 이름 (예: 서초구)
+    region: Optional[str] = None
+    lat: float
+    lng: float
+    # 트랙 선 [[lat, lng], …]. 비어 있으면 지도에 핀만 표시합니다.
+    path_json: Optional[str] = None
+    # 한 바퀴 거리(1레인 기준, m). 모르면 비워 둡니다.
+    length_m: Optional[int] = None
+    lanes: Optional[int] = None
+    surface: Optional[str] = None
+    note: Optional[str] = None
+    source: str = Field(default="manual")
+    # OSM 원본 (예: way/123). 다시 가져올 때 같은 트랙을 찾는 데 씁니다.
+    osm_ref: Optional[str] = Field(default=None, unique=True)
+    # 관리자가 이름을 고쳤으면 OSM에서 다시 가져와도 이름을 덮어쓰지 않습니다.
+    name_locked: bool = Field(default=False)
+    hidden: bool = Field(default=False)
+    created_at: str = Field(default_factory=utc_now)
+    updated_at: str = Field(default_factory=utc_now)
+
 # create_all은 기존 테이블에 열을 추가하지 않으므로, 이전 버전에서 만든 course 테이블에 빠진 열을 추가합니다.
 COURSE_MIGRATIONS = {
     # 기존 코스를 처음 로그인한 계정에 자동 배정하지 않습니다.
@@ -487,14 +511,40 @@ def random_virtual_uid(session: Session, exclude: Optional[str] = None) -> Optio
     uids = [uid for uid in session.exec(select(VirtualAccount.firebase_uid)).all() if uid != exclude]
     return secrets.choice(uids) if uids else None
 
+# 제목 앞의 [제주 5km]처럼 대괄호로 묶은 머리말이 같은 코스는 한 시리즈로 봅니다. 거리(5km·10K·800m)는 시리즈마다 달라서 빼고 비교합니다.
+SERIES_PREFIX = re.compile(r"^\s*[\[［【]([^\]］】]{1,40})[\]］】]")
+SERIES_DISTANCE = re.compile(r"\d+(?:\.\d+)?\s*(?:km|k|m|키로|킬로)?", re.IGNORECASE)
+
+def series_key(title: Optional[str]) -> Optional[str]:
+    match = SERIES_PREFIX.match(title or "")
+    if not match:
+        return None
+    key = re.sub(r"[\s·\-_/]+", "", SERIES_DISTANCE.sub("", match.group(1))).lower()
+    return key or None
+
+def series_author(session: Session, course: Course) -> Optional[str]:
+    # 운영 계정이 공개한 같은 시리즈 코스에 이미 정한 작성자가 있으면 그 작성자를 씁니다.
+    key = series_key(course.title)
+    if not key:
+        return None
+    seeds = session.exec(select(SeedAccount.firebase_uid)).all()
+    virtual = set(session.exec(select(VirtualAccount.firebase_uid)).all())
+    rows = session.exec(select(Course.id, Course.title, Course.display_uid).where(
+        Course.firebase_uid.in_(seeds), Course.is_deleted == False, Course.display_uid != None).order_by(Course.id)).all()
+    for course_id, title, uid in rows:
+        if course_id != course.id and uid in virtual and series_key(title) == key:
+            return uid
+    return None
+
 def apply_visibility(session: Session, course: Course, visibility: str, user_id: str | int):
     if visibility == "public":
         require_profile(session, user_id)
         if course.visibility != "public":
             course.published_at = utc_now()
-        # 운영 계정이 처음 공개하는 코스는 가상 계정 중 하나를 작성자로 보여줍니다. 한 번 정하면 유지합니다.
+        # 운영 계정이 처음 공개하는 코스는 가상 계정 중 하나를 작성자로 보여줍니다. 한 번 정하면 유지하고,
+        # 같은 시리즈([제주 5km] …)는 같은 작성자로 맞춥니다.
         if not course.display_uid and is_seed_account(session, user_id):
-            course.display_uid = random_virtual_uid(session)
+            course.display_uid = series_author(session, course) or random_virtual_uid(session)
     if visibility != "private" and not course.share_token:
         course.share_token = secrets.token_urlsafe(9)
     course.visibility = visibility
@@ -1534,9 +1584,11 @@ from pydantic import ConfigDict, model_validator
 from starlette.concurrency import run_in_threadpool
 try:
     from . import course_geo
+    from . import tracks as track_data
     from .mcp_protocol import McpServer, Tool, ToolError, PARSE_ERROR, INVALID_REQUEST, error_response
 except ImportError:
     import course_geo
+    import tracks as track_data
     from mcp_protocol import McpServer, Tool, ToolError, PARSE_ERROR, INVALID_REQUEST, error_response
 
 # 사용자가 AI 서비스에 입력하는 주소의 기준. 개발 환경에서는 http://localhost:5173 처럼 바꿉니다.
@@ -2374,8 +2426,18 @@ def assign_virtual_authors(session: Session, mode: str = "unassigned") -> int:
     if not uids:
         return 0
     courses = seed_courses_query(session, mode)
+    # 같은 시리즈 코스는 같은 작성자로 배정합니다. 다시 섞기(all)가 아니면 이미 정한 시리즈 작성자를 이어 씁니다.
+    chosen: dict[str, str] = {}
     for course in courses:
-        course.display_uid = secrets.choice(uids)
+        key = series_key(course.title)
+        if key and key not in chosen and mode != "all":
+            existing = series_author(session, course)
+            if existing:
+                chosen[key] = existing
+        uid = chosen.get(key) if key else None
+        course.display_uid = uid or secrets.choice(uids)
+        if key:
+            chosen[key] = course.display_uid
         session.add(course)
     session.commit()
     return len(courses)
@@ -2444,8 +2506,16 @@ def admin_delete_virtual_account(uid: str, session: Session = Depends(get_sessio
     session.delete(account)
     session.flush()
     # 이 계정이 작성자로 보이던 코스는 남은 가상 계정 중 하나로 바꿉니다 (없으면 실제 작성자로 보입니다).
+    # 같은 시리즈 코스는 함께 같은 계정으로 옮깁니다.
+    chosen: dict[str, Optional[str]] = {}
     for course in session.exec(select(Course).where(Course.display_uid == uid)).all():
-        course.display_uid = random_virtual_uid(session, exclude=uid)
+        key = series_key(course.title)
+        if key and key in chosen:
+            course.display_uid = chosen[key]
+        else:
+            course.display_uid = random_virtual_uid(session, exclude=uid)
+            if key:
+                chosen[key] = course.display_uid
         session.add(course)
     session.commit()
     return {"status": "success", "deleted_id": uid}
@@ -2535,3 +2605,175 @@ def community_map(
     # 많이 담기고 좋아요가 많은 코스부터 보여줍니다.
     items.sort(key=lambda item: (item["share_count"] + item["like_count"]), reverse=True)
     return {"items": items[:MAP_COURSE_LIMIT], "total": len(items), "truncated": len(items) > MAP_COURSE_LIMIT}
+
+# --- 12. 육상 트랙 ---
+# 코스 지도의 '트랙' 보기에 쓰입니다. OSM 트랙은 관리자 페이지에서 가져오고(수십 초 걸려 뒤에서 처리), 빠진 트랙은 직접 넣습니다.
+track_logger = logging.getLogger("trazo.tracks")
+track_import_lock = threading.Lock()
+track_import_status: dict = {"running": False, "started_at": None, "finished_at": None, "result": None, "error": None}
+
+def track_json(track: Track, admin: bool = False) -> dict:
+    try:
+        path = json.loads(track.path_json) if track.path_json else None
+    except ValueError:
+        path = None
+    item = {"id": track.id, "name": track.name, "region": track.region, "lat": track.lat, "lng": track.lng, "path": path,
+            "length_m": track.length_m, "lanes": track.lanes, "surface": track.surface, "note": track.note, "source": track.source}
+    if admin:
+        item.update({"osm_ref": track.osm_ref, "hidden": track.hidden, "name_locked": track.name_locked, "updated_at": track.updated_at})
+    return item
+
+@app.get("/community/tracks")
+def community_tracks(
+    south: float = Query(default=-90, ge=-90, le=90),
+    west: float = Query(default=-180, ge=-180, le=180),
+    north: float = Query(default=90, ge=-90, le=90),
+    east: float = Query(default=180, ge=-180, le=180),
+    session: Session = Depends(get_session),
+):
+    rows = session.exec(select(Track).where(Track.hidden == False, Track.lat >= south, Track.lat <= north, Track.lng >= west, Track.lng <= east)
+                        .order_by(Track.id).limit(500)).all()
+    return {"items": [track_json(track) for track in rows]}
+
+def import_osm_tracks(session: Session, data: Optional[dict] = None) -> dict:
+    parsed = track_data.parse_tracks(data if data is not None else track_data.fetch_overpass())
+    existing = {track.osm_ref: track for track in session.exec(select(Track).where(Track.osm_ref != None)).all()}
+    created = updated = 0
+    for item in parsed:
+        track = existing.get(item["osm_ref"])
+        if not track:
+            track = Track(source="osm", osm_ref=item["osm_ref"], name=item["name"], lat=item["lat"], lng=item["lng"])
+            created += 1
+        else:
+            updated += 1
+        if not track.name_locked:
+            track.name = item["name"]
+        track.region = item["region"]
+        track.lat, track.lng = item["lat"], item["lng"]
+        track.path_json = json.dumps(item["path"])
+        track.length_m, track.lanes, track.surface = item["length_m"], item["lanes"], item["surface"]
+        track.updated_at = utc_now()
+        session.add(track)
+    session.commit()
+    # OSM에서 사라진 트랙은 지우지 않고 숨깁니다 (관리자가 다시 보이게 할 수 있음).
+    gone = [track for ref, track in existing.items() if ref not in {item["osm_ref"] for item in parsed} and not track.hidden]
+    for track in gone:
+        track.hidden = True
+        session.add(track)
+    session.commit()
+    return {"found": len(parsed), "created": created, "updated": updated, "hidden": len(gone)}
+
+def run_track_import():
+    try:
+        with Session(engine) as session:
+            result = import_osm_tracks(session)
+        track_logger.warning("OSM 트랙 가져오기: %s", result)
+        track_import_status.update(result=result, error=None)
+    except Exception as error:  # 외부 서버 오류를 관리자 화면에 그대로 보여줍니다.
+        track_logger.exception("OSM 트랙 가져오기 실패")
+        track_import_status.update(error=str(error)[:300])
+    finally:
+        track_import_status.update(running=False, finished_at=utc_now())
+        track_import_lock.release()
+
+@app.post("/admin/tracks/import-osm", dependencies=[Depends(require_admin)])
+def admin_import_tracks():
+    if not track_import_lock.acquire(blocking=False):
+        return {"status": "running", **track_import_status}
+    track_import_status.update(running=True, started_at=utc_now(), finished_at=None, error=None)
+    threading.Thread(target=run_track_import, daemon=True).start()
+    return {"status": "started", **track_import_status}
+
+@app.get("/admin/tracks", dependencies=[Depends(require_admin)])
+def admin_tracks(q: str = "", source: Optional[Literal["osm", "manual"]] = None, session: Session = Depends(get_session)):
+    statement = select(Track)
+    if q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(or_(Track.name.ilike(pattern), Track.region.ilike(pattern)))
+    if source:
+        statement = statement.where(Track.source == source)
+    rows = session.exec(statement.order_by(Track.source.desc(), Track.name).limit(1000)).all()
+    total = session.exec(select(func.count()).select_from(Track)).one()
+    hidden = session.exec(select(func.count()).select_from(Track).where(Track.hidden == True)).one()
+    return {"items": [track_json(track, admin=True) for track in rows], "total": total, "hidden": hidden, "import": track_import_status}
+
+class TrackShape(BaseModel):
+    # pin: 핀만, oval: 표준 트랙 모양을 그림 (bearing: 직선 방향, 북쪽 0° 시계 방향)
+    shape: Literal["pin", "oval"] = "oval"
+    bearing: float = PydanticField(default=0, ge=-360, le=360)
+    # 그릴 트랙 크기(1레인 한 바퀴, m)
+    size_m: float = PydanticField(default=400, ge=100, le=1000)
+
+class TrackCreateRequest(TrackShape):
+    name: str = PydanticField(min_length=1, max_length=60)
+    lat: float = PydanticField(ge=-90, le=90)
+    lng: float = PydanticField(ge=-180, le=180)
+    region: Optional[str] = PydanticField(default=None, max_length=40)
+    length_m: Optional[int] = PydanticField(default=None, ge=50, le=5000)
+    lanes: Optional[int] = PydanticField(default=None, ge=1, le=12)
+    surface: Optional[str] = PydanticField(default=None, max_length=30)
+    note: Optional[str] = PydanticField(default=None, max_length=200)
+
+class TrackUpdateRequest(BaseModel):
+    name: Optional[str] = PydanticField(default=None, min_length=1, max_length=60)
+    region: Optional[str] = PydanticField(default=None, max_length=40)
+    length_m: Optional[int] = PydanticField(default=None, ge=0, le=5000)
+    lanes: Optional[int] = PydanticField(default=None, ge=0, le=12)
+    surface: Optional[str] = PydanticField(default=None, max_length=30)
+    note: Optional[str] = PydanticField(default=None, max_length=200)
+    hidden: Optional[bool] = None
+    # 위치·모양을 다시 그릴 때만 보냅니다.
+    lat: Optional[float] = PydanticField(default=None, ge=-90, le=90)
+    lng: Optional[float] = PydanticField(default=None, ge=-180, le=180)
+    shape: Optional[TrackShape] = None
+
+def shape_path(lat: float, lng: float, shape: TrackShape) -> Optional[str]:
+    return json.dumps(track_data.oval_path(lat, lng, shape.bearing, shape.size_m)) if shape.shape == "oval" else None
+
+@app.post("/admin/tracks", dependencies=[Depends(require_admin)])
+def admin_create_track(data: TrackCreateRequest, session: Session = Depends(get_session)):
+    track = Track(name=data.name.strip(), region=data.region, lat=data.lat, lng=data.lng, path_json=shape_path(data.lat, data.lng, data),
+                  length_m=data.length_m, lanes=data.lanes, surface=data.surface, note=data.note, source="manual", name_locked=True)
+    session.add(track)
+    session.commit()
+    session.refresh(track)
+    return {"track": track_json(track, admin=True)}
+
+@app.put("/admin/tracks/{track_id}", dependencies=[Depends(require_admin)])
+def admin_update_track(track_id: int, data: TrackUpdateRequest, session: Session = Depends(get_session)):
+    track = session.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    fields = data.model_dump(exclude_unset=True, exclude={"shape", "lat", "lng"})
+    if "name" in fields:
+        fields["name"] = fields["name"].strip()
+        track.name_locked = True
+    for key in ("length_m", "lanes"):
+        # 0을 보내면 '모름'으로 비웁니다.
+        if fields.get(key) == 0:
+            fields[key] = None
+    for key, value in fields.items():
+        setattr(track, key, value)
+    if data.lat is not None and data.lng is not None:
+        track.lat, track.lng = data.lat, data.lng
+    if data.shape is not None:
+        track.path_json = shape_path(track.lat, track.lng, data.shape)
+    track.updated_at = utc_now()
+    session.add(track)
+    session.commit()
+    session.refresh(track)
+    return {"track": track_json(track, admin=True)}
+
+@app.delete("/admin/tracks/{track_id}", dependencies=[Depends(require_admin)])
+def admin_delete_track(track_id: int, session: Session = Depends(get_session)):
+    track = session.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    # OSM 트랙은 다시 가져오면 되살아나므로 지우지 않고 숨깁니다.
+    if track.source == "osm":
+        track.hidden = True
+        session.add(track)
+    else:
+        session.delete(track)
+    session.commit()
+    return {"status": "success", "hidden": track.source == "osm"}

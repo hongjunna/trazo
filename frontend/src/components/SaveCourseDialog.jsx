@@ -8,7 +8,7 @@ import { VisibilityPicker } from './ShareDialog';
 
 const TITLE_MAX = 60;
 
-const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, defaultFolderId = null, defaultVisibility = 'private', onSubmit, isSaving }) => {
+const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, defaultFolderId = null, defaultVisibility = 'public', onSubmit, isSaving }) => {
     const [mode, setMode] = useState(existingTitle ? 'update' : 'new');
     const [title, setTitle] = useState(defaultTitle);
     const [folderId, setFolderId] = useState(defaultFolderId);

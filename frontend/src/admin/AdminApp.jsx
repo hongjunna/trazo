@@ -1,5 +1,5 @@
 // src/admin/AdminApp.jsx
-// 관리자 페이지: 개요, 회원 목록, 공개 범위와 상관없는 전체 코스 목록과 코스 상세(지도·댓글).
+// 관리자 페이지: 개요, 회원 목록, 공개 범위와 상관없는 전체 코스 목록과 코스 상세(지도·댓글), 가상 계정, 육상 트랙.
 import { useCallback, useEffect, useState } from 'react';
 import Button from '../components/ui/Button';
 import Dialog from '../components/ui/Dialog';
@@ -9,7 +9,7 @@ import CourseThumbnail from '../components/CourseThumbnail';
 import { useFeedback } from '../components/ui/feedbackContext';
 import { SPORTS } from '../sports';
 import { VISIBILITY, copyText, sharePath } from '../utils/share';
-import { assignVirtualAccounts, createVirtualAccounts, deleteVirtualAccount, getCourse, getCourses, getSummary, getUsers, getVirtualAccounts, isUnauthorized, loadToken, login, loginErrorMessage, saveToken } from './adminApi';
+import { assignVirtualAccounts, createTrack, createVirtualAccounts, deleteTrack, deleteVirtualAccount, getCourse, getTracks, importOsmTracks, updateTrack, getCourses, getSummary, getUsers, getVirtualAccounts, isUnauthorized, loadToken, login, loginErrorMessage, saveToken } from './adminApi';
 
 const USER_PAGE = 50;
 const COURSE_PAGE = 30;
@@ -18,6 +18,7 @@ const TABS = [
     { id: 'users', label: '회원', icon: 'users' },
     { id: 'courses', label: '코스', icon: 'route' },
     { id: 'virtual', label: '가상 계정', icon: 'user' },
+    { id: 'tracks', label: '트랙', icon: 'track' },
 ];
 
 // 코스 저장 시각은 시간대 없이 UTC로 저장돼 있어, 표시할 때 UTC로 읽습니다.
@@ -403,7 +404,7 @@ const VirtualTab = ({ onUnauthorized }) => {
     };
 
     const assign = async (mode) => {
-        if (mode === 'all' && !(await confirm({ title: '작성자 다시 섞기', message: '운영 계정의 공개 코스 작성자를 모두 무작위로 다시 정해요. 이미 보이던 작성자 이름도 바뀌어요.', confirmLabel: '다시 섞기' }))) return;
+        if (mode === 'all' && !(await confirm({ title: '작성자 다시 섞기', message: '운영 계정의 공개 코스 작성자를 모두 무작위로 다시 정해요. 이미 보이던 작성자 이름도 바뀌어요. 제목 머리말이 같은 시리즈([제주 5km] …)는 같은 작성자로 맞춰요.', confirmLabel: '다시 섞기' }))) return;
         try {
             const { data: result } = await assignVirtualAccounts(mode);
             toast(`코스 ${result.assigned}개에 작성자를 배정했어요.`, { tone: 'success' });
@@ -439,7 +440,7 @@ const VirtualTab = ({ onUnauthorized }) => {
                     <p className="admin-muted">서버 .env의 SEED_ACCOUNT_EMAILS에 운영 계정 이메일을 넣어야 해요.</p>
                 ) : (
                     <>
-                        <p className="admin-muted">이 계정이 전체 공개한 코스는 아래 가상 계정 중 하나가 작성자로 보여요: {data.seed_emails.join(', ')}</p>
+                        <p className="admin-muted">이 계정이 전체 공개한 코스는 아래 가상 계정 중 하나가 작성자로 보여요: {data.seed_emails.join(', ')}. 제목 머리말이 같은 시리즈([제주 3km], [제주 5km] …)는 같은 작성자로 보여요.</p>
                         {data.seed_accounts.length === 0
                             ? <p className="admin-muted">아직 확인된 계정이 없어요. 서비스에 운영 계정으로 한 번 로그인하면 표시돼요.</p>
                             : (
@@ -497,6 +498,185 @@ const VirtualTab = ({ onUnauthorized }) => {
     );
 };
 
+const EMPTY_TRACK = { name: '', coords: '', shape: 'oval', bearing: '0', size: '400', length: '', note: '' };
+// "37.5006, 126.9942"처럼 붙여 넣은 좌표를 읽습니다 (카카오맵·구글 지도에서 복사한 형식).
+const parseCoords = (text) => {
+    const numbers = (text.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    return numbers.length >= 2 && Math.abs(numbers[0]) <= 90 && Math.abs(numbers[1]) <= 180 ? { lat: numbers[0], lng: numbers[1] } : null;
+};
+
+const TracksTab = ({ onUnauthorized }) => {
+    const { toast, confirm } = useFeedback();
+    const [data, setData] = useState(null);
+    const [q, setQ] = useState('');
+    const [form, setForm] = useState(EMPTY_TRACK);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+
+    const fail = useCallback((err, message) => {
+        if (isUnauthorized(err)) onUnauthorized();
+        else toast(message, { tone: 'error' });
+    }, [onUnauthorized, toast]);
+    const load = useCallback(() => {
+        getTracks({ q })
+            .then(({ data: next }) => { setData(next); setError(null); })
+            .catch(err => { setError(err); if (isUnauthorized(err)) onUnauthorized(); });
+    }, [q, onUnauthorized]);
+    useEffect(() => {
+        const timer = window.setTimeout(load, 250);
+        return () => window.clearTimeout(timer);
+    }, [load]);
+    // OSM 가져오기는 서버에서 수십 초 걸려, 끝날 때까지 몇 초마다 다시 확인합니다.
+    const running = data?.import?.running;
+    useEffect(() => {
+        if (!running) return undefined;
+        const timer = window.setInterval(load, 4000);
+        return () => window.clearInterval(timer);
+    }, [running, load]);
+
+    const startImport = async () => {
+        try {
+            await importOsmTracks();
+            toast('OpenStreetMap에서 트랙을 가져오는 중이에요. 1~3분 걸려요.', { tone: 'info' });
+            load();
+        } catch (err) {
+            fail(err, '가져오기를 시작하지 못했어요.');
+        }
+    };
+
+    const coords = parseCoords(form.coords);
+    const add = async (event) => {
+        event.preventDefault();
+        if (!form.name.trim() || !coords) return;
+        setBusy(true);
+        try {
+            await createTrack({
+                name: form.name.trim(), ...coords, shape: form.shape, bearing: Number(form.bearing) || 0, size_m: Number(form.size) || 400,
+                length_m: form.length ? Number(form.length) : null, note: form.note.trim() || null,
+            });
+            toast('트랙을 추가했어요.', { tone: 'success' });
+            setForm(EMPTY_TRACK);
+            load();
+        } catch (err) {
+            fail(err, '추가하지 못했어요. 입력값을 확인하세요.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const update = async (track, changes, message) => {
+        try {
+            await updateTrack(track.id, changes);
+            if (message) toast(message, { tone: 'success' });
+            load();
+        } catch (err) {
+            fail(err, '바꾸지 못했어요.');
+        }
+    };
+
+    const rename = async (track) => {
+        const name = window.prompt('트랙 이름', track.name);
+        if (name && name.trim() && name.trim() !== track.name) update(track, { name: name.trim() }, '이름을 바꿨어요.');
+    };
+
+    const editLength = async (track) => {
+        const value = window.prompt('한 바퀴 거리(m). 비우면 모름으로 표시해요.', track.length_m ?? '');
+        if (value === null) return;
+        update(track, { length_m: value.trim() ? Number(value) : 0 });
+    };
+
+    const remove = async (track) => {
+        const isOsm = track.source === 'osm';
+        const ok = await confirm({
+            title: `'${track.name}' ${isOsm ? '숨기기' : '삭제'}`,
+            message: isOsm ? 'OpenStreetMap 트랙은 지우지 않고 지도에서 숨겨요. 다시 가져와도 숨긴 상태로 남아요.' : '직접 추가한 트랙을 지워요.',
+            confirmLabel: isOsm ? '숨기기' : '삭제', tone: 'danger',
+        });
+        if (!ok) return;
+        try {
+            await deleteTrack(track.id);
+            load();
+        } catch (err) {
+            fail(err, '지우지 못했어요.');
+        }
+    };
+
+    const status = data?.import;
+    if (error && !data) return <p className="admin-error">트랙을 불러오지 못했어요.</p>;
+    if (!data) return <p className="admin-muted">불러오는 중…</p>;
+    return (
+        <section className="admin-virtual">
+            <div className="admin-panel">
+                <h3 className="admin-subtitle">OpenStreetMap에서 가져오기</h3>
+                <p className="admin-muted">
+                    공원·경기장·체육시설 안의 육상 트랙과 이름이 있는 트랙을 가져와요 (학교 운동장은 빼요). 다시 가져오면 모양·거리는 새로 고치고, 직접 고친 이름과 숨김은 그대로 둬요.
+                    지금 {data.total}개 · 숨김 {data.hidden}개
+                </p>
+                {status?.running && <p className="admin-muted"><Icon name="loader" size={12} className="spin" /> 가져오는 중… ({formatDate(status.started_at)} 시작)</p>}
+                {!status?.running && status?.result && <p className="admin-muted">마지막 결과: 찾음 {status.result.found} · 새로 추가 {status.result.created} · 갱신 {status.result.updated} · 사라져 숨김 {status.result.hidden}</p>}
+                {!status?.running && status?.error && <p className="admin-error">실패: {status.error}</p>}
+                <div className="admin-actions">
+                    <Button size="sm" variant="soft" onClick={startImport} disabled={status?.running}>지금 가져오기</Button>
+                </div>
+            </div>
+
+            <form className="admin-panel" onSubmit={add}>
+                <h3 className="admin-subtitle">트랙 직접 추가</h3>
+                <p className="admin-muted">OSM에 없는 트랙(예: 반포종합운동장)을 넣어요. 좌표는 트랙 가운데, 방향은 직선 구간이 향하는 방위(북 0°, 동 90°)예요.</p>
+                <div className="admin-track-form">
+                    <input className="input" placeholder="이름 (예: 반포종합운동장)" value={form.name} maxLength={60} onChange={e => setForm({ ...form, name: e.target.value })} />
+                    <input className="input" placeholder="좌표 (예: 37.5006, 126.9942)" value={form.coords} onChange={e => setForm({ ...form, coords: e.target.value })} />
+                    <select className="input" value={form.shape} onChange={e => setForm({ ...form, shape: e.target.value })} aria-label="모양">
+                        <option value="oval">트랙 모양으로 그리기</option>
+                        <option value="pin">핀만 표시</option>
+                    </select>
+                    {form.shape === 'oval' && <>
+                        <label>방향(°)<input className="input" type="number" value={form.bearing} onChange={e => setForm({ ...form, bearing: e.target.value })} /></label>
+                        <label>그릴 크기(m)<input className="input" type="number" min="100" max="1000" value={form.size} onChange={e => setForm({ ...form, size: e.target.value })} /></label>
+                    </>}
+                    <label>한 바퀴(m, 모르면 비움)<input className="input" type="number" min="50" value={form.length} onChange={e => setForm({ ...form, length: e.target.value })} /></label>
+                    <input className="input" placeholder="메모 (예: 야간 개방, 우레탄 8레인)" value={form.note} maxLength={200} onChange={e => setForm({ ...form, note: e.target.value })} />
+                </div>
+                {form.coords && !coords && <p className="admin-error">좌표를 읽지 못했어요. "위도, 경도" 형식으로 넣어주세요.</p>}
+                <div className="admin-actions">
+                    <Button type="submit" variant="primary" size="sm" loading={busy} disabled={!form.name.trim() || !coords}>추가</Button>
+                </div>
+            </form>
+
+            <SearchInput value={q} onChange={setQ} placeholder="이름·지역 검색" />
+            <div className="admin-table-wrap">
+                <table className="admin-table">
+                    <thead>
+                        <tr><th>이름</th><th>지역</th><th>출처</th><th className="num">한 바퀴</th><th>표시</th><th /></tr>
+                    </thead>
+                    <tbody>
+                        {data.items.map(track => (
+                            <tr key={track.id} className={track.hidden ? 'is-deleted' : undefined}>
+                                <td>
+                                    <a href={`https://map.kakao.com/link/map/${encodeURIComponent(track.name)},${track.lat},${track.lng}`} target="_blank" rel="noreferrer">{track.name}</a>
+                                    {track.note && <div className="admin-muted">{track.note}</div>}
+                                </td>
+                                <td>{track.region ?? '-'}</td>
+                                <td>{track.source === 'osm' ? 'OSM' : '직접'}{track.path ? '' : ' · 핀'}</td>
+                                <td className="num">{track.length_m ? `${track.length_m}m` : '-'}</td>
+                                <td>{track.hidden ? '숨김' : '보임'}</td>
+                                <td className="admin-row-actions">
+                                    <Button size="sm" variant="ghost" onClick={() => rename(track)}>이름</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => editLength(track)}>거리</Button>
+                                    {track.hidden
+                                        ? <Button size="sm" variant="ghost" onClick={() => update(track, { hidden: false }, '다시 보이게 했어요.')}>보이기</Button>
+                                        : <Button size="sm" variant="danger-ghost" onClick={() => remove(track)}>{track.source === 'osm' ? '숨기기' : '삭제'}</Button>}
+                                </td>
+                            </tr>
+                        ))}
+                        {!data.items.length && <tr><td colSpan={6} className="admin-empty">트랙이 없어요. 위에서 OpenStreetMap 트랙을 가져오세요.</td></tr>}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    );
+};
+
 const AdminApp = () => {
     const [token, setToken] = useState(loadToken);
     const [tab, setTab] = useState('overview');
@@ -536,6 +716,7 @@ const AdminApp = () => {
                 {tab === 'users' && <UsersTab onUnauthorized={handleUnauthorized} onShowCourses={showCourses} />}
                 {/* 회원을 바꾸면 필터와 쪽을 처음부터 다시 봅니다. */}
                 {tab === 'virtual' && <VirtualTab onUnauthorized={handleUnauthorized} />}
+                {tab === 'tracks' && <TracksTab onUnauthorized={handleUnauthorized} />}
                 {tab === 'courses' && <CoursesTab key={owner?.firebase_uid ?? 'all'} owner={owner} onClearOwner={() => setOwner(null)} onUnauthorized={handleUnauthorized} onOpen={setOpenCourse} />}
             </main>
             <CourseDetail courseId={openCourse} onClose={() => setOpenCourse(null)} onUnauthorized={handleUnauthorized} onShowOwner={showCourses} />

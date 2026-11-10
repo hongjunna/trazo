@@ -2,9 +2,10 @@
 // 코스 지도: 전체 공개된 러닝·자전거 코스를 지도 위에 한꺼번에 그려 둘러봅니다.
 // 지도를 움직이면 보이는 범위의 코스를 다시 불러오고, 코스를 누르면 정보와 '자세히 보기'를 보여줍니다.
 // 데스크톱은 왼쪽 목록 + 지도, 모바일은 전체 화면 지도 + 아래 접히는 목록입니다.
+// '전체'와 '트랙' 보기에서는 육상 트랙(OpenStreetMap·관리자 등록)도 트랙 모양 선이나 핀으로 함께 보여줍니다.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Map, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import { getCourseMap } from '../api/courseApi';
+import { getCourseMap, getTrackMap } from '../api/courseApi';
 import { SPORTS, SPORT_IDS } from '../sports';
 import { COLORS } from '../styles/theme';
 import { readStored, writeStored } from '../utils/storage';
@@ -14,6 +15,7 @@ import Icon from './ui/Icon';
 import SegmentedControl from './ui/SegmentedControl';
 
 const FETCH_DELAY_MS = 250;
+const NONE = [];
 // 이 축척보다 넓게 보면(숫자가 클수록 넓음) 출발점 핀을 숨겨 지도가 복잡해지지 않게 합니다.
 const PIN_MAX_LEVEL = 8;
 // 선 아래에 까는 짙은 테두리. 카카오 지도의 주황 도로·초록 공원과 코스 선이 섞여 보이지 않게 합니다.
@@ -22,7 +24,18 @@ const ROUTE_LABEL = { loop: '순환', out_and_back: '왕복', point_to_point: '�
 const SPORT_FILTERS = [
     { value: 'all', label: '전체' },
     ...SPORT_IDS.map(id => ({ value: id, label: SPORTS[id].label, swatch: SPORTS[id].color })),
+    { value: 'track', label: '트랙', swatch: COLORS.track },
 ];
+const FILTER_IDS = new Set(SPORT_FILTERS.map(filter => filter.value));
+// 이 축척보다 넓게 보면 트랙 선이 점처럼 작아지므로 트랙 핀을 함께 보여줍니다.
+const TRACK_PIN_MIN_LEVEL = 5;
+const SURFACE_LABEL = { tartan: '우레탄(탄성)', synthetic: '우레탄(탄성)', rubber: '고무', asphalt: '아스팔트', dirt: '흙', ground: '흙', clay: '흙', grass: '잔디', artificial_turf: '인조잔디', gravel: '자갈', sand: '모래', concrete: '콘크리트', paved: '포장', unpaved: '비포장', compacted: '다짐 흙' };
+const trackPath = (track) => (track.path ?? []).map(([lat, lng]) => ({ lat, lng }));
+const trackMeta = (track) => [
+    track.length_m ? `한 바퀴 ${track.length_m.toLocaleString()}m` : null,
+    track.lanes ? `${track.lanes}레인` : null,
+    track.surface ? (SURFACE_LABEL[track.surface] ?? track.surface) : null,
+].filter(Boolean);
 
 const initialView = () => {
     const stored = readStored('trazo:exploreView', null) ?? readStored('trazo:view', null);
@@ -71,13 +84,42 @@ const ExploreItem = ({ item, selected, onSelect, onHover }) => {
     );
 };
 
+const TrackItem = ({ track, selected, onSelect, onHover }) => (
+    <li>
+        <button
+            type="button"
+            className="explore-item"
+            aria-pressed={selected}
+            onClick={() => onSelect(track)}
+            onMouseEnter={() => onHover(track.id)}
+            onMouseLeave={() => onHover(null)}
+        >
+            <span className="explore-item__bar" style={{ background: COLORS.track }} />
+            <span className="explore-item__body">
+                <span className="explore-item__title">{track.name}</span>
+                <span className="explore-item__meta">
+                    {trackMeta(track).map(text => <span key={text}>{text}</span>)}
+                    {!trackMeta(track).length && <span>트랙 정보 없음</span>}
+                </span>
+                <span className="explore-item__author">육상 트랙{track.region ? ` · ${track.region}` : ''}</span>
+            </span>
+        </button>
+    </li>
+);
+
 const CourseExplorer = ({ onOpenCourse }) => {
     const [view] = useState(initialView);
     const [map, setMap] = useState(null);
-    const [sport, setSport] = useState(() => readStored('trazo:exploreSport', 'all'));
+    const [sport, setSport] = useState(() => {
+        const stored = readStored('trazo:exploreSport', 'all');
+        return FILTER_IDS.has(stored) ? stored : 'all';
+    });
     const [bounds, setBounds] = useState(null);
     const [result, setResult] = useState({ key: null, items: [], total: 0, truncated: false, error: null });
     const [selectedToken, setSelectedToken] = useState(null);
+    const [trackResult, setTrackResult] = useState({ key: null, items: [], error: null });
+    const [selectedTrackId, setSelectedTrackId] = useState(null);
+    const [hoveredTrackId, setHoveredTrackId] = useState(null);
     const [hoveredToken, setHoveredToken] = useState(null);
     const [listOpen, setListOpen] = useState(false);
     const [attempt, setAttempt] = useState(0);
@@ -89,10 +131,26 @@ const CourseExplorer = ({ onOpenCourse }) => {
 
     // 지도가 아직 뜨지 않았으면(또는 지도를 불러오지 못하면) 범위 없이 인기 코스부터 불러옵니다.
     const key = JSON.stringify([sport, bounds ?? {}, attempt]);
-    const loading = result.key !== key;
+    const showCourses = sport !== 'track';
+    const showTracks = sport === 'all' || sport === 'track';
+    const trackKey = JSON.stringify([bounds ?? {}, attempt]);
+    const loading = showCourses ? result.key !== key : trackResult.key !== trackKey;
+
+    useEffect(() => {
+        if (!showTracks) return undefined;
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => {
+            const [box] = JSON.parse(trackKey);
+            getTrackMap(box, controller.signal)
+                .then(({ data }) => setTrackResult({ key: trackKey, items: data.items, error: null }))
+                .catch(error => { if (!controller.signal.aborted) setTrackResult(prev => ({ ...prev, key: trackKey, error })); });
+        }, FETCH_DELAY_MS);
+        return () => { window.clearTimeout(timer); controller.abort(); };
+    }, [trackKey, showTracks]);
 
     useEffect(() => {
         const controller = new AbortController();
+        if (!showCourses) return undefined;
         const timer = window.setTimeout(() => {
             const [filter, box] = JSON.parse(key);
             getCourseMap({ ...box, sport: filter === 'all' ? undefined : filter }, controller.signal)
@@ -100,7 +158,7 @@ const CourseExplorer = ({ onOpenCourse }) => {
                 .catch(error => { if (!controller.signal.aborted) setResult(prev => ({ ...prev, key, error })); });
         }, FETCH_DELAY_MS);
         return () => { window.clearTimeout(timer); controller.abort(); };
-    }, [key]);
+    }, [key, showCourses]);
 
     // 페이지 크기가 바뀌면(모바일 회전, 창 크기) 지도 크기를 다시 계산합니다.
     useEffect(() => {
@@ -134,10 +192,15 @@ const CourseExplorer = ({ onOpenCourse }) => {
 
     const changeSport = (value) => {
         setSport(value);
+        setSelectedToken(null);
+        setSelectedTrackId(null);
         writeStored('trazo:exploreSport', value);
     };
 
-    const items = result.items;
+    const items = showCourses ? result.items : NONE;
+    const tracks = showTracks ? trackResult.items : NONE;
+    const selectedTrack = tracks.find(track => track.id === selectedTrackId) ?? null;
+    const hoveredTrack = tracks.find(track => track.id === hoveredTrackId) ?? null;
     const selected = items.find(item => item.token === selectedToken) ?? null;
     const hovered = items.find(item => item.token === hoveredToken) ?? null;
     // 고른 코스와 마우스를 올린 코스를 맨 위에 그립니다.
@@ -146,7 +209,33 @@ const CourseExplorer = ({ onOpenCourse }) => {
         return [...items.filter(item => !front.has(item.token)), ...items.filter(item => front.has(item.token))];
     }, [items, hoveredToken, selectedToken]);
 
+    const selectTrack = (track, fit = false) => {
+        setSelectedTrackId(track.id);
+        setSelectedToken(null);
+        if (fit && map) {
+            if (track.path?.length) {
+                const box = new window.kakao.maps.LatLngBounds();
+                track.path.forEach(([lat, lng]) => box.extend(new window.kakao.maps.LatLng(lat, lng)));
+                map.setBounds(box, 80, 80, 80, 80);
+            } else {
+                map.setLevel(3);
+                map.panTo(new window.kakao.maps.LatLng(track.lat, track.lng));
+            }
+        }
+    };
+
+    const handleTrackListSelect = (track) => {
+        selectTrack(track, true);
+        setListOpen(false);
+    };
+
+    const clearSelection = () => {
+        setSelectedToken(null);
+        setSelectedTrackId(null);
+    };
+
     const select = (item, fit = false) => {
+        setSelectedTrackId(null);
         setSelectedToken(item.token);
         if (fit && map) {
             const box = new window.kakao.maps.LatLngBounds();
@@ -170,12 +259,26 @@ const CourseExplorer = ({ onOpenCourse }) => {
     };
 
     let listBody;
-    if (result.error && !loading) {
+    const listError = showCourses ? result.error : trackResult.error;
+    if (listError && !loading) {
         listBody = (
             <div className="explore-empty">
                 <Icon name="alert" size={24} />
-                <span>코스를 불러오지 못했어요.</span>
+                <span>{showCourses ? '코스를' : '트랙을'} 불러오지 못했어요.</span>
                 <Button size="sm" variant="secondary" onClick={() => setAttempt(value => value + 1)}>다시 시도</Button>
+            </div>
+        );
+    } else if (!showCourses) {
+        listBody = tracks.length ? (
+            <ul className="explore-list">
+                {tracks.map(track => (
+                    <TrackItem key={track.id} track={track} selected={track.id === selectedTrackId} onSelect={handleTrackListSelect} onHover={setHoveredTrackId} />
+                ))}
+            </ul>
+        ) : (
+            <div className="explore-empty">
+                <Icon name="track" size={24} />
+                <span>{loading ? '트랙을 찾는 중…' : '이 지역에는 등록된 육상 트랙이 없어요. 지도를 옮기거나 축소해 보세요.'}</span>
             </div>
         );
     } else if (!items.length) {
@@ -195,7 +298,10 @@ const CourseExplorer = ({ onOpenCourse }) => {
         );
     }
 
-    const countLabel = loading && !items.length ? '불러오는 중…' : `이 지역 공개 코스 ${result.total.toLocaleString()}개${result.truncated ? ` (인기 ${items.length}개 표시)` : ''}`;
+    let countLabel;
+    if (!showCourses) countLabel = loading && !tracks.length ? '불러오는 중…' : `이 지역 육상 트랙 ${tracks.length.toLocaleString()}개`;
+    else if (loading && !items.length) countLabel = '불러오는 중…';
+    else countLabel = `이 지역 공개 코스 ${result.total.toLocaleString()}개${result.truncated ? ` (인기 ${items.length}개 표시)` : ''}${showTracks && tracks.length ? ` · 트랙 ${tracks.length}개` : ''}`;
 
     return (
         <div className="explore">
@@ -223,8 +329,61 @@ const CourseExplorer = ({ onOpenCourse }) => {
                     style={{ width: '100%', height: '100%' }}
                     onCreate={setMap}
                     onIdle={handleIdle}
-                    onClick={() => setSelectedToken(null)}
+                    onClick={clearSelection}
                 >
+                    {/* 육상 트랙: 코스 선보다 아래에 깔아, 트랙 위를 지나는 코스도 잘 보이게 합니다. */}
+                    {tracks.filter(track => track.path?.length).map(track => {
+                        const focused = track.id === selectedTrackId || track.id === hoveredTrackId;
+                        return (
+                            <Polyline
+                                key={`track-${track.id}-casing`}
+                                path={trackPath(track)}
+                                strokeWeight={focused ? 10 : 7}
+                                strokeColor={focused ? '#FFFFFF' : CASING_COLOR}
+                                strokeOpacity={focused ? 1 : 0.55}
+                                strokeStyle="solid"
+                            />
+                        );
+                    })}
+                    {tracks.filter(track => track.path?.length).map(track => {
+                        const focused = track.id === selectedTrackId || track.id === hoveredTrackId;
+                        return (
+                            <Polyline
+                                key={`track-${track.id}`}
+                                path={trackPath(track)}
+                                strokeWeight={focused ? 6 : 4}
+                                strokeColor={COLORS.track}
+                                strokeOpacity={1}
+                                strokeStyle="solid"
+                                onClick={() => selectTrack(track)}
+                                onMouseover={() => setHoveredTrackId(track.id)}
+                                onMouseout={() => setHoveredTrackId(id => (id === track.id ? null : id))}
+                            />
+                        );
+                    })}
+                    {tracks.filter(track => !track.path?.length || level >= TRACK_PIN_MIN_LEVEL).map(track => {
+                        const focused = track.id === selectedTrackId || track.id === hoveredTrackId;
+                        return (
+                            <CustomOverlayMap key={`track-${track.id}-pin`} position={{ lat: track.lat, lng: track.lng }} zIndex={focused ? 8 : 3} clickable>
+                                <button
+                                    type="button"
+                                    className={`explore-pin explore-pin--track ${focused ? 'is-focused' : ''}`}
+                                    style={{ '--pin': COLORS.track, '--pin-on': '#FFFFFF' }}
+                                    aria-label={`${track.name} 육상 트랙`}
+                                    onClick={() => selectTrack(track)}
+                                    onMouseEnter={() => setHoveredTrackId(track.id)}
+                                    onMouseLeave={() => setHoveredTrackId(id => (id === track.id ? null : id))}
+                                >
+                                    <Icon name="track" size={12} strokeWidth={2.5} />
+                                </button>
+                            </CustomOverlayMap>
+                        );
+                    })}
+                    {hoveredTrack && hoveredTrack.id !== selectedTrackId && (
+                        <CustomOverlayMap position={{ lat: hoveredTrack.lat, lng: hoveredTrack.lng }} zIndex={9} yAnchor={1.8}>
+                            <div className="explore-tip">{hoveredTrack.name}{hoveredTrack.length_m ? ` · ${hoveredTrack.length_m}m` : ''}</div>
+                        </CustomOverlayMap>
+                    )}
                     {/* 모든 코스의 짙은 테두리를 먼저 깔고, 그 위에 종목 색 선을 그립니다. */}
                     {ordered.map(item => {
                         const focused = item.token === selectedToken || item.token === hoveredToken;
@@ -307,9 +466,40 @@ const CourseExplorer = ({ onOpenCourse }) => {
                 </div>
 
                 <div className="explore__legend" aria-hidden="true">
-                    {SPORT_IDS.map(id => <span key={id}><i style={{ background: SPORTS[id].color }} />{SPORTS[id].label}</span>)}
+                    {showCourses && SPORT_IDS.filter(id => sport === 'all' || sport === id).map(id => <span key={id}><i style={{ background: SPORTS[id].color }} />{SPORTS[id].label}</span>)}
+                    {showTracks && <span><i style={{ background: COLORS.track }} />육상 트랙</span>}
                 </div>
 
+                {selectedTrack && (
+                    <div className="explore-card" role="dialog" aria-label={`${selectedTrack.name} 트랙 정보`}>
+                        <span className="explore-card__bar" style={{ background: COLORS.track }} />
+                        <div className="explore-card__body">
+                            <div className="explore-card__top">
+                                <span className="sport-tag" style={{ background: COLORS.track, color: '#FFFFFF' }}>
+                                    <Icon name="track" size={12} strokeWidth={2.5} />육상 트랙
+                                </span>
+                                <button type="button" className="explore-card__close" aria-label="닫기" onClick={clearSelection}><Icon name="x" size={16} /></button>
+                            </div>
+                            <strong className="explore-card__title">{selectedTrack.name}</strong>
+                            <span className="explore-item__meta">
+                                {trackMeta(selectedTrack).map(text => <span key={text}>{text}</span>)}
+                                {selectedTrack.region && <span>{selectedTrack.region}</span>}
+                            </span>
+                            {selectedTrack.note && <span className="explore-item__author">{selectedTrack.note}</span>}
+                            <span className="explore-item__author">
+                                {selectedTrack.source === 'osm' ? '위치 정보: © OpenStreetMap 기여자' : 'Trazo가 등록한 트랙'} · 이용 시간은 시설에 확인하세요
+                            </span>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                icon="map"
+                                onClick={() => window.open(`https://map.kakao.com/link/to/${encodeURIComponent(selectedTrack.name)},${selectedTrack.lat},${selectedTrack.lng}`, '_blank', 'noopener')}
+                            >
+                                카카오맵 길찾기
+                            </Button>
+                        </div>
+                    </div>
+                )}
                 {selected && (
                     <div className="explore-card" role="dialog" aria-label={`${selected.title} 코스 정보`}>
                         <span className="explore-card__bar" style={{ background: sportOf(selected).color }} />

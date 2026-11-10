@@ -29,6 +29,8 @@ import CourseImageDialog from './components/CourseImageDialog';
 import CourseLibrary from './components/CourseLibrary';
 import ElevationPanel from './components/ElevationPanel';
 import { MapContextMenu, MapControls, MapHint, RouteStatus } from './components/MapOverlays';
+import { PlaceSearchMarkers, PlaceSearchPanel } from './components/PlaceSearch';
+import { usePlaceSearch } from './hooks/usePlaceSearch';
 import RoutingHelpDialog from './components/RoutingHelpDialog';
 import SaveCourseDialog from './components/SaveCourseDialog';
 import ShareDialog from './components/ShareDialog';
@@ -159,6 +161,8 @@ function App() {
 
   // --- 지도 ---
   const [map, setMap] = useState(null);
+  // 지도 오른쪽 위 장소 검색 (카카오 키워드 검색)
+  const placeSearch = usePlaceSearch(map);
   const mapAreaRef = useRef(null);
   const hoverMarkerRef = useRef(null);
   const [hoverBus] = useState(createHoverBus);
@@ -1240,6 +1244,7 @@ function App() {
             <div className="my-location" aria-label="내 위치" />
           </CustomOverlayMap>
         )}
+        <PlaceSearchMarkers search={placeSearch} />
       </Map>
 
       {!isSportPickerOpen && !isRouting && !routeError && <MapHint sport={sport} markerCount={currentMarkers.length} />}
@@ -1270,6 +1275,7 @@ function App() {
         isSatellite={isSatellite}
         onToggleSatellite={handleToggleSatellite}
       />
+      <PlaceSearchPanel search={placeSearch} compact={isMobile} />
     </div>
   );
 
@@ -1374,7 +1380,8 @@ function App() {
           defaultTitle={displayTitle}
           existingTitle={currentId ? savedState.title ?? displayTitle : null}
           defaultFolderId={currentMeta ? currentMeta.folderId : readStored('trazo:lastFolder', null)}
-          defaultVisibility={currentMeta?.visibility ?? 'private'}
+          // 새 코스는 전체 공개가 기본입니다. 닉네임을 정하기 전에는 전체 공개를 할 수 없어 비공개로 시작합니다.
+          defaultVisibility={currentMeta?.visibility ?? (nickname ? 'public' : 'private')}
           onSubmit={handleSubmitSave}
           isSaving={isSaving}
         />

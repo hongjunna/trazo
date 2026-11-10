@@ -853,7 +853,8 @@
 /* ───────── 지도 위 요소 ───────── */
 .map-controls {
   position: absolute;
-  top: 16px;
+  /* 맨 위는 장소 검색 버튼 자리 */
+  top: 68px;
   right: 16px;
   z-index: 15;
   display: flex;
@@ -1058,7 +1059,8 @@
 
 .app--mobile .map-hint {
   left: 12px;
-  width: calc(100% - 24px);
+  /* 오른쪽 위 장소 검색 버튼 자리를 비워 둡니다. */
+  width: calc(100% - 80px);
 }
 
 .km-badge {
@@ -2811,9 +2813,55 @@
   align-items: center;
 }
 
-.topnav .avatar {
-  width: 34px;
-  height: 34px;
+/* 계정 버튼: 둥근 사각형 안에 원형 프로필 사진 + 닉네임 */
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 220px;
+  height: 40px;
+  padding: 0 10px 0 4px;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.account-chip:hover,
+.account-chip[aria-expanded='true'] {
+  background: var(--c-surface-2);
+  border-color: var(--c-border-strong);
+}
+
+.account-chip:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+.account-chip .avatar {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  box-shadow: none;
+  font-size: 13px;
+}
+
+.account-chip__name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-chip__caret {
+  flex: none;
+  color: var(--c-text-3);
 }
 
 /* 모바일 코스 생성 화면: 위쪽에는 종목 선택만 띄웁니다 (로고·계정은 상단 메뉴에 있습니다). */
@@ -2934,9 +2982,25 @@
     padding: 0 10px;
   }
 
-  .topnav .avatar {
-    width: 30px;
-    height: 30px;
+  .account-chip {
+    max-width: 132px;
+    height: 34px;
+    gap: 6px;
+    padding: 0 8px 0 3px;
+    border-radius: 10px;
+  }
+
+  .account-chip .avatar {
+    width: 26px;
+    height: 26px;
+  }
+
+  .account-chip__name {
+    font-size: 13px;
+  }
+
+  .account-chip__caret {
+    display: none;
   }
 }
 
@@ -3558,6 +3622,11 @@
   opacity: 0.35;
 }
 
+/* 육상 트랙 핀은 둥근 사각형으로 코스 출발점 핀과 구분합니다. */
+.explore-pin--track {
+  border-radius: 7px;
+}
+
 .explore-tip {
   padding: 5px 10px;
   border-radius: var(--radius-full);
@@ -3622,4 +3691,233 @@
     grid-column: 1 / -1;
     padding-top: 4px;
   }
+}
+
+/* 코스 생성 지도의 장소 검색 (오른쪽 위) */
+.place-search {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 16;
+  width: min(360px, calc(100% - 32px));
+  background: var(--c-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+  animation: fade-up 0.18s var(--ease);
+}
+
+.place-search--closed {
+  width: auto;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+  animation: none;
+}
+
+.place-search--closed .btn {
+  --btn-h: 42px;
+  width: 42px;
+  box-shadow: var(--shadow-2);
+}
+
+.app--mobile .place-search {
+  top: calc(var(--safe-top) + 70px);
+  right: 12px;
+  width: calc(100% - 24px);
+}
+
+.app--mobile .place-search--closed {
+  width: auto;
+}
+
+.place-search__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 6px 0 14px;
+  color: var(--c-text-2);
+}
+
+.place-search__bar input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--c-text);
+}
+
+.place-search__bar input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.place-search__close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--c-text-3);
+  cursor: pointer;
+}
+
+.place-search__close:hover {
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+
+.place-search__note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--c-border);
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.place-search__list {
+  max-height: min(360px, 50vh);
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  list-style: none;
+  border-top: 1px solid var(--c-border);
+}
+
+.app--mobile .place-search__list {
+  max-height: 34vh;
+}
+
+.place-search__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.place-search__item:hover,
+.place-search__item.is-active {
+  background: var(--c-surface-2);
+}
+
+.place-search__num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.place-search__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.place-search__text strong {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--c-text);
+}
+
+.place-search__text span {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--c-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place-search__more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-top: 1px solid var(--c-border);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--c-primary);
+  cursor: pointer;
+}
+
+/* 지도 위 검색 결과 핀: 아래 꼭짓점이 장소 위치 */
+.place-pin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font);
+  cursor: pointer;
+}
+
+.place-pin__num {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-bottom: 7px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s ease;
+}
+
+/* 아래로 뾰족한 꼬리 */
+.place-pin__num::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  border: 5px solid transparent;
+  border-top: 6px solid #fff;
+  transform: translateX(-50%);
+}
+
+.place-pin.is-active .place-pin__num {
+  background: #E8463A;
+  transform: scale(1.15);
+}
+
+.place-pin__label {
+  margin-bottom: 7px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: #0E2A2E;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }

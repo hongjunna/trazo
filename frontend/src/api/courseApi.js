@@ -90,6 +90,7 @@ export const deleteComment = (commentId) => courseClient.delete(`/comments/${com
 export const getCommunity = (params, signal) => publicClient.get('/community', { params, signal });
 // 코스 지도: 지도에 보이는 범위(south·west·north·east)와 겹치는 전체 공개 코스와 줄인 경로
 export const getCourseMap = (params, signal) => publicClient.get('/community/map', { params, signal });
+export const getTrackMap = (params, signal) => publicClient.get('/community/tracks', { params, signal });
 
 // 연동센터: 내 계정에 연결된 AI 서비스(MCP)
 export const getAiConnections = () => courseClient.get('/oauth/connections');

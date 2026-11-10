@@ -92,6 +92,22 @@ class PersonaTests(unittest.TestCase):
         self.assertEqual(detail['nickname'], 'operator')
         self.assertIn(detail['display_nickname'], {'러너김', '자전거박'})
 
+    def test_series_courses_share_author(self):
+        # 제목 머리말이 같은 시리즈([제주 3km], [제주 5km] …)는 거리와 상관없이 같은 작성자로 보입니다.
+        self.add_personas(*[f'가상계정{i}' for i in range(12)])
+        titles = [f'[제주 {km}km] 코스{km}' for km in (3, 5, 7, 4, 10)]
+        for title in titles:
+            self.publish(self.seed, title)
+        self.publish(self.seed, '[부산 5km] 해운대')
+        authors = {self.community()[title]['nickname'] for title in titles}
+        self.assertEqual(len(authors), 1)
+        for _ in range(3):
+            self.client.post('/admin/virtual-accounts/assign', headers=self.admin, json={'mode': 'all'})
+            self.assertEqual(len({self.community()[title]['nickname'] for title in titles}), 1)
+        self.assertEqual(api.series_key('［제주 10K］ 이호'), '제주')
+        self.assertIsNone(api.series_key('[5km] 이름 없는 시리즈'))
+        self.assertIsNone(api.series_key('제주 5km'))
+
     def test_assignment_stays_and_reassigns_on_delete(self):
         self.add_personas('하나아이디')
         course = self.publish(self.seed, '고정 코스')

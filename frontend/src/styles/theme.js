@@ -10,6 +10,8 @@ export const COLORS = {
 
     bike: '#8FCE3A',
     run: '#FF7A45',
+    // 육상 트랙 (코스 지도). 러닝 주황·자전거 라임과 겹치지 않는 보라
+    track: '#7C5CFF',
 
     white: '#FFFFFF',
     text: '#15262C',

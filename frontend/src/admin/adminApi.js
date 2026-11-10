@@ -37,6 +37,13 @@ export const deleteVirtualAccount = (uid) => client.delete(`/virtual-accounts/${
 // mode: 'unassigned'(아직 배정 안 된 코스만) | 'all'(모두 다시 섞기)
 export const assignVirtualAccounts = (mode) => client.post('/virtual-accounts/assign', { mode });
 
+// 육상 트랙 (코스 지도의 트랙 보기)
+export const getTracks = (params, signal) => client.get('/tracks', { params, signal });
+export const importOsmTracks = () => client.post('/tracks/import-osm');
+export const createTrack = (track) => client.post('/tracks', track);
+export const updateTrack = (trackId, changes) => client.put(`/tracks/${trackId}`, changes);
+export const deleteTrack = (trackId) => client.delete(`/tracks/${trackId}`);
+
 export const isUnauthorized = (error) => error.response?.status === 401;
 
 export const loginErrorMessage = (error) => {

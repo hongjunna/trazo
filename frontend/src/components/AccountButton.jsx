@@ -1,5 +1,5 @@
 // src/components/AccountButton.jsx
-// 로그인 전: 구글 로그인 버튼 / 로그인 후: 프로필 사진을 누르면 내 코스·커뮤니티·연동센터·닉네임 변경·로그아웃 메뉴
+// 로그인 전: 구글 로그인 버튼 / 로그인 후: 프로필 사진·닉네임 버튼을 누르면 내 코스·커뮤니티·연동센터·닉네임 변경·로그아웃 메뉴
 import { useEffect, useRef, useState } from 'react';
 import Icon from './ui/Icon';
 
@@ -46,17 +46,23 @@ const AccountButton = ({ user, nickname, configured, loading, busy, onLogin, onL
     const name = nickname || user.displayName || user.email || '내 계정';
     return (
         <div className="account" ref={rootRef}>
+            {/* 둥근 사각형 버튼: 왼쪽 프로필 사진(원형) + 오른쪽 닉네임 */}
             <button
                 type="button"
-                className="avatar"
+                className="account-chip"
                 aria-haspopup="menu"
                 aria-expanded={open}
                 aria-label={`${name} 계정 메뉴`}
+                title={name}
                 onClick={() => setOpen(value => !value)}
             >
-                {user.photoURL
-                    ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" />
-                    : name.slice(0, 1).toUpperCase()}
+                <span className="avatar" aria-hidden="true">
+                    {user.photoURL
+                        ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" />
+                        : name.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="account-chip__name">{name}</span>
+                <Icon name="chevron-down" size={14} className="account-chip__caret" />
             </button>
             {open && (
                 <div className="menu" role="menu">

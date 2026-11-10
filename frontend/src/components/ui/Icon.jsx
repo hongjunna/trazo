@@ -22,6 +22,7 @@ const PATHS = {
     help: <><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></>,
     route: <><circle cx="6" cy="19" r="3" /><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /><circle cx="18" cy="5" r="3" /></>,
     straight: <><path d="M6.5 17.5 17.5 6.5" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="5" r="2" /></>,
+    track: <><rect x="2" y="6" width="20" height="12" rx="6" /><rect x="6.5" y="9.5" width="11" height="5" rx="2.5" /></>,
     mountain: <path d="m8 3 4 8 5-5 5 15H2L8 3z" />,
     clock: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
     search: <><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>,
