@@ -28,7 +28,7 @@ const SPORT_FILTERS = [
 ];
 const FILTER_IDS = new Set(SPORT_FILTERS.map(filter => filter.value));
 // 이 축척보다 넓게 보면 트랙 선이 점처럼 작아지므로 트랙 핀을 함께 보여줍니다.
-const TRACK_PIN_MIN_LEVEL = 5;
+const TRACK_PIN_MIN_LEVEL = 6;
 const SURFACE_LABEL = { tartan: '우레탄(탄성)', synthetic: '우레탄(탄성)', rubber: '고무', asphalt: '아스팔트', dirt: '흙', ground: '흙', clay: '흙', grass: '잔디', artificial_turf: '인조잔디', gravel: '자갈', sand: '모래', concrete: '콘크리트', paved: '포장', unpaved: '비포장', compacted: '다짐 흙' };
 const trackPath = (track) => (track.path ?? []).map(([lat, lng]) => ({ lat, lng }));
 const trackMeta = (track) => [

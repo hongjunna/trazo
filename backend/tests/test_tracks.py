@@ -11,7 +11,7 @@ import backend.main as api
 from backend import tracks
 
 
-def ring(lat, lng, size=0.0015):
+def ring(lat, lng, size=0.0006):
     points = [(lat, lng), (lat + size, lng), (lat + size, lng + size * 1.6), (lat, lng + size * 1.6), (lat, lng)]
     return [{'lat': a, 'lon': b} for a, b in points]
 
@@ -26,6 +26,11 @@ OVERPASS = {'elements': [
     {'type': 'way', 'id': 2, 'tags': {'leisure': 'track', 'sport': 'athletics'}, 'geometry': ring(37.6, 127.1)},
     {'type': 'way', 'id': 3, 'tags': {'leisure': 'track', 'sport': 'running', 'name': '한강 러닝 트랙'}, 'geometry': ring(37.7, 127.2)},
     {'type': 'way', 'id': 4, 'tags': {'leisure': 'track', 'sport': 'running'}, 'geometry': ring(10.0, 10.0)},
+    # 육상 트랙이 아닌 것: 가늘고 긴 공중보행로, 이름이 보행로, 공원 둘레 조깅 코스(너무 김)
+    {'type': 'way', 'id': 5, 'tags': {'leisure': 'track', 'sport': 'running'}, 'geometry': [
+        {'lat': 37.56, 'lon': 126.99}, {'lat': 37.568, 'lon': 126.99}, {'lat': 37.568, 'lon': 126.9905}, {'lat': 37.56, 'lon': 126.9905}, {'lat': 37.56, 'lon': 126.99}]},
+    {'type': 'way', 'id': 6, 'tags': {'leisure': 'track', 'sport': 'running', 'name': '세운상가 공중보행로'}, 'geometry': ring(37.57, 126.99)},
+    {'type': 'way', 'id': 7, 'tags': {'leisure': 'track', 'sport': 'running'}, 'geometry': ring(37.45, 127.0, 0.003)},
     {'type': 'way', 'id': 10, 'tags': {'leisure': 'sports_centre', 'name': '반포종합운동장'}, 'bounds': bounds(37.5005, 127.001, 0.01)},
     {'type': 'way', 'id': 11, 'tags': {'amenity': 'school', 'name': '어느초등학교'}, 'bounds': bounds(37.6005, 127.101, 0.01)},
     {'type': 'relation', 'id': 12, 'tags': {'boundary': 'administrative', 'admin_level': '7', 'name': '서초구'}, 'bounds': bounds(37.5, 127.0, 0.5)},
@@ -52,6 +57,12 @@ class TrackTests(unittest.TestCase):
         self.assertEqual(parsed['way/1']['region'], '서초구')
         self.assertEqual(parsed['way/1']['lanes'], 8)
         self.assertEqual(parsed['way/3']['name'], '한강 러닝 트랙')
+
+    def test_athletics_shape_filter(self):
+        oval = [tuple(p) for p in tracks.oval_path(37.5, 127.0, 30, 400)]
+        self.assertTrue(tracks.is_athletics_track(oval))
+        self.assertFalse(tracks.is_athletics_track(oval, '공중보행로'))
+        self.assertFalse(tracks.is_athletics_track(oval[:-10]))  # 닫히지 않은 선
 
     def test_oval_is_about_lap_length(self):
         path = tracks.oval_path(37.5, 127.0, 75, 400)
