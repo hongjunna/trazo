@@ -34,7 +34,7 @@ node(w.t)->.tn;
 
 VENUE_LEISURE = {"stadium", "sports_centre", "park", "sports_hall", "recreation_ground"}
 SCHOOL_AMENITY = {"school", "kindergarten"}
-GENERIC_NAME = re.compile(r"^(?:\d+\s*m\s*)?(?:육상\s*)?(?:트랙|운동장(?:\s*트랙)?|track|running track|playground.*|축구장|400m.*)$", re.IGNORECASE)
+GENERIC_NAME = re.compile(r"^(?:\d+\s*m\s*)?(?:(?:육상|달리기|러닝|조깅|우레탄)\s*)?(?:트랙|운동장(?:\s*트랙)?|track|running track|playground.*|축구장|400m.*)$", re.IGNORECASE)
 MAX_PATH_POINTS = 160
 # 육상 트랙 모양만 남깁니다. 공중보행로·산책로·공원 둘레 조깅 코스도 leisure=track으로 그려진 경우가 있어,
 # 닫힌 고리이고 한 바퀴가 이 범위이며 타원에 가까운(가늘고 길지 않은) 것만 육상 트랙으로 봅니다.

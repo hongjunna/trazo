@@ -67,6 +67,11 @@ class TrackTests(unittest.TestCase):
         self.assertFalse(tracks.is_athletics_track(oval, '공중보행로'))
         self.assertFalse(tracks.is_athletics_track(oval[:-10]))  # 닫히지 않은 선
 
+    def test_generic_names(self):
+        for name in ('달리기 트랙', '러닝 트랙', '육상트랙', '400m 트랙', '운동장 트랙'):
+            self.assertTrue(tracks.GENERIC_NAME.match(name), name)
+        self.assertFalse(tracks.GENERIC_NAME.match('한강 러닝 트랙'))
+
     def test_oval_is_about_lap_length(self):
         path = tracks.oval_path(37.5, 127.0, 75, 400)
         self.assertEqual(path[0], path[-1])
