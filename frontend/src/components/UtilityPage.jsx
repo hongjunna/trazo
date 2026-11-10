@@ -58,7 +58,7 @@ const DistanceInput = ({ value, onChange }) => (
     <fieldset className="pace-group">
         <legend>거리</legend>
         <div className="pace-inline">
-            <NumberField label="km" value={value} onChange={onChange} step={0.01} width={96} placeholder="10" />
+            <NumberField label="km" value={value} onChange={onChange} step={0.0001} width={120} placeholder="10" />
         </div>
         <div className="pace-presets" role="group" aria-label="대회 거리">
             {RACE_DISTANCES.map(race => (
