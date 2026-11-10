@@ -9,12 +9,13 @@ import CourseThumbnail from '../components/CourseThumbnail';
 import { useFeedback } from '../components/ui/feedbackContext';
 import { SPORTS } from '../sports';
 import { VISIBILITY, copyText, sharePath } from '../utils/share';
-import { assignVirtualAccounts, createTrack, createVirtualAccounts, deleteTrack, deleteVirtualAccount, getCourse, getTracks, importOsmTracks, updateTrack, getCourses, getSummary, getUsers, getVirtualAccounts, isUnauthorized, loadToken, login, loginErrorMessage, saveToken } from './adminApi';
+import { assignVirtualAccounts, createTrack, createVirtualAccounts, deleteTrack, deleteVirtualAccount, getCourse, getInsights, getTracks, importOsmTracks, updateTrack, getCourses, getSummary, getUsers, getVirtualAccounts, isUnauthorized, loadToken, login, loginErrorMessage, rerunInsight, reviewInsight, saveToken } from './adminApi';
 
 const USER_PAGE = 50;
 const COURSE_PAGE = 30;
 const TABS = [
     { id: 'overview', label: '개요', icon: 'chart' },
+    { id: 'insights', label: 'AI 분석', icon: 'gauge' },
     { id: 'users', label: '회원', icon: 'users' },
     { id: 'courses', label: '코스', icon: 'route' },
     { id: 'virtual', label: '가상 계정', icon: 'user' },
@@ -363,6 +364,129 @@ const CourseDetail = ({ courseId, onClose, onUnauthorized, onShowOwner }) => {
                 </div>
             )}
         </Dialog>
+    );
+};
+
+const INSIGHT_STATUSES = [
+    { id: 'review', label: '검토 대기' },
+    { id: 'queued', label: '처리 중' },
+    { id: 'pending', label: '대기' },
+    { id: 'published', label: '공개됨' },
+    { id: 'failed', label: '실패' },
+    { id: 'rejected', label: '반려' },
+];
+
+const InsightStatus = ({ status }) => {
+    const item = INSIGHT_STATUSES.find(value => value.id === status);
+    return <span className={`admin-insight-status admin-insight-status--${status}`}>{item?.label ?? status}</span>;
+};
+
+const InsightsTab = ({ onUnauthorized }) => {
+    const { toast } = useFeedback();
+    const [status, setStatus] = useState('review');
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(null);
+    const [busy, setBusy] = useState(null);
+
+    const load = useCallback((signal) => {
+        getInsights({ status, offset: 0, limit: 100 }, signal)
+            .then(({ data: next }) => { setData(next); setError(null); })
+            .catch(err => {
+                if (signal?.aborted) return;
+                if (isUnauthorized(err)) onUnauthorized();
+                setError(err);
+            });
+    }, [onUnauthorized, status]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        load(controller.signal);
+        return () => controller.abort();
+    }, [load]);
+
+    useEffect(() => {
+        if (!data || (!data.counts.pending && !data.counts.queued)) return undefined;
+        const timer = window.setInterval(() => load(), 5000);
+        return () => window.clearInterval(timer);
+    }, [data, load]);
+
+    const action = async (courseId, operation, message) => {
+        setBusy(courseId);
+        try {
+            await operation();
+            toast(message, { tone: 'success' });
+            load();
+        } catch (err) {
+            if (isUnauthorized(err)) onUnauthorized();
+            else toast(err.response?.data?.detail || '처리하지 못했어요.', { tone: 'error' });
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    if (error && !data) return <p className="admin-error">AI 분석 현황을 불러오지 못했어요.</p>;
+    if (!data) return <p className="admin-muted">불러오는 중…</p>;
+
+    return (
+        <section className="admin-insights">
+            <div className="admin-insight-summary">
+                <div>
+                    <h2 className="admin-subtitle">공개 코스 AI 분석</h2>
+                    <p className="admin-muted">
+                        {data.auto_publish ? '분석이 완료되면 자동 공개됩니다.' : '분석 완료 후 검토 대기 상태가 되며, 승인해야 공개됩니다.'}
+                        {data.counts.pending || data.counts.queued ? ' · 5초마다 자동 갱신 중' : ''}
+                    </p>
+                </div>
+                <Button size="sm" variant="soft" icon="zoom-reset" onClick={() => load()}>새로고침</Button>
+            </div>
+            <div className="admin-insight-counts">
+                {INSIGHT_STATUSES.map(item => (
+                    <button type="button" key={item.id} className={`admin-insight-count${status === item.id ? ' is-selected' : ''}`} onClick={() => setStatus(item.id)}>
+                        <span>{item.label}</span><strong>{data.counts[item.id] ?? 0}</strong>
+                    </button>
+                ))}
+            </div>
+            <div className="admin-toolbar">
+                <select value={status} onChange={event => setStatus(event.target.value)} aria-label="AI 분석 상태">
+                    {INSIGHT_STATUSES.map(item => <option key={item.id} value={item.id}>{item.label} ({data.counts[item.id] ?? 0})</option>)}
+                </select>
+                <span className="admin-muted">현재 목록 {data.total.toLocaleString('ko-KR')}건</span>
+            </div>
+            <div className="admin-insight-list" aria-busy={!data}>
+                {data.items.map(item => (
+                    <article className="admin-panel admin-insight-card" key={item.course_id}>
+                        <div className="admin-insight-card__header">
+                            <div>
+                                <h3>{item.title || '(이름 없음)'} <span className="admin-muted">#{item.course_id}</span></h3>
+                                <p className="admin-muted">{item.sport === 'run' ? '러닝' : '자전거'} · {item.distance_km}km · 상승 {item.ascent_m ?? 0}m · {formatDate(item.updated_at)}</p>
+                            </div>
+                            <InsightStatus status={item.ai_status} />
+                        </div>
+                        {item.feature_ko && <p><strong>특징</strong> {item.feature_ko}</p>}
+                        {item.route_ko && <p><strong>안내</strong> {item.route_ko}</p>}
+                        {item.themes?.length > 0 && <p className="admin-muted">테마: {item.themes.join(', ')}</p>}
+                        {item.ai_provider && <p className="admin-muted">모델: {item.ai_provider} · {item.ai_model || '-' } · 시도 {item.ai_attempts}회</p>}
+                        {item.ai_error && <p className="admin-error">오류: {item.ai_error}</p>}
+                        {item.issues?.length > 0 && <p className="admin-insight-warning"><Icon name="alert" size={14} />{item.issues.join(' / ')}</p>}
+                        <div className="admin-actions">
+                            {item.ai_status === 'review' && (
+                                <>
+                                    <Button size="sm" variant="primary" icon="check" disabled={busy === item.course_id}
+                                        onClick={() => action(item.course_id, () => reviewInsight(item.course_id, { action: 'approve' }), 'AI 분석을 공개했어요.')}>승인·공개</Button>
+                                    <Button size="sm" variant="danger-ghost" disabled={busy === item.course_id}
+                                        onClick={() => action(item.course_id, () => reviewInsight(item.course_id, { action: 'reject' }), 'AI 분석을 반려했어요.')}>반려</Button>
+                                </>
+                            )}
+                            {(item.ai_status === 'failed' || item.ai_status === 'rejected') && (
+                                <Button size="sm" variant="soft" icon="redo" loading={busy === item.course_id}
+                                    onClick={() => action(item.course_id, () => rerunInsight(item.course_id), 'AI 분석을 다시 요청했어요.')}>다시 분석</Button>
+                            )}
+                        </div>
+                    </article>
+                ))}
+                {!data.items.length && <p className="admin-empty">이 상태의 AI 분석이 없어요.</p>}
+            </div>
+        </section>
     );
 };
 
@@ -727,6 +851,7 @@ const AdminApp = () => {
             </header>
             <main className="admin-main">
                 {tab === 'overview' && <Overview onUnauthorized={handleUnauthorized} />}
+                {tab === 'insights' && <InsightsTab onUnauthorized={handleUnauthorized} />}
                 {tab === 'users' && <UsersTab onUnauthorized={handleUnauthorized} onShowCourses={showCourses} />}
                 {/* 회원을 바꾸면 필터와 쪽을 처음부터 다시 봅니다. */}
                 {tab === 'virtual' && <VirtualTab onUnauthorized={handleUnauthorized} />}

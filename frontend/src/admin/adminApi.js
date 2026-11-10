@@ -25,6 +25,9 @@ client.interceptors.request.use((config) => {
 
 export const login = (username, password) => client.post('/login', { username, password });
 export const getSummary = () => client.get('/summary');
+export const getInsights = (params, signal) => client.get('/insights', { params, signal });
+export const reviewInsight = (courseId, changes) => client.put(`/insights/${courseId}`, changes);
+export const rerunInsight = (courseId) => client.post(`/insights/${courseId}/rerun`);
 // params: { q, offset, limit }
 export const getUsers = (params, signal) => client.get('/users', { params, signal });
 // params: { q, uid, sport, visibility, deleted, sort, offset, limit }
