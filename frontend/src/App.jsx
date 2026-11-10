@@ -1298,7 +1298,7 @@ function App() {
         isSatellite={isSatellite}
         onToggleSatellite={handleToggleSatellite}
       />
-      <PlaceSearchPanel search={placeSearch} compact={isMobile} />
+      <PlaceSearchPanel search={placeSearch} />
     </div>
   );
 

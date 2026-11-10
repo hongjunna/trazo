@@ -26,7 +26,7 @@ export const PlaceSearchMarkers = ({ search }) => search.results.map((place, ind
 });
 
 // 지도 오른쪽 위의 검색 버튼·검색창
-export const PlaceSearchPanel = ({ search, compact }) => {
+export const PlaceSearchPanel = ({ search }) => {
     const inputRef = useRef(null);
     const [listOpen, setListOpen] = useState(true);
     const { open, setOpen, close } = search;
@@ -59,8 +59,8 @@ export const PlaceSearchPanel = ({ search, compact }) => {
 
     const pick = (place) => {
         search.choose(place);
-        // 휴대폰에서는 목록이 지도를 가리므로 고르면 목록을 접습니다.
-        if (compact) setListOpen(false);
+        // 목록이 지도와 오른쪽 도구 버튼을 가리므로 고르면 목록을 접습니다 (결과 핀은 그대로).
+        setListOpen(false);
     };
 
     let body = null;
