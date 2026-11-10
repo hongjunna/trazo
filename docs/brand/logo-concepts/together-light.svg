@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Trazo – M. 함께 달리기</title>
+  <path d="M15 40C15 52 26 54 32 46C38 38 49 40 49 52" fill="none" stroke="rgba(11,79,87,0.3)" stroke-width="4" stroke-linecap="round" stroke-dasharray="0.1 7"/>
+  <circle cx="17" cy="18" r="6" fill="#78B52C"/>
+  <path d="M7 38C7 30 11 27 17 27S27 30 27 38" fill="#78B52C"/>
+  <circle cx="47" cy="26" r="6" fill="#0B4F57"/>
+  <path d="M37 46C37 38 41 35 47 35S57 38 57 46" fill="#0B4F57"/>
+</svg>

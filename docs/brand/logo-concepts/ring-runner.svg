@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Trazo – J. 링 위의 러너</title>
+  <rect width="64" height="64" rx="15" fill="#0B4F57"/>
+  <circle cx="32" cy="32" r="22" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="4"/>
+  <path d="M32 10A22 22 0 1 1 10 32" fill="none" stroke="#8FCE3A" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="10" cy="32" r="4" fill="#8FCE3A"/>
+  <g transform="translate(9.5 8.5) scale(0.68)" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="40" cy="12" r="5" fill="#FFFFFF" stroke="none"/>
+    <path d="M36 21L30 34"/>
+    <path d="M35 23L28 25L24 30"/>
+    <path d="M35 23L41 28L47 25"/>
+    <path d="M30 34L38 39L36 46"/>
+    <path d="M30 34L24 41L17 41"/>
+  </g>
+</svg>

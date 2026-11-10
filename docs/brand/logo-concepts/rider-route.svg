@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Trazo – I. 라이더와 길</title>
+  <rect width="64" height="64" rx="15" fill="#0B4F57"/>
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="16" cy="43" r="8.5" stroke-width="3.5"/>
+    <circle cx="48" cy="43" r="8.5" stroke-width="3.5"/>
+    <path d="M16 43L24 32H39L48 43M24 32L30 43H16M30 43L39 32M39 32L37 27" stroke-width="3"/>
+    <circle cx="41" cy="11" r="4.5" fill="#FFFFFF" stroke="none"/>
+    <path d="M25 28L37 18L42 27" stroke-width="4"/>
+    <path d="M25 28L33 33L30 43" stroke-width="4"/>
+  </g>
+  <path d="M8 55H56" stroke="#8FCE3A" stroke-width="4" stroke-linecap="round"/>
+</svg>

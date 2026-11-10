@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Trazo – L. 정상에서 만세</title>
+  <path d="M8 52L22 38L28 43L36 31L46 42L56 34V56H8Z" fill="#78B52C" opacity="0.2"/>
+  <path d="M8 52L22 38L28 43L36 31L46 42L56 34" fill="none" stroke="#78B52C" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="36" cy="11" r="4.5" fill="#0B4F57"/>
+  <path d="M36 18V26M36 26L32.5 31M36 26L39.5 31M29 12L36 19L43 12" fill="none" stroke="#0B4F57" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

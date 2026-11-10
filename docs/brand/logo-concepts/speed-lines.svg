@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Trazo – K. 속도선 러너</title>
+  <rect width="64" height="64" rx="15" fill="#0B4F57"/>
+  <path d="M8 26H18M6 35H17M10 44H20" stroke="#8FCE3A" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="8" cy="26" r="3" fill="#8FCE3A"/>
+  <circle cx="6" cy="35" r="3" fill="#8FCE3A"/>
+  <circle cx="10" cy="44" r="3" fill="#8FCE3A"/>
+  <g transform="translate(6 0)" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="40" cy="12" r="5" fill="#FFFFFF" stroke="none"/>
+    <path d="M36 21L30 34"/>
+    <path d="M35 23L28 25L24 30"/>
+    <path d="M35 23L41 28L47 25"/>
+    <path d="M30 34L38 39L36 46"/>
+    <path d="M30 34L24 41L17 41"/>
+  </g>
+</svg>

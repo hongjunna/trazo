@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Trazo – G. 크루 루프</title>
+  <path d="M32 13A19 19 0 0 1 48.5 41.5" fill="none" stroke="#78B52C" stroke-width="6" stroke-linecap="round"/>
+  <path d="M45 46A19 19 0 0 1 15.5 41.5" fill="none" stroke="#0B4F57" stroke-width="6" stroke-linecap="round"/>
+  <path d="M13.2 36A19 19 0 0 1 26 14" fill="none" stroke="#0B4F57" stroke-width="6" stroke-linecap="round" opacity="0.55"/>
+  <circle cx="32" cy="13" r="4.5" fill="#78B52C"/>
+  <circle cx="48.5" cy="41.5" r="4.5" fill="#0B4F57"/>
+  <circle cx="15.5" cy="41.5" r="4.5" fill="#0B4F57"/>
+  <circle cx="32" cy="32" r="5" fill="#78B52C"/>
+</svg>

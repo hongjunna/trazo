@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trazo 로고 시안</title>
+<style>
+  :root { --bg:#F3F5F6; --surface:#fff; --text:#15262C; --text-2:#536269; --border:#E2E7E9; --primary:#0B4F57; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px 16px 64px; background:var(--bg); color:var(--text); font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; }
+  header { display:flex; gap:20px; align-items:center; margin-bottom:28px; flex-wrap:wrap; }
+  header h1 { margin:0 0 4px; font-size:24px; }
+  header p { margin:0; color:var(--text-2); }
+  .current { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:12px; font-size:13px; color:var(--text-2); margin-left:auto; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:16px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; }
+  .sizes { display:flex; align-items:flex-end; gap:14px; }
+  .lockups { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+  .lockup { display:inline-flex; align-items:center; gap:8px; padding:8px 14px 8px 8px; border-radius:12px; font-weight:800; font-size:20px; letter-spacing:-0.02em; }
+  .lockup--light { background:#fff; color:var(--primary); border:1px solid var(--border); }
+  .lockup--dark { background:#083C42; color:#fff; }
+  h2 { margin:18px 0 6px; font-size:17px; }
+  p { margin:0 0 10px; color:var(--text-2); font-size:14px; line-height:1.6; }
+  code { font-size:12px; color:var(--text-2); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Trazo 로고 아이콘 시안</h1>
+      <p>서비스 색(딥 틸 #0B4F57 · 라임 #8FCE3A)은 그대로 두고 모양만 바꾼 시안입니다. 크기별(128·48·32·16px)과 글자 조합으로 비교하세요.</p>
+    </div>
+    <span class="current"><svg width="36" height="36" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#0B4F57"/><path d="M15 47C34 47 30 17 49 17" fill="none" stroke="#8FCE3A" stroke-width="8" stroke-linecap="round"/><circle cx="32" cy="32" r="3.4" fill="#FFFFFF"/><circle cx="15" cy="47" r="6.5" fill="#0B4F57" stroke="#FFFFFF" stroke-width="4"/><circle cx="49" cy="17" r="7" fill="#FFFFFF"/></svg>지금 로고</span>
+  </header>
+  <section class="grid">
+<article class="card">
+  <div class="sizes">
+    <img src="merge.svg" width="128" height="128" alt="">
+    <img src="merge.svg" width="48" height="48" alt="">
+    <img src="merge.svg" width="32" height="32" alt="">
+    <img src="merge.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="merge-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="merge.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>A. 합류</h2>
+  <p>자전거 길(라임)과 러닝 길(흰색)이 한 점에서 만나 하나의 코스가 됩니다. 두 종목과 함께 달리는 커뮤니티를 한 번에 보여줍니다.</p>
+  <code>merge.svg · merge-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="track-loop.svg" width="128" height="128" alt="">
+    <img src="track-loop.svg" width="48" height="48" alt="">
+    <img src="track-loop.svg" width="32" height="32" alt="">
+    <img src="track-loop.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="track-loop-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="track-loop.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>B. 트랙에서 길로</h2>
+  <p>400m 트랙을 돌던 선(훈련)이 트랙을 벗어나 바깥 길(코스)로 뻗어 나갑니다. 트랙 지도·페이스 계산기 같은 훈련 기능과 코스 만들기를 잇습니다.</p>
+  <code>track-loop.svg · track-loop-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="elevation.svg" width="128" height="128" alt="">
+    <img src="elevation.svg" width="48" height="48" alt="">
+    <img src="elevation.svg" width="32" height="32" alt="">
+    <img src="elevation.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="elevation-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="elevation.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>C. 고도 획</h2>
+  <p>한 획으로 그린 고도 그래프 꼭대기에 깃발을 꽂았습니다. 오르막을 확인하고 목표를 세워 훈련하는 느낌입니다.</p>
+  <code>elevation.svg · elevation-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="route-t.svg" width="128" height="128" alt="">
+    <img src="route-t.svg" width="48" height="48" alt="">
+    <img src="route-t.svg" width="32" height="32" alt="">
+    <img src="route-t.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="route-t-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="route-t.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>D. 경로 T</h2>
+  <p>Trazo의 T. 가로획은 지도 위에 찍은 두 점, 세로획은 그 사이를 구불구불 이어 가는 실제 경로입니다. 작은 크기에서도 글자로 읽힙니다.</p>
+  <code>route-t.svg · route-t-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="pin-ridge.svg" width="128" height="128" alt="">
+    <img src="pin-ridge.svg" width="48" height="48" alt="">
+    <img src="pin-ridge.svg" width="32" height="32" alt="">
+    <img src="pin-ridge.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="pin-ridge-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="pin-ridge.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>E. 지도 핀 + 능선</h2>
+  <p>지도 핀 안에 오르내리는 길을 넣었습니다. "어디서, 어떤 길을 달릴지"를 한 아이콘에 담아 지도 서비스라는 점이 가장 분명하게 보입니다.</p>
+  <code>pin-ridge.svg · pin-ridge-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="switchback.svg" width="128" height="128" alt="">
+    <img src="switchback.svg" width="48" height="48" alt="">
+    <img src="switchback.svg" width="32" height="32" alt="">
+    <img src="switchback.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="switchback-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="switchback.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>F. 스위치백</h2>
+  <p>산길을 지그재그로 오르는 헤어핀 길을 한 획(trazo)으로 그렸습니다. 아래에서 출발해 위에서 끝나 성장·훈련의 방향감을 줍니다.</p>
+  <code>switchback.svg · switchback-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="crew.svg" width="128" height="128" alt="">
+    <img src="crew.svg" width="48" height="48" alt="">
+    <img src="crew.svg" width="32" height="32" alt="">
+    <img src="crew.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="crew-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="crew.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>G. 크루 루프</h2>
+  <p>세 갈래 길이 하나의 순환 코스를 함께 그립니다. 각자 만든 코스를 공유하고 함께 달리는 커뮤니티를 강조한 시안입니다.</p>
+  <code>crew.svg · crew-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="runner-route.svg" width="128" height="128" alt="">
+    <img src="runner-route.svg" width="48" height="48" alt="">
+    <img src="runner-route.svg" width="32" height="32" alt="">
+    <img src="runner-route.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="runner-route-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="runner-route.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>H. 러너와 길</h2>
+  <p>앞으로 기울어 달리는 러너 아래로 라임색 코스가 출발점에서 도착점까지 이어집니다. "내가 만든 길을 달린다"를 가장 직접적으로 보여줍니다.</p>
+  <code>runner-route.svg · runner-route-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="rider-route.svg" width="128" height="128" alt="">
+    <img src="rider-route.svg" width="48" height="48" alt="">
+    <img src="rider-route.svg" width="32" height="32" alt="">
+    <img src="rider-route.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="rider-route-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="rider-route.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>I. 라이더와 길</h2>
+  <p>자전거를 탄 라이더가 라임색 코스 위를 달립니다. 바퀴와 길을 단순한 선으로 그려 작은 크기에서도 자전거로 읽힙니다.</p>
+  <code>rider-route.svg · rider-route-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="ring-runner.svg" width="128" height="128" alt="">
+    <img src="ring-runner.svg" width="48" height="48" alt="">
+    <img src="ring-runner.svg" width="32" height="32" alt="">
+    <img src="ring-runner.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="ring-runner-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="ring-runner.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>J. 링 위의 러너</h2>
+  <p>자전거 바퀴이자 육상 트랙인 고리 안을 러너가 달립니다. 라임 고리는 아직 다 그리지 않은 코스(획)여서 "자전거·러닝·트랙 훈련"을 한 기호로 묶습니다.</p>
+  <code>ring-runner.svg · ring-runner-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="speed-lines.svg" width="128" height="128" alt="">
+    <img src="speed-lines.svg" width="48" height="48" alt="">
+    <img src="speed-lines.svg" width="32" height="32" alt="">
+    <img src="speed-lines.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="speed-lines-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="speed-lines.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>K. 속도선 러너</h2>
+  <p>러너 뒤로 남는 속도선이 곧 지도 위 코스 선입니다. 점으로 끝나는 선은 찍은 경유점을 뜻해 "달리면서 그리는 코스"를 표현합니다.</p>
+  <code>speed-lines.svg · speed-lines-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="summit.svg" width="128" height="128" alt="">
+    <img src="summit.svg" width="48" height="48" alt="">
+    <img src="summit.svg" width="32" height="32" alt="">
+    <img src="summit.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="summit-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="summit.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>L. 정상에서 만세</h2>
+  <p>고도 그래프 꼭대기에서 두 팔을 든 사람. 오르막을 이겨 낸 성취감과 훈련의 목표를 보여줍니다.</p>
+  <code>summit.svg · summit-light.svg</code>
+</article>
+<article class="card">
+  <div class="sizes">
+    <img src="together.svg" width="128" height="128" alt="">
+    <img src="together.svg" width="48" height="48" alt="">
+    <img src="together.svg" width="32" height="32" alt="">
+    <img src="together.svg" width="16" height="16" alt="">
+  </div>
+  <div class="lockups">
+    <span class="lockup lockup--light"><img src="together-light.svg" width="36" height="36" alt="">Trazo</span>
+    <span class="lockup lockup--dark"><img src="together.svg" width="36" height="36" alt="">Trazo</span>
+  </div>
+  <h2>M. 함께 달리기</h2>
+  <p>두 사람(라임·흰색)이 한 코스의 양 끝에서 서로를 향합니다. 코스를 공유하고 함께 달리는 커뮤니티를 사람 중심으로 표현했습니다.</p>
+  <code>together.svg · together-light.svg</code>
+</article>
+  </section>
+</main>
+</body>
+</html>

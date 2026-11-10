@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="2 0 58 58">
+  <title>Trazo</title>
+  <path d="M10 46L20 33L27 40L38 21L46 33L54 27V52H10Z" fill="#6FAE28" opacity="0.18"/>
+  <path d="M10 46L20 33L27 40L38 21L46 33L54 27" fill="none" stroke="#6FAE28" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M38 21V8" stroke="#0B4F57" stroke-width="3" stroke-linecap="round"/>
+  <path d="M38 8.5L48 12L38 15.5Z" fill="#0B4F57" stroke="#0B4F57" stroke-width="1.5" stroke-linejoin="round"/>
+  <circle cx="10" cy="46" r="4.5" fill="#FFFFFF" stroke="#0B4F57" stroke-width="3"/>
+  <circle cx="54" cy="27" r="4.5" fill="#0B4F57"/>
+</svg>
