@@ -3321,6 +3321,51 @@
   margin-top: 4px;
 }
 
+/* 트랙 정보: 지도 위 트랙 바로 위에 말풍선처럼 띄웁니다. */
+.explore-card--popup {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: 300px;
+  margin-bottom: 14px;
+  white-space: normal;
+  cursor: default;
+}
+
+.explore-card--popup::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--c-surface);
+  box-shadow: 4px 4px 6px rgba(0, 0, 0, 0.08);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.track-details {
+  display: grid;
+  gap: 3px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--c-text-2);
+}
+
+.track-details li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.track-details a {
+  color: var(--c-primary);
+  text-decoration: underline;
+}
+
 @media (max-width: 767px) {
   .explore {
     display: block;
@@ -3401,8 +3446,15 @@
     width: auto;
   }
 
-  .explore__map:has(.explore-card) .explore__tools {
+  .explore__map:has(.explore-card:not(.explore-card--popup)) .explore__tools {
     bottom: 200px;
+  }
+
+  .explore-card--popup {
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: min(280px, calc(100vw - 40px));
   }
 }
 

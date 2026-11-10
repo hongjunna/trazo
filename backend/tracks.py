@@ -122,6 +122,31 @@ def _contains(bounds: dict, lat: float, lng: float) -> bool:
     return bounds["minlat"] <= lat <= bounds["maxlat"] and bounds["minlon"] <= lng <= bounds["maxlon"]
 
 
+# 트랙 자체 태그를 먼저 보고, 없으면 트랙을 둘러싼 시설(체육공원·경기장)의 태그를 씁니다.
+INFO_TAGS = ("opening_hours", "lit", "access", "fee", "operator", "phone", "website")
+FACILITY_INFO_TAGS = ("opening_hours", "operator", "phone", "website", "fee", "access")
+TAG_ALIASES = {"phone": ("phone", "contact:phone"), "website": ("website", "contact:website", "url")}
+
+
+def _tag(tags: dict, key: str) -> Optional[str]:
+    for name in TAG_ALIASES.get(key, (key,)):
+        value = (tags.get(name) or "").strip()
+        if value:
+            return value[:200]
+    return None
+
+
+def track_info(tags: dict, facility_tags: Optional[dict]) -> dict:
+    info = {}
+    for key in INFO_TAGS:
+        value = _tag(tags, key)
+        if value is None and facility_tags and key in FACILITY_INFO_TAGS:
+            value = _tag(facility_tags, key)
+        if value is not None:
+            info[key] = value
+    return info
+
+
 def parse_tracks(data: dict) -> list[dict]:
     """Overpass 결과를 Track 행으로 바꿀 값 목록으로 정리합니다."""
     elements = data.get("elements", [])
@@ -152,8 +177,9 @@ def parse_tracks(data: dict) -> list[dict]:
         # 학교 운동장 트랙은 외부인이 쓰기 어려워 뺍니다 (대학교는 둡니다).
         if any(c["tags"].get("amenity") in SCHOOL_AMENITY for c in around):
             continue
-        venue = next((c["tags"]["name"] for c in around if c["tags"].get("name") and (
+        facility = next((c for c in around if c["tags"].get("name") and (
             c["tags"].get("leisure") in VENUE_LEISURE or c["tags"].get("amenity") in {"university", "college"})), None)
+        venue = facility["tags"]["name"] if facility else None
         region = next((c["tags"]["name"] for c in around if c["tags"].get("boundary") == "administrative" and c["tags"].get("admin_level") in {"6", "7"} and c["tags"].get("name")), None)
         own = (tags.get("name:ko") or tags.get("name") or "").strip()
         if own and not GENERIC_NAME.match(own):
@@ -176,6 +202,7 @@ def parse_tracks(data: dict) -> list[dict]:
             "length_m": lap,
             "lanes": int(lanes) if lanes and lanes.isdigit() else None,
             "surface": tags.get("surface"),
+            "info": track_info(tags, facility["tags"] if facility else None),
         })
     return results
 

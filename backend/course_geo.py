@@ -13,6 +13,9 @@ RETURN_RADIUS_M = 300
 # 근처 검색에 쓰는 경로 점은 이 간격보다 촘촘하게 남기지 않습니다.
 NEAR_SAMPLE_M = 150
 NEAR_SAMPLE_MAX = 400
+# 코스 지도에 그리는 경로: 모양을 지키며 줄입니다(Douglas–Peucker). 점이 너무 많으면 허용 오차를 키웁니다.
+MAP_TOLERANCE_M = 4
+MAP_POINTS_MAX = 500
 
 
 def haversine(lat1, lng1, lat2, lng2):
@@ -58,6 +61,42 @@ def round_point(lat, lng):
     return {"lat": round(lat, 5), "lng": round(lng, 5)}
 
 
+def simplify_path(points, tolerance_m=MAP_TOLERANCE_M, max_points=MAP_POINTS_MAX):
+    """[(lat, lng), …]를 모양이 크게 바뀌지 않게 줄입니다. 처음과 끝 점은 항상 남깁니다."""
+    if len(points) <= 2:
+        return [tuple(p[:2]) for p in points]
+    lat0 = math.radians(sum(p[0] for p in points) / len(points))
+    xy = [(p[1] * 111320 * math.cos(lat0), p[0] * 111320) for p in points]
+
+    def run(tolerance):
+        keep = [False] * len(points)
+        keep[0] = keep[-1] = True
+        stack = [(0, len(points) - 1)]
+        while stack:
+            first, last = stack.pop()
+            (ax, ay), (bx, by) = xy[first], xy[last]
+            dx, dy = bx - ax, by - ay
+            length = math.hypot(dx, dy)
+            far, far_at = 0.0, None
+            for i in range(first + 1, last):
+                px, py = xy[i]
+                d = abs(dx * (py - ay) - dy * (px - ax)) / length if length else math.hypot(px - ax, py - ay)
+                if d > far:
+                    far, far_at = d, i
+            if far_at is not None and far > tolerance:
+                keep[far_at] = True
+                stack.append((first, far_at))
+                stack.append((far_at, last))
+        return [tuple(points[i][:2]) for i, flag in enumerate(keep) if flag]
+
+    tolerance = tolerance_m
+    simplified = run(tolerance)
+    while len(simplified) > max_points:
+        tolerance *= 1.6
+        simplified = run(tolerance)
+    return simplified
+
+
 def classify_route(points, cumulative, total):
     """순환(loop) · 왕복(out_and_back) · 편도(point_to_point)를 구분합니다."""
     if total < 500:
@@ -83,7 +122,7 @@ def analyze_route(polylines_json: str, sport: str = "bike") -> dict:
         return {"distance_km": 0.0, "ascent_m": 0, "descent_m": 0, "route_type": "point_to_point",
                 "start": round_point(*points[0][:2]) if points else None, "end": None, "bounds": None,
                 "has_elevation": False, "elevation": None, "grades": None, "climbs": [], "splits": [],
-                "_cumulative": [0.0] * len(points), "_points": points, "_near": [p[:2] for p in points]}
+                "_cumulative": [0.0] * len(points), "_points": points, "_near": [p[:2] for p in points], "_map": [p[:2] for p in points]}
     cumulative = [0.0]
     for a, b in zip(points, points[1:]):
         cumulative.append(cumulative[-1] + haversine(a[0], a[1], b[0], b[1]))
@@ -132,6 +171,7 @@ def analyze_route(polylines_json: str, sport: str = "bike") -> dict:
     if near[-1] != points[-1][:2]:
         near.append(points[-1][:2])
     result["_near"] = near
+    result["_map"] = simplify_path(points)
     result["_cumulative"] = cumulative
     result["_points"] = points
     return result

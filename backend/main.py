@@ -195,6 +195,10 @@ class Track(SQLModel, table=True):
     lanes: Optional[int] = None
     surface: Optional[str] = None
     note: Optional[str] = None
+    # 그 밖의 정보 (OSM 태그 이름 그대로): opening_hours, lit, access, fee, operator, phone, website
+    info_json: Optional[str] = None
+    # 관리자가 직접 넣은 정보 (예: 운영시간). info_json보다 우선하고, OSM에서 다시 가져와도 바뀌지 않습니다.
+    manual_info_json: Optional[str] = None
     source: str = Field(default="manual")
     # OSM 원본 (예: way/123). 다시 가져올 때 같은 트랙을 찾는 데 씁니다.
     osm_ref: Optional[str] = Field(default=None, unique=True)
@@ -221,6 +225,8 @@ COURSE_MIGRATIONS = {
     "display_uid": "VARCHAR(128)",
 }
 
+TRACK_MIGRATIONS = {"info_json": "TEXT", "manual_info_json": "TEXT"}
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     SQLModel.metadata.create_all(engine)
@@ -230,6 +236,10 @@ async def lifespan(app: FastAPI):
             if name not in columns:
                 connection.execute(text(f"ALTER TABLE course ADD COLUMN {name} {definition}"))
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_course_share_token ON course (share_token)"))
+        track_columns = {column["name"] for column in inspect(connection).get_columns("track")}
+        for name, definition in TRACK_MIGRATIONS.items():
+            if name not in track_columns:
+                connection.execute(text(f"ALTER TABLE track ADD COLUMN {name} {definition}"))
     yield
 
 app = FastAPI(title="Trazo API", lifespan=lifespan)
@@ -2084,7 +2094,7 @@ analysis_lock = threading.Lock()
 ANALYSIS_CACHE_MAX = 2000
 # 한 번의 검색에서 거리·위치 조건을 확인하는 최대 코스 수 (최근 코스부터)
 MCP_SEARCH_CANDIDATES = 3000
-LIGHT_KEYS = ("distance_km", "ascent_m", "descent_m", "route_type", "start", "end", "bounds", "_near")
+LIGHT_KEYS = ("distance_km", "ascent_m", "descent_m", "route_type", "start", "end", "bounds", "_near", "_map")
 
 def light_analyses(session: Session, rows: list) -> dict:
     """rows: (코스, 경로 JSON 길이) 목록. 캐시에 없거나 경로가 바뀐 코스만 경로를 DB에서 읽어 분석합니다.
@@ -2565,7 +2575,6 @@ def like_bot_like(request: HTTPRequest, credentials: Optional[HTTPAuthorizationC
 # --- 11. 코스 지도 ---
 # 전체 공개 코스를 지도 위에 한꺼번에 그립니다. 지도에 보이는 범위(bounds)와 겹치는 코스만 돌려줍니다.
 MAP_COURSE_LIMIT = 300
-MAP_PATH_POINTS = 120
 
 @app.get("/community/map")
 def community_map(
@@ -2591,11 +2600,8 @@ def community_map(
         box = analysis["bounds"]
         if not box or box["north"] < south or box["south"] > north or box["east"] < west or box["west"] > east:
             continue
-        near = analysis["_near"]
-        step = max(1, math.ceil(len(near) / MAP_PATH_POINTS))
-        path = near[::step]
-        if path[-1] != near[-1]:
-            path = path + [near[-1]]
+        # 근처 검색용 표본(150m 간격)은 굽은 길을 뚝뚝 끊어 그리므로, 모양을 지키며 줄인 경로를 씁니다.
+        path = analysis.get("_map") or analysis["_near"]
         items.append({
             "token": course.share_token, "title": course.title, "sport": course.sport, "nickname": nickname,
             "distance_km": analysis["distance_km"], "ascent_m": analysis["ascent_m"], "route_type": analysis["route_type"],
@@ -2612,13 +2618,25 @@ track_logger = logging.getLogger("trazo.tracks")
 track_import_lock = threading.Lock()
 track_import_status: dict = {"running": False, "started_at": None, "finished_at": None, "result": None, "error": None}
 
+# 관리자가 고치면 OSM에서 다시 가져와도 덮어쓰지 않는 열
+TRACK_MANUAL_FIELDS = ("length_m", "lanes", "surface")
+
+def load_info(raw: Optional[str]) -> dict:
+    try:
+        value = json.loads(raw) if raw else {}
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
 def track_json(track: Track, admin: bool = False) -> dict:
     try:
         path = json.loads(track.path_json) if track.path_json else None
     except ValueError:
         path = None
+    info = {key: value for key, value in {**load_info(track.info_json), **load_info(track.manual_info_json)}.items() if key not in TRACK_MANUAL_FIELDS}
     item = {"id": track.id, "name": track.name, "region": track.region, "lat": track.lat, "lng": track.lng, "path": path,
-            "length_m": track.length_m, "lanes": track.lanes, "surface": track.surface, "note": track.note, "source": track.source}
+            "length_m": track.length_m, "lanes": track.lanes, "surface": track.surface, "note": track.note, "source": track.source,
+            "info": info}
     if admin:
         item.update({"osm_ref": track.osm_ref, "hidden": track.hidden, "name_locked": track.name_locked, "updated_at": track.updated_at})
     return item
@@ -2651,7 +2669,12 @@ def import_osm_tracks(session: Session, data: Optional[dict] = None) -> dict:
         track.region = item["region"]
         track.lat, track.lng = item["lat"], item["lng"]
         track.path_json = json.dumps(item["path"])
-        track.length_m, track.lanes, track.surface = item["length_m"], item["lanes"], item["surface"]
+        # 관리자가 고친 거리·레인·노면은 다시 가져와도 그대로 둡니다.
+        manual = load_info(track.manual_info_json)
+        for key in TRACK_MANUAL_FIELDS:
+            if key not in manual:
+                setattr(track, key, item[key])
+        track.info_json = json.dumps(item.get("info", {}), ensure_ascii=False)
         track.updated_at = utc_now()
         session.add(track)
     session.commit()
@@ -2713,6 +2736,7 @@ class TrackCreateRequest(TrackShape):
     lanes: Optional[int] = PydanticField(default=None, ge=1, le=12)
     surface: Optional[str] = PydanticField(default=None, max_length=30)
     note: Optional[str] = PydanticField(default=None, max_length=200)
+    opening_hours: Optional[str] = PydanticField(default=None, max_length=200)
 
 class TrackUpdateRequest(BaseModel):
     name: Optional[str] = PydanticField(default=None, min_length=1, max_length=60)
@@ -2722,6 +2746,8 @@ class TrackUpdateRequest(BaseModel):
     surface: Optional[str] = PydanticField(default=None, max_length=30)
     note: Optional[str] = PydanticField(default=None, max_length=200)
     hidden: Optional[bool] = None
+    # 빈 문자열을 보내면 지웁니다.
+    opening_hours: Optional[str] = PydanticField(default=None, max_length=200)
     # 위치·모양을 다시 그릴 때만 보냅니다.
     lat: Optional[float] = PydanticField(default=None, ge=-90, le=90)
     lng: Optional[float] = PydanticField(default=None, ge=-180, le=180)
@@ -2733,7 +2759,8 @@ def shape_path(lat: float, lng: float, shape: TrackShape) -> Optional[str]:
 @app.post("/admin/tracks", dependencies=[Depends(require_admin)])
 def admin_create_track(data: TrackCreateRequest, session: Session = Depends(get_session)):
     track = Track(name=data.name.strip(), region=data.region, lat=data.lat, lng=data.lng, path_json=shape_path(data.lat, data.lng, data),
-                  length_m=data.length_m, lanes=data.lanes, surface=data.surface, note=data.note, source="manual", name_locked=True)
+                  length_m=data.length_m, lanes=data.lanes, surface=data.surface, note=data.note, source="manual", name_locked=True,
+                  manual_info_json=json.dumps({"opening_hours": data.opening_hours.strip()} if data.opening_hours and data.opening_hours.strip() else {}, ensure_ascii=False))
     session.add(track)
     session.commit()
     session.refresh(track)
@@ -2744,7 +2771,7 @@ def admin_update_track(track_id: int, data: TrackUpdateRequest, session: Session
     track = session.get(Track, track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    fields = data.model_dump(exclude_unset=True, exclude={"shape", "lat", "lng"})
+    fields = data.model_dump(exclude_unset=True, exclude={"shape", "lat", "lng", "opening_hours"})
     if "name" in fields:
         fields["name"] = fields["name"].strip()
         track.name_locked = True
@@ -2754,6 +2781,18 @@ def admin_update_track(track_id: int, data: TrackUpdateRequest, session: Session
             fields[key] = None
     for key, value in fields.items():
         setattr(track, key, value)
+    # 관리자가 넣은 값은 manual_info_json에 남겨, OSM에서 다시 가져와도 유지합니다.
+    manual = load_info(track.manual_info_json)
+    for key in TRACK_MANUAL_FIELDS:
+        if key in fields:
+            manual[key] = fields[key]
+    if "opening_hours" in data.model_fields_set:
+        hours = (data.opening_hours or "").strip()
+        if hours:
+            manual["opening_hours"] = hours
+        else:
+            manual.pop("opening_hours", None)
+    track.manual_info_json = json.dumps(manual, ensure_ascii=False)
     if data.lat is not None and data.lng is not None:
         track.lat, track.lng = data.lat, data.lng
     if data.shape is not None:

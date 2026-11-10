@@ -498,7 +498,7 @@ const VirtualTab = ({ onUnauthorized }) => {
     );
 };
 
-const EMPTY_TRACK = { name: '', coords: '', shape: 'oval', bearing: '0', size: '400', length: '', note: '' };
+const EMPTY_TRACK = { name: '', coords: '', shape: 'oval', bearing: '0', size: '400', length: '', note: '', hours: '' };
 // "37.5006, 126.9942"처럼 붙여 넣은 좌표를 읽습니다 (카카오맵·구글 지도에서 복사한 형식).
 const parseCoords = (text) => {
     const numbers = (text.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
@@ -552,7 +552,7 @@ const TracksTab = ({ onUnauthorized }) => {
         try {
             await createTrack({
                 name: form.name.trim(), ...coords, shape: form.shape, bearing: Number(form.bearing) || 0, size_m: Number(form.size) || 400,
-                length_m: form.length ? Number(form.length) : null, note: form.note.trim() || null,
+                length_m: form.length ? Number(form.length) : null, note: form.note.trim() || null, opening_hours: form.hours.trim() || null,
             });
             toast('트랙을 추가했어요.', { tone: 'success' });
             setForm(EMPTY_TRACK);
@@ -583,6 +583,17 @@ const TracksTab = ({ onUnauthorized }) => {
         const value = window.prompt('한 바퀴 거리(m). 비우면 모름으로 표시해요.', track.length_m ?? '');
         if (value === null) return;
         update(track, { length_m: value.trim() ? Number(value) : 0 });
+    };
+
+    // OSM에 운영시간·레인·노면이 거의 없어 관리자가 채웁니다. 비우면 지웁니다.
+    const editInfo = async (track) => {
+        const hours = window.prompt('운영시간 (예: 06:00-22:00, 월 휴무). 비우면 지워요.', track.info?.opening_hours ?? '');
+        if (hours === null) return;
+        const lanes = window.prompt('레인 수 (숫자). 비우면 모름.', track.lanes ?? '');
+        if (lanes === null) return;
+        const surface = window.prompt('노면 (예: 우레탄, 흙, 인조잔디). 비우면 모름.', track.surface ?? '');
+        if (surface === null) return;
+        update(track, { opening_hours: hours.trim(), lanes: lanes.trim() ? Number(lanes) || 0 : 0, surface: surface.trim() || null }, '정보를 고쳤어요.');
     };
 
     const remove = async (track) => {
@@ -635,6 +646,7 @@ const TracksTab = ({ onUnauthorized }) => {
                         <label>그릴 크기(m)<input className="input" type="number" min="100" max="1000" value={form.size} onChange={e => setForm({ ...form, size: e.target.value })} /></label>
                     </>}
                     <label>한 바퀴(m, 모르면 비움)<input className="input" type="number" min="50" value={form.length} onChange={e => setForm({ ...form, length: e.target.value })} /></label>
+                    <input className="input" placeholder="운영시간 (예: 06:00-22:00, 월 휴무)" value={form.hours} maxLength={200} onChange={e => setForm({ ...form, hours: e.target.value })} />
                     <input className="input" placeholder="메모 (예: 야간 개방, 우레탄 8레인)" value={form.note} maxLength={200} onChange={e => setForm({ ...form, note: e.target.value })} />
                 </div>
                 {form.coords && !coords && <p className="admin-error">좌표를 읽지 못했어요. "위도, 경도" 형식으로 넣어주세요.</p>}
@@ -647,7 +659,7 @@ const TracksTab = ({ onUnauthorized }) => {
             <div className="admin-table-wrap">
                 <table className="admin-table">
                     <thead>
-                        <tr><th>이름</th><th>지역</th><th>출처</th><th className="num">한 바퀴</th><th>표시</th><th /></tr>
+                        <tr><th>이름</th><th>지역</th><th>출처</th><th className="num">한 바퀴</th><th>정보</th><th>표시</th><th /></tr>
                     </thead>
                     <tbody>
                         {data.items.map(track => (
@@ -659,17 +671,19 @@ const TracksTab = ({ onUnauthorized }) => {
                                 <td>{track.region ?? '-'}</td>
                                 <td>{track.source === 'osm' ? 'OSM' : '직접'}{track.path ? '' : ' · 핀'}</td>
                                 <td className="num">{track.length_m ? `${track.length_m}m` : '-'}</td>
+                                <td className="admin-muted">{[track.lanes && `${track.lanes}레인`, track.surface, track.info?.opening_hours].filter(Boolean).join(' · ') || '-'}</td>
                                 <td>{track.hidden ? '숨김' : '보임'}</td>
                                 <td className="admin-row-actions">
                                     <Button size="sm" variant="ghost" onClick={() => rename(track)}>이름</Button>
                                     <Button size="sm" variant="ghost" onClick={() => editLength(track)}>거리</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => editInfo(track)}>정보</Button>
                                     {track.hidden
                                         ? <Button size="sm" variant="ghost" onClick={() => update(track, { hidden: false }, '다시 보이게 했어요.')}>보이기</Button>
                                         : <Button size="sm" variant="danger-ghost" onClick={() => remove(track)}>{track.source === 'osm' ? '숨기기' : '삭제'}</Button>}
                                 </td>
                             </tr>
                         ))}
-                        {!data.items.length && <tr><td colSpan={6} className="admin-empty">트랙이 없어요. 위에서 OpenStreetMap 트랙을 가져오세요.</td></tr>}
+                        {!data.items.length && <tr><td colSpan={7} className="admin-empty">트랙이 없어요. 위에서 OpenStreetMap 트랙을 가져오세요.</td></tr>}
                     </tbody>
                 </table>
             </div>

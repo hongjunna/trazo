@@ -284,6 +284,8 @@ export const CourseSettings = ({
   onOutAndBack,
   isAutoRouting,
   onToggleAutoRouting,
+  smoothStraight,
+  onToggleSmoothStraight,
   routeOptions,
   onToggleRouteOption,
   onOpenHelp,
@@ -350,10 +352,28 @@ export const CourseSettings = ({
             ))}
           </div>
         ) : (
-          <p className="section__note">
-            길을 찾지 않고 점과 점을 곧게 이어요. 지도에 없는 길이나 운동장
-            트랙에 사용하세요.
-          </p>
+          <>
+            <p className="section__note">
+              길을 찾지 않고 점과 점을 곧게 이어요. 지도에 없는 길이나 운동장
+              트랙에 사용하세요.
+            </p>
+            <div className="option-list" role="group" aria-label="직선 연결 옵션">
+              <label className={`option-row ${isBusy ? 'option-row--disabled' : ''}`}>
+                <span className="option-row__text">
+                  <span className="option-row__label">부드럽게 다듬기</span>
+                  <span className="option-row__desc">찍은 점을 지나는 곡선으로 이어요. 운동장 트랙의 곡선 구간을 점 몇 개로 그릴 수 있어요. 끄면 다시 직선이 돼요.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  className="switch"
+                  checked={Boolean(smoothStraight)}
+                  disabled={isBusy}
+                  onChange={() => onToggleSmoothStraight(!smoothStraight)}
+                />
+              </label>
+            </div>
+          </>
         )}
         {isAutoRouting && (
           <p className="section__note">옵션은 다음에 찍는 점부터 적용돼요.</p>

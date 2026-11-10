@@ -31,6 +31,68 @@ const FILTER_IDS = new Set(SPORT_FILTERS.map(filter => filter.value));
 const TRACK_PIN_MIN_LEVEL = 6;
 const SURFACE_LABEL = { tartan: '우레탄(탄성)', synthetic: '우레탄(탄성)', rubber: '고무', asphalt: '아스팔트', dirt: '흙', ground: '흙', clay: '흙', grass: '잔디', artificial_turf: '인조잔디', gravel: '자갈', sand: '모래', concrete: '콘크리트', paved: '포장', unpaved: '비포장', compacted: '다짐 흙' };
 const trackPath = (track) => (track.path ?? []).map(([lat, lng]) => ({ lat, lng }));
+// OSM opening_hours 표기(Mo-Su 06:00-22:00)를 읽기 쉽게 바꿉니다.
+const DAY_LABEL = { Mo: '월', Tu: '화', We: '수', Th: '목', Fr: '금', Sa: '토', Su: '일', PH: '공휴일' };
+const formatHours = (value) => (value === '24/7' ? '24시간' : value
+    .replace(/\b(Mo|Tu|We|Th|Fr|Sa|Su|PH)\b/g, day => DAY_LABEL[day])
+    .replace(/\boff\b/g, '휴무')
+    .replace(/;\s*/g, ' · '));
+const ACCESS_LABEL = { yes: '누구나 이용', permissive: '누구나 이용', public: '누구나 이용', customers: '이용객만', private: '일반 개방 안 함', no: '일반 개방 안 함', permit: '허가 필요' };
+const trackDetails = (track) => {
+    const info = track.info ?? {};
+    const rows = [];
+    if (info.opening_hours) rows.push({ icon: 'clock', text: formatHours(info.opening_hours) });
+    if (info.lit === 'yes') rows.push({ icon: 'info', text: '야간 조명 있음' });
+    else if (info.lit === 'no') rows.push({ icon: 'info', text: '야간 조명 없음' });
+    const access = [ACCESS_LABEL[info.access], info.fee === 'no' ? '무료' : info.fee === 'yes' ? '유료' : null].filter(Boolean).join(' · ');
+    if (access) rows.push({ icon: 'users', text: access });
+    if (info.operator) rows.push({ icon: 'flag', text: info.operator });
+    if (info.phone) rows.push({ icon: 'send', text: info.phone, href: `tel:${info.phone.replace(/[^\d+]/g, '')}` });
+    if (info.website && /^https?:\/\//.test(info.website)) rows.push({ icon: 'link', text: '홈페이지', href: info.website });
+    return rows;
+};
+
+const TrackPopup = ({ track, onClose }) => (
+    <div className="explore-card explore-card--popup" role="dialog" aria-label={`${track.name} 트랙 정보`}>
+        <span className="explore-card__bar" style={{ background: COLORS.track }} />
+        <div className="explore-card__body">
+            <div className="explore-card__top">
+                <span className="sport-tag" style={{ background: COLORS.track, color: '#FFFFFF' }}>
+                    <Icon name="track" size={12} strokeWidth={2.5} />육상 트랙
+                </span>
+                <button type="button" className="explore-card__close" aria-label="닫기" onClick={onClose}><Icon name="x" size={16} /></button>
+            </div>
+            <strong className="explore-card__title">{track.name}</strong>
+            <span className="explore-item__meta">
+                {trackMeta(track).map(text => <span key={text}>{text}</span>)}
+                {track.region && <span>{track.region}</span>}
+            </span>
+            {trackDetails(track).length > 0 && (
+                <ul className="track-details">
+                    {trackDetails(track).map(row => (
+                        <li key={row.text}>
+                            <Icon name={row.icon} size={13} />
+                            {row.href ? <a href={row.href} target="_blank" rel="noreferrer">{row.text}</a> : <span>{row.text}</span>}
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {track.note && <span className="explore-item__author">{track.note}</span>}
+            <span className="explore-item__author">
+                {track.source === 'osm' ? '© OpenStreetMap 기여자' : 'Trazo가 등록한 트랙'}{track.info?.opening_hours ? '' : ' · 이용 시간은 시설에 확인하세요'}
+            </span>
+            <Button
+                variant="primary"
+                size="sm"
+                icon="map"
+                onClick={() => window.open(`https://map.kakao.com/link/to/${encodeURIComponent(track.name)},${track.lat},${track.lng}`, '_blank', 'noopener')}
+            >
+                카카오맵 길찾기
+            </Button>
+        </div>
+    </div>
+);
+
 const trackMeta = (track) => [
     track.length_m ? `한 바퀴 ${track.length_m.toLocaleString()}m` : null,
     track.lanes ? `${track.lanes}레인` : null,
@@ -212,6 +274,14 @@ const CourseExplorer = ({ onOpenCourse }) => {
     const selectTrack = (track, fit = false) => {
         setSelectedTrackId(track.id);
         setSelectedToken(null);
+        // 지도 위에 뜨는 정보 창이 잘리지 않게 트랙을 화면 아래쪽 가운데로 옮깁니다.
+        if (!fit && map) {
+            const projection = map.getProjection();
+            const point = projection.containerPointFromCoords(new window.kakao.maps.LatLng(track.lat, track.lng));
+            const node = map.getNode?.();
+            const height = node?.clientHeight ?? 600;
+            if (point.y < 300) map.panTo(projection.coordsFromContainerPoint(new window.kakao.maps.Point(point.x, point.y - (height * 0.25))));
+        }
         if (fit && map) {
             if (track.path?.length) {
                 const box = new window.kakao.maps.LatLngBounds();
@@ -379,6 +449,12 @@ const CourseExplorer = ({ onOpenCourse }) => {
                             </CustomOverlayMap>
                         );
                     })}
+                    {/* 고른 트랙의 정보는 지도 위 트랙 바로 위에 띄웁니다. */}
+                    {selectedTrack && (
+                        <CustomOverlayMap position={{ lat: selectedTrack.lat, lng: selectedTrack.lng }} zIndex={20} yAnchor={1} clickable>
+                            <TrackPopup track={selectedTrack} onClose={clearSelection} />
+                        </CustomOverlayMap>
+                    )}
                     {hoveredTrack && hoveredTrack.id !== selectedTrackId && (
                         <CustomOverlayMap position={{ lat: hoveredTrack.lat, lng: hoveredTrack.lng }} zIndex={9} yAnchor={1.8}>
                             <div className="explore-tip">{hoveredTrack.name}{hoveredTrack.length_m ? ` · ${hoveredTrack.length_m}m` : ''}</div>
@@ -470,36 +546,6 @@ const CourseExplorer = ({ onOpenCourse }) => {
                     {showTracks && <span><i style={{ background: COLORS.track }} />육상 트랙</span>}
                 </div>
 
-                {selectedTrack && (
-                    <div className="explore-card" role="dialog" aria-label={`${selectedTrack.name} 트랙 정보`}>
-                        <span className="explore-card__bar" style={{ background: COLORS.track }} />
-                        <div className="explore-card__body">
-                            <div className="explore-card__top">
-                                <span className="sport-tag" style={{ background: COLORS.track, color: '#FFFFFF' }}>
-                                    <Icon name="track" size={12} strokeWidth={2.5} />육상 트랙
-                                </span>
-                                <button type="button" className="explore-card__close" aria-label="닫기" onClick={clearSelection}><Icon name="x" size={16} /></button>
-                            </div>
-                            <strong className="explore-card__title">{selectedTrack.name}</strong>
-                            <span className="explore-item__meta">
-                                {trackMeta(selectedTrack).map(text => <span key={text}>{text}</span>)}
-                                {selectedTrack.region && <span>{selectedTrack.region}</span>}
-                            </span>
-                            {selectedTrack.note && <span className="explore-item__author">{selectedTrack.note}</span>}
-                            <span className="explore-item__author">
-                                {selectedTrack.source === 'osm' ? '위치 정보: © OpenStreetMap 기여자' : 'Trazo가 등록한 트랙'} · 이용 시간은 시설에 확인하세요
-                            </span>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                icon="map"
-                                onClick={() => window.open(`https://map.kakao.com/link/to/${encodeURIComponent(selectedTrack.name)},${selectedTrack.lat},${selectedTrack.lng}`, '_blank', 'noopener')}
-                            >
-                                카카오맵 길찾기
-                            </Button>
-                        </div>
-                    </div>
-                )}
                 {selected && (
                     <div className="explore-card" role="dialog" aria-label={`${selected.title} 코스 정보`}>
                         <span className="explore-card__bar" style={{ background: sportOf(selected).color }} />

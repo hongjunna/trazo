@@ -31,6 +31,7 @@ import ElevationPanel from './components/ElevationPanel';
 import { MapContextMenu, MapControls, MapHint, RouteStatus } from './components/MapOverlays';
 import { PlaceSearchMarkers, PlaceSearchPanel } from './components/PlaceSearch';
 import { usePlaceSearch } from './hooks/usePlaceSearch';
+import { applySmoothing, resmoothCourse, smoothNewSegments } from './utils/smoothing';
 import RoutingHelpDialog from './components/RoutingHelpDialog';
 import SaveCourseDialog from './components/SaveCourseDialog';
 import ShareDialog from './components/ShareDialog';
@@ -178,6 +179,8 @@ function App() {
   const [routeOptionsBySport, setRouteOptionsBySport] = useState(initialRouteOptions);
   const [speedBySport, setSpeedBySport] = useState(initialSpeeds);
   const [isAutoRouting, setIsAutoRouting] = useState(true);
+  // 직선 연결 구간을 부드러운 곡선으로 보정 (운동장 트랙처럼 길찾기가 안 되는 곳)
+  const [smoothStraight, setSmoothStraight] = useState(() => readStored('trazo:smoothStraight', false) === true);
   const currentSport = SPORTS[sport];
 
   // --- 코스 ---
@@ -348,6 +351,23 @@ function App() {
 
   const findRoute = (from, to, mode, signal) => fetchRoutePath(from, to, { mode, sport, options: enabledRouteOptions }, signal);
 
+  // 직선 보정이 켜져 있으면 새로 이은 직선 구간을 곡선으로 그리고, 보정한 구간 옆이 바뀌었으면 곡선을 다시 계산합니다.
+  const withSmoothing = (next, changed, mode) => {
+    if (mode === 'straight' && smoothStraight) return { ...next, polylines: smoothNewSegments(next.markers, next.polylines, changed) };
+    return { ...next, polylines: resmoothCourse(next.markers, next.polylines) };
+  };
+
+  const handleToggleSmoothStraight = (on) => {
+    setSmoothStraight(on);
+    writeStored('trazo:smoothStraight', on);
+    if (routeRequestRef.current || savingRef.current || !currentPolylines.length) return;
+    const polylines = applySmoothing(currentMarkers, currentPolylines, on);
+    if (polylines !== currentPolylines) {
+      commitCourse({ markers: currentMarkers, polylines });
+      toast(on ? '직선 구간을 부드럽게 다듬었어요.' : '다듬은 구간을 다시 직선으로 되돌렸어요.', { tone: 'success' });
+    }
+  };
+
   const addPoint = (newPoint, mode = routeMode) => {
     if (routeRequestRef.current || savingRef.current) return;
     if (!currentMarkers.length) {
@@ -361,7 +381,7 @@ function App() {
       const closesLoop = newPoint.lat === currentMarkers[0].lat && newPoint.lng === currentMarkers[0].lng;
       const markers = currentMarkers.length === 1 ? [onRoad(segment[0])] : [...currentMarkers];
       markers.push(closesLoop ? markers[0] : onRoad(segment.at(-1)));
-      return { markers, polylines: [...currentPolylines, segment] };
+      return withSmoothing({ markers, polylines: [...currentPolylines, segment] }, [currentPolylines.length], mode);
     }, () => setRouteError({
       point: newPoint,
       mode,
@@ -394,9 +414,10 @@ function App() {
       markers[index] = moved;
       if (loopEnd) { markers[0] = moved; markers[n - 1] = moved; }
       const polylines = [...currentPolylines];
-      if (incoming) polylines[index > 0 ? index - 1 : n - 2] = incoming;
-      if (outgoing) polylines[index < n - 1 ? index : 0] = outgoing;
-      return { markers, polylines };
+      const changed = [];
+      if (incoming) { changed.push(index > 0 ? index - 1 : n - 2); polylines[changed.at(-1)] = incoming; }
+      if (outgoing) { changed.push(index < n - 1 ? index : 0); polylines[changed.at(-1)] = outgoing; }
+      return withSmoothing({ markers, polylines }, changed, mode);
     }, editFailed);
   };
 
@@ -412,7 +433,7 @@ function App() {
       markers.splice(segmentIndex + 1, 0, onRoad(before.at(-1)));
       const polylines = [...currentPolylines];
       polylines.splice(segmentIndex, 1, before, after);
-      return { markers, polylines };
+      return withSmoothing({ markers, polylines }, [segmentIndex, segmentIndex + 1], mode);
     }, editFailed);
   };
 
@@ -1143,6 +1164,8 @@ function App() {
       onOutAndBack={handleOutAndBack}
       isAutoRouting={isAutoRouting}
       onToggleAutoRouting={setIsAutoRouting}
+      smoothStraight={smoothStraight}
+      onToggleSmoothStraight={handleToggleSmoothStraight}
       routeOptions={routeOptionsBySport[sport]}
       onToggleRouteOption={handleToggleRouteOption}
       onOpenHelp={() => setIsHelpOpen(true)}

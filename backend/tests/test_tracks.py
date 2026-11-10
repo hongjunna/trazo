@@ -22,7 +22,7 @@ def bounds(lat, lng, size):
 
 # Overpass 응답 모양: 트랙(geometry 포함)과 트랙을 둘러싼 시설·행정구역(bounds만)
 OVERPASS = {'elements': [
-    {'type': 'way', 'id': 1, 'tags': {'leisure': 'track', 'sport': 'running', 'name': '육상 트랙', 'lanes': '8'}, 'geometry': ring(37.5, 127.0)},
+    {'type': 'way', 'id': 1, 'tags': {'leisure': 'track', 'sport': 'running', 'name': '육상 트랙', 'lanes': '8', 'lit': 'yes', 'surface': 'tartan'}, 'geometry': ring(37.5, 127.0)},
     {'type': 'way', 'id': 2, 'tags': {'leisure': 'track', 'sport': 'athletics'}, 'geometry': ring(37.6, 127.1)},
     {'type': 'way', 'id': 3, 'tags': {'leisure': 'track', 'sport': 'running', 'name': '한강 러닝 트랙'}, 'geometry': ring(37.7, 127.2)},
     {'type': 'way', 'id': 4, 'tags': {'leisure': 'track', 'sport': 'running'}, 'geometry': ring(10.0, 10.0)},
@@ -31,7 +31,7 @@ OVERPASS = {'elements': [
         {'lat': 37.56, 'lon': 126.99}, {'lat': 37.568, 'lon': 126.99}, {'lat': 37.568, 'lon': 126.9905}, {'lat': 37.56, 'lon': 126.9905}, {'lat': 37.56, 'lon': 126.99}]},
     {'type': 'way', 'id': 6, 'tags': {'leisure': 'track', 'sport': 'running', 'name': '세운상가 공중보행로'}, 'geometry': ring(37.57, 126.99)},
     {'type': 'way', 'id': 7, 'tags': {'leisure': 'track', 'sport': 'running'}, 'geometry': ring(37.45, 127.0, 0.003)},
-    {'type': 'way', 'id': 10, 'tags': {'leisure': 'sports_centre', 'name': '반포종합운동장'}, 'bounds': bounds(37.5005, 127.001, 0.01)},
+    {'type': 'way', 'id': 10, 'tags': {'leisure': 'sports_centre', 'name': '반포종합운동장', 'operator': '서초구청', 'phone': '+82 2 2155 8711', 'opening_hours': 'Mo-Su 06:00-22:00'}, 'bounds': bounds(37.5005, 127.001, 0.01)},
     {'type': 'way', 'id': 11, 'tags': {'amenity': 'school', 'name': '어느초등학교'}, 'bounds': bounds(37.6005, 127.101, 0.01)},
     {'type': 'relation', 'id': 12, 'tags': {'boundary': 'administrative', 'admin_level': '7', 'name': '서초구'}, 'bounds': bounds(37.5, 127.0, 0.5)},
 ]}
@@ -57,6 +57,9 @@ class TrackTests(unittest.TestCase):
         self.assertEqual(parsed['way/1']['region'], '서초구')
         self.assertEqual(parsed['way/1']['lanes'], 8)
         self.assertEqual(parsed['way/3']['name'], '한강 러닝 트랙')
+        # 조명은 트랙 태그, 운영시간·운영기관·전화는 둘러싼 시설 태그에서 가져옵니다.
+        self.assertEqual(parsed['way/1']['info'], {'lit': 'yes', 'opening_hours': 'Mo-Su 06:00-22:00', 'operator': '서초구청', 'phone': '+82 2 2155 8711'})
+        self.assertEqual(parsed['way/1']['surface'], 'tartan')
 
     def test_athletics_shape_filter(self):
         oval = [tuple(p) for p in tracks.oval_path(37.5, 127.0, 30, 400)]
@@ -74,10 +77,17 @@ class TrackTests(unittest.TestCase):
             self.assertEqual(api.import_osm_tracks(session, OVERPASS)['created'], 2)
         listed = self.client.get('/admin/tracks', headers=self.admin).json()['items']
         first = next(item for item in listed if item['osm_ref'] == 'way/1')
-        self.client.put(f"/admin/tracks/{first['id']}", headers=self.admin, json={'name': '반포 트랙'})
+        self.client.put(f"/admin/tracks/{first['id']}", headers=self.admin, json={'name': '반포 트랙', 'opening_hours': '05:00-23:00', 'lanes': 6})
         with Session(api.engine) as session:
             self.assertEqual(api.import_osm_tracks(session, OVERPASS)['updated'], 2)
-        names = {item['name'] for item in self.client.get('/community/tracks').json()['items']}
+        items = self.client.get('/community/tracks').json()['items']
+        banpo = next(item for item in items if item['name'] == '반포 트랙')
+        # 직접 넣은 운영시간은 다시 가져와도 OSM 값보다 우선합니다.
+        self.assertEqual(banpo['info']['opening_hours'], '05:00-23:00')
+        self.assertEqual(banpo['info']['operator'], '서초구청')
+        self.assertEqual(banpo['lanes'], 6)
+        self.assertNotIn('lanes', banpo['info'])
+        names = {item['name'] for item in items}
         self.assertEqual(names, {'반포 트랙', '한강 러닝 트랙'})
         # OSM 트랙을 지우면 숨기기만 합니다.
         self.assertTrue(self.client.delete(f"/admin/tracks/{first['id']}", headers=self.admin).json()['hidden'])
@@ -99,3 +109,19 @@ class TrackTests(unittest.TestCase):
         self.assertEqual(updated['length_m'], 400)
         self.assertEqual(self.client.delete(f"/admin/tracks/{created['id']}", headers=self.admin).json()['hidden'], False)
         self.assertEqual(self.client.get('/community/tracks').json()['items'], [])
+
+
+class MapPathTests(unittest.TestCase):
+    def test_simplify_keeps_curves(self):
+        from backend import course_geo
+        import math
+        # 반지름 200m 반원을 1m 간격 점으로: 줄여도 곡선에서 4m 이상 벗어나지 않아야 합니다.
+        points = [(37.5 + 200 * math.sin(t / 200) / 111320, 127 + 200 * (1 - math.cos(t / 200)) / 88300, 0) for t in range(0, 629)]
+        simplified = course_geo.simplify_path(points)
+        self.assertLess(len(simplified), 80)
+        self.assertGreater(len(simplified), 6)
+        self.assertEqual(simplified[0], points[0][:2])
+        self.assertEqual(simplified[-1], points[-1][:2])
+        straight = [(37.5 + i / 111320, 127.0, 0) for i in range(1000)]
+        self.assertEqual(len(course_geo.simplify_path(straight)), 2)
+        self.assertLessEqual(len(course_geo.simplify_path(points, tolerance_m=0.001, max_points=50)), 50)
