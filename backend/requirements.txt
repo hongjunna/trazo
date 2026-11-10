@@ -30,3 +30,6 @@ xyzservices==2025.11.0
 google-auth[requests]>=2.40,<3
 cryptography>=45,<49
 CacheControl>=0.14,<1
+
+# 코스 AI 분석 작업기(insight_worker)의 OSM 장소 찾기
+osmium==4.3.2

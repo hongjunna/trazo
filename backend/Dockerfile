@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# osmium(OSM 파일 읽기, insight_worker의 장소 찾기)이 libexpat을 씁니다.
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

@@ -52,6 +52,8 @@ services:
       - REVIEWER_UID=${REVIEWER_UID:-}
       # OpenAI 플러그인 제출의 도메인 인증 토큰 (/.well-known/openai-apps-challenge)
       - OPENAI_APPS_CHALLENGE=${OPENAI_APPS_CHALLENGE:-}
+      # 코스 AI 분석의 소개 문장을 관리자 승인 없이 바로 공개 (true). 비워 두면 관리자 페이지에서 승인해야 공개됩니다.
+      - COURSE_INSIGHT_AUTO_PUBLISH=${COURSE_INSIGHT_AUTO_PUBLISH:-}
     healthcheck:
       test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
       interval: 30s
@@ -180,10 +182,48 @@ services:
     networks:
       - toporider_net
 
+  # 전체 공개 코스의 AI 분석(소개 문장·테마) 작업기 (운영 전용, deploy.sh live에서만 실행). backend/insight_worker.py 참고.
+  # 데스크톱 AI(Junlab AI Service)를 junlab-ai 네트워크로 부르고, 안 되면 Groq 무료 API로 대신합니다.
+  insight-worker:
+    build: ./backend
+    command: ['python', '-u', 'insight_worker.py']
+    profiles: ['insight-worker']
+    restart: unless-stopped
+    volumes:
+      # 경로 근처 장소를 찾을 대한민국 OSM 파일 (읽기 전용)
+      - ./data:/data:ro
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL 값을 .env에 입력해주세요}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY:-}
+      - JUNLAB_AI_BASE_URL=${JUNLAB_AI_BASE_URL:-}
+      - JUNLAB_AI_API_KEY=${JUNLAB_AI_API_KEY:-}
+      - JUNLAB_AI_MODEL=${JUNLAB_AI_MODEL:-gemma4:12b}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-}
+      - COURSE_INSIGHT_AUTO_PUBLISH=${COURSE_INSIGHT_AUTO_PUBLISH:-}
+      - COURSE_INSIGHT_DISCORD_WEBHOOK=${COURSE_INSIGHT_DISCORD_WEBHOOK:-}
+      - COURSE_INSIGHT_FALLBACK_HOURS=${COURSE_INSIGHT_FALLBACK_HOURS:-6}
+      - COURSE_INSIGHT_GROQ_DAILY_LIMIT=${COURSE_INSIGHT_GROQ_DAILY_LIMIT:-30}
+      - TZ=Asia/Seoul
+    # OSM 파일을 훑을 때 경로 주변 점만 메모리에 둡니다. 서버 메모리가 빠듯해 한도를 둡니다.
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1.0
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - toporider_net
+      - junlab-ai
+
 volumes: # 맨 아래에 추가
   postgres_data:
 
 networks:
   toporider_net:
     driver: bridge
+  # 데스크톱 AI 브릿지(~/dockers/desktop-ai)가 만든 네트워크. insight-worker만 씁니다.
+  junlab-ai:
+    external: true
 

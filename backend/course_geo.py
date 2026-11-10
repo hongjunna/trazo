@@ -16,6 +16,10 @@ NEAR_SAMPLE_MAX = 400
 # 코스 지도에 그리는 경로: 모양을 지키며 줄입니다(Douglas–Peucker). 점이 너무 많으면 허용 오차를 키웁니다.
 MAP_TOLERANCE_M = 4
 MAP_POINTS_MAX = 500
+# 앞뒤 고도가 이보다 높은데 혼자 0인 점은 빈 고도로 봅니다.
+ZERO_SPIKE_M = 15
+# 고도를 아는 점이 이 비율 이상이어야 고도 분석을 합니다 (모르는 점은 앞 점의 고도로 채웁니다).
+ELEVATION_MIN_SHARE = 0.6
 
 
 def haversine(lat1, lng1, lat2, lng2):
@@ -26,6 +30,34 @@ def haversine(lat1, lng1, lat2, lng2):
 
 def valid_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def clean_elevations(elevations: list) -> list:
+    """고도 목록에서 믿을 수 없는 값을 None(모름)으로 바꿉니다.
+    - 모두 0이면 고도 정보가 없는 코스입니다 (고도 없이 만든 파일).
+    - 높은 곳 사이에 끼어 있는 0은 원본 파일의 빈 고도가 0으로 들어간 것입니다 (예: 140m, 0, 137m).
+      바닷가처럼 앞뒤 고도가 낮은 곳의 0은 그대로 둡니다."""
+    known = [e for e in elevations if e is not None]
+    if not known or all(e == 0 for e in known):
+        return [None] * len(elevations)
+    count = len(elevations)
+    before, after = [None] * count, [None] * count
+    last = None
+    for i, e in enumerate(elevations):
+        before[i] = last
+        if e is not None and e != 0:
+            last = e
+    last = None
+    for i in range(count - 1, -1, -1):
+        after[i] = last
+        e = elevations[i]
+        if e is not None and e != 0:
+            last = e
+    cleaned = list(elevations)
+    for i, e in enumerate(elevations):
+        if e == 0 and all(n is None or n > ZERO_SPIKE_M for n in (before[i], after[i])):
+            cleaned[i] = None
+    return cleaned
 
 
 def route_points(polylines_json: str) -> list:
@@ -43,7 +75,22 @@ def route_points(polylines_json: str) -> list:
             if (isinstance(p, dict) and valid_number(p.get("lat")) and valid_number(p.get("lng"))
                     and -90 <= p["lat"] <= 90 and -180 <= p["lng"] <= 180):
                 points.append((p["lat"], p["lng"], p["ele"] if valid_number(p.get("ele")) else None))
-    return points
+    elevations = clean_elevations([p[2] for p in points])
+    return [(lat, lng, ele) for (lat, lng, _), ele in zip(points, elevations)]
+
+
+def route_totals(points: list) -> tuple:
+    """(거리 m, 누적 상승 m). 고도를 모르는 점은 앞 점의 고도로 봅니다."""
+    distance = ascent = 0.0
+    last_ele = None
+    for i, (lat, lng, ele) in enumerate(points):
+        if i:
+            distance += haversine(points[i - 1][0], points[i - 1][1], lat, lng)
+        if ele is not None:
+            if last_ele is not None and ele > last_ele:
+                ascent += ele - last_ele
+            last_ele = ele
+    return distance, ascent
 
 
 def interpolate(km_list, values, target):
@@ -128,7 +175,7 @@ def analyze_route(polylines_json: str, sport: str = "bike") -> dict:
         cumulative.append(cumulative[-1] + haversine(a[0], a[1], b[0], b[1]))
     total = cumulative[-1]
     elevations = [p[2] for p in points]
-    has_elevation = sum(e is not None for e in elevations) >= len(points) * 0.8
+    has_elevation = sum(e is not None for e in elevations) >= len(points) * ELEVATION_MIN_SHARE
     ascent = descent = 0.0
     if has_elevation:
         # 고도가 빠진 점은 앞 점의 고도로 채웁니다.

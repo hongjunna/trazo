@@ -135,6 +135,8 @@ class Course(SQLModel, table=True):
     # 커뮤니티 거리순·상승 고도순 정렬용. 경로를 저장할 때 계산해 둡니다 (course_summary와 같은 계산).
     distance_m: Optional[float] = Field(default=None)
     ascent_m: Optional[int] = Field(default=None)
+    # distance_m·ascent_m을 계산한 방식 (ROUTE_STATS_VERSION)
+    stats_version: int = Field(default=0)
 
 def utc_now() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -211,6 +213,41 @@ class Track(SQLModel, table=True):
     created_at: str = Field(default_factory=utc_now)
     updated_at: str = Field(default_factory=utc_now)
 
+# 전체 공개 코스의 분석 결과 (docs/ai-course-classification.md).
+# 규칙 결과(난이도·추천 훈련 등)는 공개·수정할 때 바로 계산하고, AI 결과(소개 문장·테마)는 insight_worker가 채웁니다.
+# 전체 공개 코스에서만 보여줍니다. 비공개로 바꾸면 지우지 않고 숨기며, 다시 공개하면 경로가 그대로일 때 그대로 보여줍니다.
+class CourseInsight(SQLModel, table=True):
+    __tablename__ = "course_insight"
+    course_id: int = Field(primary_key=True)
+    # 분석에 쓴 입력 (course_insight.input_hash). 코스가 바뀌면 규칙을 다시 계산하고 AI 분석을 다시 요청합니다.
+    input_hash: str
+    rules_version: int = Field(default=0)
+    difficulty: Optional[int] = Field(default=None, index=True)
+    # 규칙 결과: {"distance", "shape", "terrain", "training": [...], "has_elevation", "elevation_suspect"}
+    rules_json: str = Field(default="{}")
+    # AI 상태: pending(요청 대기) · queued(데스크톱 AI 큐에 넣음) · review(관리자 검토 대기) · published(공개) · rejected(반려) · failed
+    ai_status: str = Field(default="pending", index=True)
+    # AI 결과가 어떤 입력으로 만든 것인지. input_hash와 다르면 보여주지 않습니다.
+    ai_hash: Optional[str] = None
+    ai_job_id: Optional[str] = None
+    ai_requested_at: Optional[str] = None
+    ai_attempts: int = Field(default=0)
+    ai_provider: Optional[str] = None
+    ai_model: Optional[str] = None
+    prompt_version: Optional[int] = None
+    feature_ko: Optional[str] = None
+    route_ko: Optional[str] = None
+    themes_json: Optional[str] = None
+    # AI가 지적한 데이터 문제와 응답 검증 경고 (관리자 확인용)
+    issues_json: Optional[str] = None
+    # AI에게 넘긴 장소 목록 (관리자 확인용)
+    places_json: Optional[str] = None
+    # AI에게 넘긴 자료. 다시 요청하거나 대체 AI로 넘길 때 장소를 다시 찾지 않고 씁니다. 코스가 바뀌면 지웁니다.
+    ai_prompt: Optional[str] = None
+    ai_error: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    updated_at: str = Field(default_factory=utc_now)
+
 # create_all은 기존 테이블에 열을 추가하지 않으므로, 이전 버전에서 만든 course 테이블에 빠진 열을 추가합니다.
 COURSE_MIGRATIONS = {
     # 기존 코스를 처음 로그인한 계정에 자동 배정하지 않습니다.
@@ -228,6 +265,7 @@ COURSE_MIGRATIONS = {
     "display_uid": "VARCHAR(128)",
     "distance_m": "DOUBLE PRECISION",
     "ascent_m": "INTEGER",
+    "stats_version": "INTEGER NOT NULL DEFAULT 0",
 }
 
 TRACK_MIGRATIONS = {"info_json": "TEXT", "manual_info_json": "TEXT"}
@@ -246,6 +284,7 @@ async def lifespan(app: FastAPI):
             if name not in track_columns:
                 connection.execute(text(f"ALTER TABLE track ADD COLUMN {name} {definition}"))
     backfill_route_stats()
+    backfill_insights()
     yield
 
 app = FastAPI(title="Trazo API", lifespan=lifespan)
@@ -595,6 +634,9 @@ def create_course(course_data: CreateCourseRequest, session: Session = Depends(g
     session.add(new_course)
     session.commit()
     session.refresh(new_course)
+    if refresh_insight(session, new_course):
+        session.commit()
+        session.refresh(new_course)
     return {"status": "success", "course_id": new_course.id, "title": new_course.title, "course": new_course}
 
 @app.get("/courses")
@@ -630,6 +672,7 @@ def update_course(course_id: int, course_data: UpdateCourseRequest, session: Ses
         course.folder_id = check_folder(session, course_data.folder_id, user_id)
 
     session.add(course)
+    refresh_insight(session, course)
     session.commit()
     session.refresh(course)
     return {"status": "success", "course": course}
@@ -763,18 +806,10 @@ COMMENT_MAX = 500
 PREVIEW_POINTS = 80
 
 def course_summary(course: Course) -> dict:
-    """커뮤니티 목록에 쓰는 거리·상승 고도와, 미리보기용으로 줄인 경로"""
-    try:
-        points = [p for segment in json.loads(course.polylines_json) for p in segment
-                  if isinstance(p, dict) and isinstance(p.get("lat"), (int, float)) and isinstance(p.get("lng"), (int, float))]
-    except (ValueError, TypeError):
-        points = []
-    distance = ascent = 0.0
-    for a, b in zip(points, points[1:]):
-        distance += haversine_distance(a["lat"], a["lng"], b["lat"], b["lng"])
-        climb = (b.get("ele") or 0) - (a.get("ele") or 0)
-        if climb > 0:
-            ascent += climb
+    """커뮤니티 목록에 쓰는 거리·상승 고도와, 미리보기용으로 줄인 경로.
+    고도는 course_geo가 걸러낸 값(빈 고도가 0으로 들어간 점 제외)으로 계산합니다."""
+    points = course_geo.route_points(course.polylines_json)
+    distance, ascent = course_geo.route_totals(points)
     step = max(1, len(points) // PREVIEW_POINTS)
     sampled = points[::step]
     if points and sampled[-1] is not points[-1]:
@@ -782,25 +817,101 @@ def course_summary(course: Course) -> dict:
     return {
         "distance_km": round(distance / 1000, 2),
         "ascent_m": round(ascent),
-        "preview": [{"lat": round(p["lat"], 5), "lng": round(p["lng"], 5)} for p in sampled],
+        "preview": [{"lat": round(p[0], 5), "lng": round(p[1], 5)} for p in sampled],
     }
+
+# 거리·상승 고도 계산 방식이 바뀌면 올립니다. 시작할 때 이전 방식으로 저장된 코스를 다시 계산합니다.
+# 2: 빈 고도가 0으로 들어간 점과 고도가 모두 0인 코스를 상승 고도에서 뺌
+ROUTE_STATS_VERSION = 2
 
 def update_route_stats(course: Course) -> None:
     summary = course_summary(course)
     course.distance_m = round(summary["distance_km"] * 1000, 1)
     course.ascent_m = summary["ascent_m"]
+    course.stats_version = ROUTE_STATS_VERSION
 
 def backfill_route_stats() -> None:
-    """거리·상승 고도 열이 생기기 전에 저장된 코스를 채웁니다."""
+    """거리·상승 고도가 없거나 이전 방식으로 계산된 코스를 다시 계산합니다."""
     with Session(engine) as session:
         while True:
-            courses = session.exec(select(Course).where(Course.distance_m == None).limit(200)).all()
+            courses = session.exec(select(Course).where(
+                or_(Course.distance_m == None, Course.stats_version < ROUTE_STATS_VERSION)).limit(200)).all()
             if not courses:
                 break
             for course in courses:
                 update_route_stats(course)
                 session.add(course)
             session.commit()
+
+# --- 코스 분석 (난이도·추천 훈련·AI 소개) ---
+
+def refresh_insight(session: Session, course: Course) -> Optional[CourseInsight]:
+    """전체 공개 코스의 규칙 분석을 최신으로 맞춥니다. 입력이 바뀌었으면 AI 분석을 다시 요청합니다 (insight_worker가 처리).
+    호출한 쪽에서 commit합니다."""
+    if course.id is None or course.is_deleted or course.visibility != "public":
+        return None
+    digest = course_insight.input_hash(course)
+    insight = session.get(CourseInsight, course.id)
+    if insight and insight.input_hash == digest and insight.rules_version == course_insight.RULES_VERSION:
+        return insight
+    analysis = course_geo.analyze_route(course.polylines_json, course.sport)
+    rules = course_insight.rule_insight(analysis, course.sport)
+    if not insight:
+        insight = CourseInsight(course_id=course.id, input_hash=digest)
+    insight.input_hash = digest
+    insight.rules_version = course_insight.RULES_VERSION
+    insight.difficulty = rules["difficulty"]
+    insight.rules_json = json.dumps({k: v for k, v in rules.items() if k != "difficulty"}, ensure_ascii=False)
+    if insight.ai_hash != digest:
+        # 예전 입력으로 만든 AI 결과는 보여주지 않고(ai_hash 비교), 새 입력으로 다시 요청합니다.
+        insight.ai_status = "pending" if analysis["distance_km"] > 0 else "failed"
+        insight.ai_job_id = None
+        insight.ai_attempts = 0
+        insight.ai_error = None
+        insight.ai_prompt = None
+    insight.updated_at = utc_now()
+    session.add(insight)
+    return insight
+
+def backfill_insights() -> None:
+    """분석이 없거나 이전 규칙으로 계산된 전체 공개 코스를 계산합니다."""
+    with Session(engine) as session:
+        stale = select(Course).join(CourseInsight, CourseInsight.course_id == Course.id, isouter=True).where(
+            Course.is_deleted == False, Course.visibility == "public",
+            or_(CourseInsight.course_id == None, CourseInsight.rules_version < course_insight.RULES_VERSION))
+        while True:
+            courses = session.exec(stale.limit(100)).all()
+            if not courses:
+                break
+            for course in courses:
+                refresh_insight(session, course)
+            session.commit()
+
+def insight_view(insight: Optional[CourseInsight]) -> Optional[dict]:
+    """화면·AI 연동에 보여줄 분석 결과. AI 소개 문장과 테마는 관리자가 승인했고 지금 경로로 만든 것만 넣습니다.
+    전체 공개 코스에만 쓰세요."""
+    if not insight:
+        return None
+    try:
+        rules = json.loads(insight.rules_json or "{}")
+    except ValueError:
+        rules = {}
+    view = {"difficulty": insight.difficulty, "distance": rules.get("distance"), "shape": rules.get("shape"),
+            "terrain": rules.get("terrain"), "training": rules.get("training") or [],
+            "has_elevation": bool(rules.get("has_elevation")), "elevation_suspect": bool(rules.get("elevation_suspect")),
+            "themes": [], "feature": None, "route": None}
+    if insight.ai_status == "published" and insight.ai_hash == insight.input_hash:
+        try:
+            themes = json.loads(insight.themes_json or "[]")
+        except ValueError:
+            themes = []
+        view.update(themes=themes, feature=insight.feature_ko, route=insight.route_ko)
+    return view
+
+def load_insights(session: Session, course_ids: list) -> dict:
+    if not course_ids:
+        return {}
+    return {insight.course_id: insight for insight in session.exec(select(CourseInsight).where(CourseInsight.course_id.in_(course_ids))).all()}
 
 def get_shared_course(session: Session, token: str, public_only: bool = False) -> Course:
     course = session.exec(select(Course).where(Course.share_token == token)).first()
@@ -848,6 +959,8 @@ def read_shared_course(token: str, session: Session = Depends(get_session), user
         "liked": is_public and has_liked(session, course.id, user_id),
         "created_at": course.created_at,
         "published_at": course.published_at,
+        # 코스 분석(난이도·추천 훈련·AI 소개)은 전체 공개 코스에서만 보여줍니다.
+        "insight": insight_view(session.get(CourseInsight, course.id)) if is_public else None,
     }
 
 # --- 링크 미리보기 (카카오톡·페이스북 등) ---
@@ -1096,6 +1209,8 @@ def read_community(
     sport: Optional[Sport] = None,
     sort: Literal["recent", "popular", "likes", "distance_desc", "distance_asc", "ascent_desc", "ascent_asc"] = "recent",
     q: str = "",
+    difficulty: Optional[int] = Query(default=None, ge=1, le=5),
+    tag: Optional[str] = Query(default=None, max_length=32),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=50),
     session: Session = Depends(get_session),
@@ -1104,12 +1219,22 @@ def read_community(
     like_count = select(func.count()).select_from(CourseLike).where(CourseLike.course_id == Course.id).correlate(Course).scalar_subquery()
     comment_count = select(func.count()).select_from(CourseComment).where(CourseComment.course_id == Course.id).correlate(Course).scalar_subquery()
     statement = (
-        select(Course, UserProfile.nickname, like_count.label("like_count"), comment_count.label("comment_count"))
+        select(Course, UserProfile.nickname, like_count.label("like_count"), comment_count.label("comment_count"), CourseInsight)
         .join(UserProfile, AUTHOR_JOIN, isouter=True)
+        .join(CourseInsight, CourseInsight.course_id == Course.id, isouter=True)
         .where(Course.is_deleted == False, Course.visibility == "public")
     )
     if sport:
         statement = statement.where(Course.sport == sport)
+    if difficulty:
+        statement = statement.where(CourseInsight.difficulty == difficulty)
+    if tag:
+        if tag not in course_insight.FILTER_TAGS:
+            raise HTTPException(status_code=422, detail="Unknown tag")
+        # 태그는 정해 둔 목록의 영문 소문자라 LIKE 패턴에 그대로 넣어도 안전합니다.
+        quoted = f'%"{tag}"%'
+        approved = (CourseInsight.ai_status == "published") & (CourseInsight.ai_hash == CourseInsight.input_hash)
+        statement = statement.where(or_(CourseInsight.rules_json.like(quoted), approved & CourseInsight.themes_json.like(quoted)))
     keyword = q.strip()[:50]
     if keyword:
         pattern = f"%{escape_like(keyword)}%"
@@ -1140,8 +1265,9 @@ def read_community(
         "comment_count": comments,
         "liked": course.id in liked,
         "published_at": course.published_at,
+        "insight": insight_view(insight),
         **course_summary(course),
-    } for course, nickname, likes, comments in page]
+    } for course, nickname, likes, comments, insight in page]
     return {"items": items, "has_more": len(rows) > limit}
 
 # Docker 헬스체크: DB까지 응답하는지 확인합니다.
@@ -1415,6 +1541,96 @@ def admin_course_detail(course_id: int, session: Session = Depends(get_session))
         **course_summary(course),
     }
 
+# --- 6-5. 관리자: 코스 분석 검토 ---
+# AI가 만든 소개 문장·테마는 처음에는 관리자가 승인해야 공개됩니다 (COURSE_INSIGHT_AUTO_PUBLISH=true면 바로 공개).
+
+INSIGHT_STATUSES = ("pending", "queued", "review", "published", "rejected", "failed")
+INSIGHT_AUTO_PUBLISH = os.getenv("COURSE_INSIGHT_AUTO_PUBLISH", "").strip().lower() == "true"
+
+def load_json(raw: Optional[str], default):
+    try:
+        return json.loads(raw) if raw else default
+    except ValueError:
+        return default
+
+def admin_insight_json(insight: CourseInsight, course: Course) -> dict:
+    return {
+        "course_id": course.id, "title": course.title, "sport": course.sport, "visibility": course.visibility,
+        "share_token": course.share_token, "distance_km": round((course.distance_m or 0) / 1000, 2), "ascent_m": course.ascent_m,
+        "difficulty": insight.difficulty, "rules": load_json(insight.rules_json, {}),
+        "ai_status": insight.ai_status, "ai_current": insight.ai_hash == insight.input_hash,
+        "ai_provider": insight.ai_provider, "ai_model": insight.ai_model, "ai_attempts": insight.ai_attempts, "ai_error": insight.ai_error,
+        "feature_ko": insight.feature_ko, "route_ko": insight.route_ko, "themes": load_json(insight.themes_json, []),
+        "issues": load_json(insight.issues_json, []), "places": load_json(insight.places_json, []),
+        "reviewed_at": insight.reviewed_at, "updated_at": insight.updated_at,
+    }
+
+@app.get("/admin/insights", dependencies=[Depends(require_admin)])
+def admin_insights(
+    status: Optional[Literal["pending", "queued", "review", "published", "rejected", "failed"]] = "review",
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=30, ge=1, le=100),
+    session: Session = Depends(get_session),
+):
+    base = select(CourseInsight, Course).join(Course, Course.id == CourseInsight.course_id).where(
+        Course.is_deleted == False, Course.visibility == "public")
+    counts = dict(session.exec(select(CourseInsight.ai_status, func.count()).join(Course, Course.id == CourseInsight.course_id).where(
+        Course.is_deleted == False, Course.visibility == "public").group_by(CourseInsight.ai_status)).all())
+    statement = base.where(CourseInsight.ai_status == status) if status else base
+    total = session.exec(select(func.count()).select_from(statement.subquery())).one()
+    rows = session.exec(statement.order_by(CourseInsight.updated_at.desc()).offset(offset).limit(limit)).all()
+    return {"counts": {name: counts.get(name, 0) for name in INSIGHT_STATUSES}, "total": total,
+            "auto_publish": INSIGHT_AUTO_PUBLISH,
+            "items": [admin_insight_json(insight, course) for insight, course in rows]}
+
+class InsightReviewRequest(BaseModel):
+    action: Literal["approve", "reject", "save"]
+    feature_ko: Optional[str] = PydanticField(default=None, max_length=course_insight.FEATURE_MAX)
+    route_ko: Optional[str] = PydanticField(default=None, max_length=course_insight.ROUTE_MAX)
+    themes: Optional[List[str]] = None
+
+def get_admin_insight(session: Session, course_id: int) -> tuple[CourseInsight, Course]:
+    insight, course = session.get(CourseInsight, course_id), session.get(Course, course_id)
+    if not insight or not course:
+        raise HTTPException(status_code=404, detail="Insight not found")
+    return insight, course
+
+@app.put("/admin/insights/{course_id}", dependencies=[Depends(require_admin)])
+def admin_review_insight(course_id: int, data: InsightReviewRequest, session: Session = Depends(get_session)):
+    insight, course = get_admin_insight(session, course_id)
+    if data.feature_ko is not None:
+        insight.feature_ko = data.feature_ko.strip() or None
+    if data.route_ko is not None:
+        insight.route_ko = data.route_ko.strip() or None
+    if data.themes is not None:
+        insight.themes_json = json.dumps([t for t in dict.fromkeys(data.themes) if t in course_insight.THEMES])
+    if data.action == "approve":
+        if not insight.feature_ko or not insight.route_ko or insight.ai_hash != insight.input_hash:
+            raise HTTPException(status_code=409, detail="지금 경로로 만든 소개 문장이 없어 승인할 수 없습니다. 다시 분석하세요.")
+        insight.ai_status = "published"
+        insight.reviewed_at = utc_now()
+    elif data.action == "reject":
+        insight.ai_status = "rejected"
+        insight.reviewed_at = utc_now()
+    insight.updated_at = utc_now()
+    session.add(insight)
+    session.commit()
+    return admin_insight_json(insight, course)
+
+@app.post("/admin/insights/{course_id}/rerun", dependencies=[Depends(require_admin)])
+def admin_rerun_insight(course_id: int, session: Session = Depends(get_session)):
+    insight, course = get_admin_insight(session, course_id)
+    insight.ai_status = "pending"
+    insight.ai_hash = None
+    insight.ai_job_id = None
+    insight.ai_attempts = 0
+    insight.ai_error = None
+    insight.ai_prompt = None
+    insight.updated_at = utc_now()
+    session.add(insight)
+    session.commit()
+    return admin_insight_json(insight, course)
+
 @app.get("/route")
 async def get_route(
     point: List[str] = Query(...), 
@@ -1625,10 +1841,12 @@ from pydantic import ConfigDict, model_validator
 from starlette.concurrency import run_in_threadpool
 try:
     from . import course_geo
+    from . import course_insight
     from . import tracks as track_data
     from .mcp_protocol import McpServer, Tool, ToolError, PARSE_ERROR, INVALID_REQUEST, error_response
 except ImportError:
     import course_geo
+    import course_insight
     import tracks as track_data
     from mcp_protocol import McpServer, Tool, ToolError, PARSE_ERROR, INVALID_REQUEST, error_response
 
@@ -2154,7 +2372,20 @@ def light_analyses(session: Session, rows: list) -> dict:
 def course_url(course: Course) -> Optional[str]:
     return f"{PUBLIC_BASE_URL}/c/{course.share_token}" if course.visibility != "private" and course.share_token else None
 
-def course_card(course: Course, uid: str, analysis: dict, nickname: Optional[str], like_count: int, folders: dict) -> dict:
+def mcp_insight(insight: Optional[CourseInsight], full: bool = False) -> Optional[dict]:
+    """AI 연동에 넘기는 코스 분석. difficulty 1(입문)~5(매우 어려움), 훈련·테마는 영문 태그."""
+    view = insight_view(insight)
+    if not view:
+        return None
+    result = {"difficulty": view["difficulty"], "difficulty_label": course_insight.LEVEL_LABELS.get(view["difficulty"]),
+              "terrain": view["terrain"], "recommended_training": view["training"], "themes": view["themes"]}
+    if full:
+        result.update(feature=view["feature"], route_guide=view["route"],
+                      elevation_reliable=view["has_elevation"] and not view["elevation_suspect"])
+    return result
+
+def course_card(course: Course, uid: str, analysis: dict, nickname: Optional[str], like_count: int, folders: dict,
+                insight: Optional[CourseInsight] = None) -> dict:
     mine = course.firebase_uid == uid
     card = {
         # get_course에 넘기는 값: 내 코스는 번호, 다른 사람 코스는 공유 토큰
@@ -2178,6 +2409,8 @@ def course_card(course: Course, uid: str, analysis: dict, nickname: Optional[str
         card["folder"] = folders.get(course.folder_id)
     if course.visibility == "public":
         card.update(like_count=like_count, copy_count=course.share_count, published_at=course.published_at)
+        if insight:
+            card["insight"] = mcp_insight(insight)
     return card
 
 def add_areas(cards: list):
@@ -2212,6 +2445,15 @@ class SearchCoursesArgs(BaseModel):
     max_ascent_m: Optional[int] = PydanticField(default=None, ge=0, description="최대 누적 상승 고도(m). 평지 코스를 찾을 때")
     route_type: Optional[Literal["loop", "out_and_back", "point_to_point"]] = PydanticField(
         default=None, description="loop: 출발점으로 돌아오는 순환 코스, out_and_back: 같은 길 왕복, point_to_point: 편도")
+    min_difficulty: Optional[int] = PydanticField(default=None, ge=1, le=5, description="최소 난이도 (1 입문 · 2 쉬움 · 3 보통 · 4 어려움 · 5 매우 어려움). 전체 공개 코스에만 있습니다.")
+    max_difficulty: Optional[int] = PydanticField(default=None, ge=1, le=5, description="최대 난이도")
+    training: Optional[Literal["interval", "tempo", "hill_repeat", "lsd", "recovery", "race_pace",
+                               "hill_climb", "endurance", "recovery_ride", "steady_pace"]] = PydanticField(
+        default=None, description="추천 훈련. 러닝: interval·tempo·hill_repeat(언덕 반복)·lsd·recovery(회복)·race_pace, "
+                                  "자전거: hill_climb(업힐)·endurance(장거리)·recovery_ride·steady_pace(페이스 유지). 전체 공개 코스에만 있습니다.")
+    theme: Optional[Literal["riverside", "park", "lake", "coast", "mountain_forest", "urban", "night_view", "seasonal",
+                            "track", "race_course", "commute"]] = PydanticField(
+        default=None, description="테마 (강변·공원·호수·해안·산숲·도심·야경·계절·트랙·대회 코스·출퇴근). 검토를 마친 전체 공개 코스에만 있습니다.")
     sort: Optional[Literal["nearest", "recent", "popular", "distance_asc", "distance_desc", "ascent_desc"]] = PydanticField(
         default=None, description="정렬. 기본값은 위치를 주면 nearest(가까운 순), 아니면 recent(최근 순). popular는 담기·좋아요 많은 순")
     limit: int = PydanticField(default=10, ge=1, le=30, description="최대 결과 수")
@@ -2245,9 +2487,24 @@ def search_courses_tool(ctx: McpContext, args: SearchCoursesArgs) -> dict:
         statement = statement.where(or_(*conditions))
     rows = ctx.session.exec(statement.order_by(Course.id.desc()).limit(MCP_SEARCH_CANDIDATES)).all()
     analyses = light_analyses(ctx.session, [(course, route_size) for course, _, _, route_size in rows])
+    insights = load_insights(ctx.session, [course.id for course, _, _, _ in rows if course.visibility == "public"])
+    wants_insight = any(value is not None for value in (args.min_difficulty, args.max_difficulty, args.training, args.theme))
     matches = []
     for course, nickname, likes, _ in rows:
         analysis = analyses[course.id]
+        insight = insights.get(course.id)
+        if wants_insight:
+            view = insight_view(insight)
+            if not view or view["difficulty"] is None:
+                continue
+            if args.min_difficulty is not None and view["difficulty"] < args.min_difficulty:
+                continue
+            if args.max_difficulty is not None and view["difficulty"] > args.max_difficulty:
+                continue
+            if args.training and args.training not in view["training"]:
+                continue
+            if args.theme and args.theme not in view["themes"]:
+                continue
         if analysis["distance_km"] <= 0:
             continue
         if args.min_distance_km is not None and analysis["distance_km"] < args.min_distance_km:
@@ -2280,7 +2537,7 @@ def search_courses_tool(ctx: McpContext, args: SearchCoursesArgs) -> dict:
     matches.sort(key=order)
     cards = []
     for course, nickname, likes, analysis, gap in matches[:args.limit]:
-        card = course_card(course, ctx.uid, analysis, nickname, likes, folders)
+        card = course_card(course, ctx.uid, analysis, nickname, likes, folders, insights.get(course.id))
         if gap is not None:
             card["distance_from_point_km"] = round(gap / 1000, 2)
         cards.append(card)
@@ -2332,6 +2589,9 @@ def get_course_tool(ctx: McpContext, args: GetCourseArgs) -> dict:
     )
     if is_public:
         detail["comment_count"] = count_rows(ctx.session, CourseComment, course.id)
+        insight = mcp_insight(ctx.session.get(CourseInsight, course.id), full=True)
+        if insight:
+            detail["insight"] = insight
     add_areas([detail])
     if KAKAO_REST_API_KEY and route:
         # 경로를 따라 지나는 동네 (출발점부터 순서대로, 중복 제외)
