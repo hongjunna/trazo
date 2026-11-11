@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  .route { left: 80px; top: 700px; width: 920px; height: 560px; background-image: url(editor.png); background-size: 2410px 1506px; background-position: -1045px -195px; }
+  .feature { display: flex; gap: 22px; align-items: flex-start; margin-top: 30px; font-size: 32px; line-height: 1.45; font-weight: 600; }
+  .feature b { flex: none; width: 52px; height: 52px; border-radius: 16px; background: #8FCE3A; color: #0B4F57; display: grid; place-items: center; font-size: 26px; }
+  .cta-url { margin-top: 44px; display: inline-block; font-size: 44px; font-weight: 800; background: #fff; color: #0B4F57; padding: 22px 34px; border-radius: 24px; }
+</style></head><body>
+
+<!-- 1. 표지 -->
+<section class="s dark" id="s1">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">1/7</span>
+  <div style="margin-top:96px"><span class="eyebrow">자전거 · 러닝 코스 플래너</span></div>
+  <h1>지도에 점을 찍으면<br><em>나만의 코스</em>가<br>됩니다</h1>
+  <div class="crop route"></div>
+  <span class="label lime" style="left:110px; top:672px;">한양도성 러닝코스 · 19.9km</span>
+</section>
+
+<!-- 2. 코스 만들기 -->
+<section class="s" id="s2">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">2/7</span>
+  <div style="margin-top:80px"><span class="eyebrow">코스 만들기</span></div>
+  <h2>점만 찍으면<br><em>종목에 맞는 길</em>로 이어요</h2>
+  <p class="lead">자전거는 자전거길로, 러닝은 공원·산책로로.<br>큰 차도·계단·오르막 피하기도 켜고 끌 수 있어요.</p>
+  <div class="crop" style="left:80px; top:690px; width:500px; height:560px; background-image:url(editor.png); background-size:1800px 1125px; background-position:-12px -555px;"></div>
+  <div class="crop" style="left:610px; top:690px; width:390px; height:560px; background-image:url(editor.png); background-size:2160px 1350px; background-position:-1080px -230px;"></div>
+</section>
+
+<!-- 3. 고도 -->
+<section class="s dark" id="s3">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">3/7</span>
+  <div style="margin-top:80px"><span class="eyebrow">고도 미리 보기</span></div>
+  <h2>오르막까지<br><em>미리 알고</em> 출발</h2>
+  <p class="lead">거리·상승 고도·예상 시간을 바로 보여주고,<br>경사 구간은 색으로 나눠 보여줘요.</p>
+  <div class="crop" style="left:80px; top:740px; width:520px; height:236px; background-image:url(editor.png); background-size:2215px 1384px; background-position:-25px -197px;"></div>
+  <div class="crop" style="left:80px; top:1030px; width:920px; height:206px; background-image:url(editor.png); background-size:1252px 782px; background-position:-326px -576px;"></div>
+  <span class="label lime" style="left:640px; top:800px;">최고 324m · 상승 905m</span>
+</section>
+
+<!-- 4. 내보내기·공유 -->
+<section class="s" id="s4">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">4/7</span>
+  <div style="margin-top:80px"><span class="eyebrow">내보내기 · 공유</span></div>
+  <h2>만든 코스는<br><em>기기로, 친구에게</em></h2>
+  <div class="chips"><span class="chip">GPX</span><span class="chip">FIT</span><span class="chip">TCX</span><span class="chip">KML</span><span class="chip">GeoJSON</span></div>
+  <p class="lead" style="font-size:30px">가민·와후·스트라바에 바로 넣고, 링크 하나로 공유해요.<br>받는 사람은 로그인 없이 볼 수 있어요.</p>
+  <div class="crop" style="left:80px; top:810px; width:920px; height:460px; background-image:url(course.png); background-size:1152px 720px; background-position:-120px -170px;"></div>
+</section>
+
+<!-- 5. 커뮤니티 -->
+<section class="s dark" id="s5">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">5/7</span>
+  <div style="margin-top:80px"><span class="eyebrow">커뮤니티 · 코스 지도</span></div>
+  <h2>우리 동네<br><em>인기 코스</em>를<br>한눈에</h2>
+  <p class="lead" style="width:470px; font-size:30px">다른 러너·라이더가 공개한 코스를 지도에서 보고, 마음에 들면 내 코스에 담아 바로 내려받아요.</p>
+  <div class="phone" style="left:580px; top:330px;"><img src="m_community.png" alt=""></div>
+  <div class="crop" style="left:80px; top:960px; width:460px; height:300px; background-image:url(explore.png); background-size:1440px 900px; background-position:-760px -150px;"></div>
+</section>
+
+<!-- 6. 훈련 -->
+<section class="s" id="s6">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">6/7</span>
+  <div style="margin-top:80px"><span class="eyebrow">훈련 도구</span></div>
+  <h2>코스에서<br><em>훈련</em>까지</h2>
+  <div style="width:470px">
+    <div class="feature"><b>1</b><span>러닝 페이스 계산기<br><small style="font-size:26px; color:#536269; font-weight:500">목표 기록으로 페이스·구간 기록</small></span></div>
+    <div class="feature"><b>2</b><span>400m 트랙 한 바퀴 기록<br><small style="font-size:26px; color:#536269; font-weight:500">인터벌·템포런 목표 확인</small></span></div>
+    <div class="feature"><b>3</b><span>전국 육상 트랙 지도<br><small style="font-size:26px; color:#536269; font-weight:500">한 바퀴 거리·레인·노면</small></span></div>
+  </div>
+  <div class="phone" style="left:590px; top:330px;"><img src="m_utility.png" alt=""></div>
+</section>
+
+<!-- 7. 시작하기 -->
+<section class="s dark" id="s7">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">7/7</span>
+  <div style="margin-top:220px; text-align:center">
+    <img src="logo.svg" alt="" style="width:220px; height:220px; border-radius:52px; box-shadow:0 30px 70px rgba(0,0,0,0.3)">
+    <h1 style="margin-top:56px">지금 <em>무료</em>로<br>시작하세요</h1>
+    <p class="lead">설치 없이 브라우저에서 바로.<br>둘러보기·만들기·내려받기는 로그인도 필요 없어요.</p>
+    <span class="cta-url">trazo.runvia.app</span>
+    <p class="lead" style="font-size:28px; margin-top:28px">프로필 링크에서 바로 열 수 있어요</p>
+  </div>
+</section>
+</body></html>

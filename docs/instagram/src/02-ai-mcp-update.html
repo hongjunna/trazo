@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  .chat { position: absolute; left: 80px; right: 80px; background: #fff; color: #15262C; border-radius: 36px; padding: 40px; box-shadow: 0 30px 70px rgba(8,40,46,0.25); }
+  .msg-user { margin-left: auto; width: fit-content; max-width: 78%; background: #0B4F57; color: #fff; font-size: 30px; line-height: 1.45; font-weight: 600; padding: 22px 28px; border-radius: 28px 28px 8px 28px; }
+  .tool { display: flex; align-items: center; gap: 14px; margin-top: 22px; font-size: 24px; color: #536269; }
+  .tool code { font-family: ui-monospace, Menlo, monospace; font-size: 23px; font-weight: 700; color: #0B4F57; background: #E6F0F1; padding: 6px 12px; border-radius: 10px; }
+  .tool .dot { width: 34px; height: 34px; border-radius: 10px; background: url(logo.svg) center/cover; flex: none; }
+  .msg-ai { margin-top: 24px; font-size: 29px; line-height: 1.6; }
+  .course { margin-top: 18px; border: 2px solid #E2E7E9; border-radius: 22px; padding: 20px 24px; }
+  .course strong { display: block; font-size: 29px; }
+  .course span { font-size: 25px; color: #536269; }
+  .course .tag { display: inline-block; margin-right: 8px; font-size: 22px; font-weight: 800; color: #fff; background: #F07B3F; padding: 3px 12px; border-radius: 999px; vertical-align: 3px; }
+  .note { position: absolute; left: 80px; bottom: 72px; font-size: 24px; color: #869399; }
+  .dark .note { color: rgba(255,255,255,0.55); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 44px; }
+  .card { background: #fff; border: 2px solid #E2E7E9; border-radius: 28px; padding: 30px 30px 30px; display: flex; flex-direction: column; min-height: 248px; }
+  .card h3 { font-size: 32px; letter-spacing: -0.02em; }
+  .card p { margin-top: 10px; font-size: 25px; line-height: 1.5; color: #536269; }
+  .card q { display: block; margin-top: auto; font-size: 24px; font-weight: 700; color: #0B4F57; background: #E6F0F1; padding: 10px 16px; border-radius: 14px; quotes: '“' '”'; }
+  .steps { margin-top: 64px; display: grid; gap: 46px; }
+  .step { display: flex; gap: 26px; align-items: flex-start; }
+  .step b { flex: none; width: 64px; height: 64px; border-radius: 20px; background: #8FCE3A; color: #0B4F57; display: grid; place-items: center; font-size: 32px; }
+  .step div { font-size: 36px; font-weight: 700; line-height: 1.4; padding-top: 8px; }
+  .step small { display: block; margin-top: 6px; font-size: 25px; font-weight: 500; color: rgba(255,255,255,0.72); line-height: 1.5; }
+  .url { display: inline-block; margin-top: 12px; font-family: ui-monospace, Menlo, monospace; font-size: 30px; font-weight: 800; color: #0B4F57; background: #fff; padding: 12px 20px; border-radius: 14px; }
+  .safe { margin-top: 56px; display: grid; gap: 24px; }
+  .safe div { display: flex; gap: 24px; align-items: center; background: #fff; border: 2px solid #E2E7E9; border-radius: 26px; padding: 30px 32px; font-size: 32px; font-weight: 700; }
+  .safe i { flex: none; width: 60px; height: 60px; border-radius: 50%; background: #8FCE3A url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%230B4F57' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/34px no-repeat; }
+  .safe small { display: block; margin-top: 6px; font-size: 25px; font-weight: 500; color: #536269; }
+  .cta-url { margin-top: 44px; display: inline-block; font-size: 42px; font-weight: 800; background: #fff; color: #0B4F57; padding: 22px 34px; border-radius: 24px; }
+  .ai-logos { display: flex; justify-content: center; gap: 16px; margin-top: 36px; }
+</style></head><body>
+
+<!-- 1. 표지 -->
+<section class="s dark" id="m1">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">1/6</span>
+  <div style="margin-top:84px"><span class="eyebrow">NEW · AI 연동 업데이트</span></div>
+  <h1 style="font-size:74px">“한강에서 뛸<br>코스 추천해줘”</h1>
+  <p class="lead">이제 <b style="color:#fff">ChatGPT·Claude</b>가 Trazo의<br><em style="font-weight:800">실제 코스 데이터</em>로 답해요.</p>
+  <div class="chat" style="top:690px;">
+    <div class="msg-user">이번 주말 한강에서 뛸 10km 평지 코스 있어?</div>
+    <div class="tool"><span class="dot"></span>Trazo에서 코스를 찾는 중 <code>search_courses</code></div>
+    <div class="msg-ai">한강을 따라가는 공개 코스 중에서 골랐어요.</div>
+    <div class="course"><strong><span class="tag">러닝</span>[한강 10km] 여의나루-마곡선착장</strong><span>10.0km · 상승 46m · 거의 평지예요</span></div>
+    <div class="course"><strong><span class="tag">러닝</span>[한강 8km] 동작역-당산역</strong><span>8.1km · 상승 92m · 조금 더 짧게 뛰고 싶다면</span></div>
+  </div>
+</section>
+
+<!-- 2. 대화 예시 -->
+<section class="s" id="m2">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">2/6</span>
+  <div style="margin-top:72px"><span class="eyebrow">이렇게 물어보세요</span></div>
+  <h2 style="font-size:58px">추측이 아니라<br><em>진짜 거리·고도</em>로 답해요</h2>
+  <div class="chat" style="top:560px;">
+    <div class="msg-user">동작역 근처에서 출발하는 5km 러닝 코스 비교해줘</div>
+    <div class="tool"><span class="dot"></span><code>find_place</code> 동작역 → <code>search_courses</code> 러닝 · 4~6km</div>
+    <div class="msg-ai">동작역 근처에서 출발하는 5km 코스 3개를 찾았어요.</div>
+    <div class="course"><strong><span class="tag">러닝</span>[한강 5km] 동작역 출발</strong><span>5.0km · 상승 44m · 셋 중 가장 평탄해요</span></div>
+    <div class="course"><strong><span class="tag">러닝</span>[한강 5km] 동작역-샛강역</strong><span>5.0km · 상승 61m</span></div>
+    <div class="course"><strong><span class="tag">러닝</span>[한강 5km] 동작역-여의나루역</strong><span>5.0km · 상승 66m</span></div>
+  </div>
+  <p class="note">대화 예시예요. 실제 답변 문장은 AI에 따라 달라요.</p>
+</section>
+
+<!-- 3. 할 수 있는 일 -->
+<section class="s" id="m3">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">3/6</span>
+  <div style="margin-top:72px"><span class="eyebrow">AI와 함께 할 수 있는 일</span></div>
+  <h2 style="font-size:58px">코스 고민은<br><em>AI에게</em> 물어보세요</h2>
+  <div class="grid">
+    <div class="card"><h3>오늘의 코스 추천</h3><p>거리·순환 여부·오르막 정도로 골라 줘요.</p><q>오늘 저녁 5km 코스 추천해줘</q></div>
+    <div class="card"><h3>장소로 코스 찾기</h3><p>장소 근처를 지나는 코스를 찾아요.</p><q>한강에서 뛸 평지 코스</q></div>
+    <div class="card"><h3>훈련 궁합 보기</h3><p>오르막과 경사로 인터벌·템포런·LSD에 맞는지 알려줘요.</p><q>이 코스로 템포런 어때?</q></div>
+    <div class="card"><h3>라이딩 계획</h3><p>상승 고도와 주요 업힐로 난이도를 따져요.</p><q>여의도 출발 40km 코스</q></div>
+    <div class="card"><h3>공유 링크 분석</h3><p>친구가 보낸 코스의 고도·난이도를 정리해요.</p><q>이 코스 초보도 괜찮아?</q></div>
+    <div class="card"><h3>내 코스 정리</h3><p>저장한 코스를 거리·지역별로 비교해요.</p><q>10km 넘는 순환 코스 비교</q></div>
+  </div>
+</section>
+
+<!-- 4. 연결 방법 -->
+<section class="s dark" id="m4">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">4/6</span>
+  <div style="margin-top:72px"><span class="eyebrow">2분이면 연결 끝</span></div>
+  <h2 style="font-size:58px">앱 설치도, API 키도<br><em>필요 없어요</em></h2>
+  <div class="steps">
+    <div class="step"><b>1</b><div>연결 주소를 복사해요<br><span class="url">trazo.runvia.app/mcp</span></div></div>
+    <div class="step"><b>2</b><div>AI 서비스에 추가해요<small>ChatGPT: 사이드바 → 플러그인 → 추가 → 사용자 지정 MCP 서버<br>Claude: 맞춤 설정 → 커넥터 → 커스텀 커넥터 추가</small></div></div>
+    <div class="step"><b>3</b><div>구글 계정으로 로그인하고 ‘허용’</div></div>
+    <div class="step"><b>4</b><div>평소처럼 물어보면 끝!<small>“한강 러닝 코스 추천해줘”</small></div></div>
+  </div>
+  <p class="note">화면별 자세한 안내는 Trazo 연동센터(trazo.runvia.app/connect)에 있어요.</p>
+</section>
+
+<!-- 5. 안전 -->
+<section class="s" id="m5">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">5/6</span>
+  <div style="margin-top:72px"><span class="eyebrow">안심하고 연결하세요</span></div>
+  <h2 style="font-size:58px">AI는 <em>읽기만</em> 해요</h2>
+  <div class="safe">
+    <div><i></i><span>코스를 바꾸거나 지우지 않아요<small>Trazo AI 연동은 읽기 전용이에요.</small></span></div>
+    <div><i></i><span>내가 허용한 경우에만<small>내 비공개 코스는 직접 로그인해 허용했을 때만 읽어요.</small></span></div>
+    <div><i></i><span>이메일·좋아요·댓글은 넘기지 않아요<small>다른 사람의 비공개 코스도 읽을 수 없어요.</small></span></div>
+    <div><i></i><span>언제든 연결 끊기<small>연동센터에서 버튼 하나로 끊을 수 있어요.</small></span></div>
+    <div><i></i><span>Trazo AI 연동은 무료<small>ChatGPT·Claude 이용 요금은 각 서비스 정책을 따라요.</small></span></div>
+  </div>
+</section>
+
+<!-- 6. 시작하기 -->
+<section class="s dark" id="m6">
+  <div class="brand"><img src="logo.svg" alt="">Trazo</div>
+  <span class="page">6/6</span>
+  <div style="margin-top:200px; text-align:center">
+    <img src="logo.svg" alt="" style="width:200px; height:200px; border-radius:48px; box-shadow:0 30px 70px rgba(0,0,0,0.3)">
+    <h1 style="margin-top:56px">내 코스를<br><em>AI 러닝 코치</em>에게</h1>
+    <p class="lead">ChatGPT · Claude에서 지금 바로 연결하세요.</p>
+    <span class="cta-url">trazo.runvia.app/connect</span>
+    <p class="lead" style="font-size:28px; margin-top:28px">프로필 링크 → 연동센터</p>
+  </div>
+</section>
+</body></html>

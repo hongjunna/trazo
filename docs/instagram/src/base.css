@@ -1,0 +1,27 @@
+* { box-sizing: border-box; margin: 0; }
+body { background: #333; font-family: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif; }
+.s { width: 1080px; height: 1350px; position: relative; overflow: hidden; background: #F3F5F6; color: #15262C; padding: 96px 80px; }
+.s.dark { background: radial-gradient(circle at 80% 10%, #11666F 0%, #0B4F57 45%, #083C42 100%); color: #fff; }
+.brand { display: flex; align-items: center; gap: 14px; font-weight: 800; font-size: 34px; letter-spacing: -0.02em; color: #0B4F57; }
+.dark .brand { color: #fff; }
+.brand img { width: 52px; height: 52px; }
+.page { position: absolute; right: 80px; top: 108px; font-size: 24px; font-weight: 700; color: #869399; }
+.dark .page { color: rgba(255,255,255,0.5); }
+.eyebrow { display: inline-block; font-size: 28px; font-weight: 800; color: #0B4F57; background: #E6F0F1; padding: 10px 22px; border-radius: 999px; }
+.dark .eyebrow { background: #8FCE3A; color: #0B4F57; }
+h1 { font-size: 78px; line-height: 1.2; letter-spacing: -0.04em; font-weight: 800; margin-top: 28px; }
+h2 { font-size: 64px; line-height: 1.22; letter-spacing: -0.04em; font-weight: 800; margin-top: 26px; }
+em { font-style: normal; color: #5E9B1C; }
+.dark em { color: #8FCE3A; }
+.lead { margin-top: 26px; font-size: 32px; line-height: 1.55; color: #536269; letter-spacing: -0.01em; }
+.dark .lead { color: rgba(255,255,255,0.8); }
+.crop { position: absolute; border-radius: 28px; background-repeat: no-repeat; background-color: #fff; box-shadow: 0 30px 70px rgba(8,40,46,0.25), 0 6px 16px rgba(8,40,46,0.12); }
+.phone { position: absolute; width: 420px; border-radius: 56px; background: #0E1A1D; padding: 14px; box-shadow: 0 40px 90px rgba(8,40,46,0.35); }
+.phone img { display: block; width: 100%; border-radius: 44px; }
+.chips { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
+.chip { font-size: 28px; font-weight: 800; padding: 14px 24px; border-radius: 18px; background: #fff; color: #0B4F57; border: 2px solid #E2E7E9; }
+.dark .chip { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.25); }
+.label { position: absolute; font-size: 26px; font-weight: 800; padding: 12px 20px; border-radius: 16px; background: #0B4F57; color: #fff; box-shadow: 0 10px 24px rgba(8,40,46,0.25); }
+.label.lime { background: #8FCE3A; color: #0B4F57; }
+.foot { position: absolute; left: 80px; right: 80px; bottom: 72px; display: flex; justify-content: space-between; align-items: center; font-size: 26px; font-weight: 700; color: #869399; }
+.dark .foot { color: rgba(255,255,255,0.6); }
