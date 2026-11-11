@@ -2892,6 +2892,9 @@ def community_map(
         statement = statement.where(Course.sport == sport)
     rows = session.exec(statement.order_by(Course.id.desc()).limit(MCP_SEARCH_CANDIDATES)).all()
     analyses = light_analyses(session, [(course, size) for course, _, _, size in rows])
+    # 인사이트 데이터도 함께 로드 (난이도, 테마 등)
+    course_ids = [course.id for course, _, _, _ in rows]
+    insights = load_insights(session, course_ids)
     items = []
     for course, nickname, likes, _ in rows:
         analysis = analyses[course.id]
@@ -2900,12 +2903,17 @@ def community_map(
             continue
         # 근처 검색용 표본(150m 간격)은 굽은 길을 뚝뚝 끊어 그리므로, 모양을 지키며 줄인 경로를 씁니다.
         path = analysis.get("_map") or analysis["_near"]
-        items.append({
+        insight = insights.get(course.id)
+        insight_view_data = insight_view(insight) if insight else None
+        item = {
             "token": course.share_token, "title": course.title, "sport": course.sport, "nickname": nickname,
             "distance_km": analysis["distance_km"], "ascent_m": analysis["ascent_m"], "route_type": analysis["route_type"],
             "like_count": likes, "share_count": course.share_count, "published_at": course.published_at,
             "path": [[round(lat, 5), round(lng, 5)] for lat, lng in path],
-        })
+        }
+        if insight_view_data:
+            item["insight"] = insight_view_data
+        items.append(item)
     # 많이 담기고 좋아요가 많은 코스부터 보여줍니다.
     items.sort(key=lambda item: (item["share_count"] + item["like_count"]), reverse=True)
     return {"items": items[:MAP_COURSE_LIMIT], "total": len(items), "truncated": len(items) > MAP_COURSE_LIMIT}
