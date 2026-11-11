@@ -1,47 +1,48 @@
 // src/components/ui/Tooltip.jsx
-// 간단한 툴팁 컴포넌트. hover/focus 시 내용 표시.
-import { useState, useRef, useEffect } from 'react';
+// 도움말 툴팁. 마우스를 올리거나 키보드로 초점을 주면 열리고, 터치 기기에서는 눌러서 엽니다.
+import { useEffect, useId, useRef, useState } from 'react';
 import Icon from './Icon';
 
-const Tooltip = ({ children, content, position = 'top' }) => {
-  const [visible, setVisible] = useState(false);
-  const wrapperRef = useRef(null);
-  const tooltipRef = useRef(null);
+const Tooltip = ({ content, label = '설명 보기', position = 'bottom', children }) => {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const ref = useRef(null);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') setVisible(false);
+    if (!open) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    const onDown = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onDown);
     };
-    if (visible) {
-      document.addEventListener('keydown', handleKeyDown);
-    }
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [visible]);
-
-  const show = () => setVisible(true);
-  const hide = () => setVisible(false);
+  }, [open]);
 
   return (
     <span
-      ref={wrapperRef}
+      ref={ref}
       className="tooltip-wrapper"
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
-      tabIndex={0}
-      role="tooltip"
-      aria-label={typeof content === 'string' ? content : undefined}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
     >
-      {children}
-      {visible && (
-        <div
-          ref={tooltipRef}
-          className={`tooltip tooltip--${position}`}
-          role="tooltip"
-        >
-          {typeof content === 'function' ? content({ hide }) : content}
-        </div>
+      <button
+        type="button"
+        className="tooltip-trigger"
+        aria-label={label}
+        aria-expanded={open}
+        aria-describedby={open ? id : undefined}
+        onClick={() => setOpen((v) => !v)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+      >
+        {children ?? <Icon name="help" size={14} />}
+      </button>
+      {open && (
+        <span id={id} role="tooltip" className={`tooltip tooltip--${position}`}>
+          {content}
+        </span>
       )}
     </span>
   );

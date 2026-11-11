@@ -107,21 +107,39 @@ export const THEME_LABELS = {
 };
 
 /**
- * 테마별 아이콘 매핑
+ * 테마별 아이콘 (components/ui/Icon.jsx 의 이름)
  */
 export const THEME_ICONS = {
-  riverside: 'flag',
-  park: 'mountain',
-  lake: 'mountain',
-  coast: 'flag',
+  riverside: 'waves',
+  park: 'tree',
+  lake: 'waves',
+  coast: 'waves',
   mountain_forest: 'mountain',
-  urban: 'street',
-  night_view: 'street',
-  seasonal: 'sparkles',
+  urban: 'building',
+  night_view: 'moon',
+  seasonal: 'leaf',
   track: 'track',
-  race_course: 'target',
+  race_course: 'flag',
   commute: 'bike',
 };
+
+/**
+ * 거리 구분 (러닝은 대회 거리, 자전거는 거리 단계)
+ */
+export const DISTANCE_KO = {
+  '5k': '5km',
+  '10k': '10km',
+  half: '하프',
+  full: '풀코스',
+  short: '단거리',
+  medium: '중거리',
+  long: '장거리',
+  granfondo: '그란폰도',
+};
+
+export function getDistanceLabel(distance) {
+  return DISTANCE_KO[distance] ?? null;
+}
 
 /**
  * 테마 배열을 한글 라벨 배열로 변환

@@ -52,6 +52,32 @@
       </section>
       <div class="layout">
         <div>
+          {% if insight and (insight.feature or insight.route or insight.themes) %}
+          <section class="card ai-card" aria-labelledby="ai-card-title">
+            <div class="ai-card__head">
+              <h2 id="ai-card-title">코스 소개</h2>
+              <span class="ai-badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>AI 작성</span>
+            </div>
+            {% if insight.themes %}
+            <ul class="theme-tags" aria-label="코스 테마">
+              {% for theme in insight.themes %}<li>{{ theme }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if insight.feature %}
+            <div class="ai-block">
+              <h3>코스 특징</h3>
+              <p>{{ insight.feature }}</p>
+            </div>
+            {% endif %}
+            {% if insight.route %}
+            <div class="ai-block">
+              <h3>코스 안내</h3>
+              <p>{{ insight.route }}</p>
+            </div>
+            {% endif %}
+            <p class="ai-note">경로·고도·주변 장소를 바탕으로 AI가 쓰고 운영자가 검토한 글이에요. 현장 상황과 다를 수 있어요.</p>
+          </section>
+          {% endif %}
           <section class="card map-card">
             <h2>코스 경로</h2>
             <div id="course-map">
@@ -107,195 +133,29 @@
             {% endif %}
           </section>
 
-          {% if insight %}
-          <section class="card insight-card">
-            <h2>AI 코스 분석</h2>
-            <div class="insight-badge">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4" />
-                <path d="M12 8h.01" />
-              </svg>
-              <span>AI 생성</span>
-            </div>
-            <div class="insight-difficulty">
-              <span
-                class="insight-difficulty__badge"
-                style="--difficulty-color: var(--difficulty-color-{{ insight.difficulty }})"
-                >{{ get_difficulty_label(insight.difficulty) }}</span
-              >
-              <p class="insight-difficulty__desc">
-                {{ get_difficulty_description(insight.difficulty, sport) }}
-              </p>
-            </div>
-            <div class="insight-details">
-              <div class="insight-detail">
-                <dt>형태</dt>
-                <dd>{{ get_shape_label(insight.shape) }}</dd>
-              </div>
-              <div class="insight-detail">
-                <dt>지형</dt>
-                <dd>{{ get_terrain_label(insight.terrain) }}</dd>
-              </div>
-              {% if insight.training %}
-              <div class="insight-training">
-                <dt>추천 훈련</dt>
-                <dd>
-                  {% for t in insight.training %}{{ get_training_label(t) }}{%
-                  if not loop.last %}, {% endif %}{% endfor %}
-                </dd>
-              </div>
-              {% endif %}
-            </div>
-            {% if insight.themes %}
-            <div class="insight-ai">
-              <div class="insight-ai__themes">
-                <span class="insight-ai__label">
-                  테마
-                  <svg
-                    class="info-icon"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 16v-4" />
-                    <path d="M12 8h.01" />
-                  </svg>
-                  <div class="tooltip">
-                    AI가 코스 특성을 분석해 자동 추출한 테마입니다. 공개
-                    코스에만 생성됩니다.
-                  </div>
-                </span>
-                <div class="insight-ai__tags">
-                  {% for theme in insight.themes %}
-                  <span class="insight-tag" data-theme="{{ theme }}">
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      {% if theme == 'scenic' or theme == 'lake' or theme ==
-                      'coastal' %}
-                      <path d="M17 18a5 5 0 0 0-10 0" />
-                      <path d="M12 2a10 10 0 1 0 10 10" />
-                      <path d="M12 16v-4" />
-                      <path d="M12 8h.01" />
-                      {% elif theme == 'climb' or theme == 'mountain_forest' or
-                      theme == 'forest' %}
-                      <path d="M8 3l4 8 5-5 5 15H2L8 3z" />
-                      {% elif theme == 'technical' %>
-                      <path d="M12 2l3 7h6" />
-                      <path d="M22 12l-3 7h-6" />
-                      <path d="M2 12l3 7h6" />
-                      <path d="M12 22l-3-7h-6" />
-                      {% elif theme == 'city' or theme == 'urban' %}
-                      <path d="M3 21h18" />
-                      <path d="M5 21V7" />
-                      <path d="M19 21V7" />
-                      <path d="M9 21V13" />
-                      <path d="M15 21V13" />
-                      {% elif theme == 'historic' %}
-                      <path d="M12 22V12" />
-                      <path d="M12 12h8" />
-                      <path d="M4 12l4 4 4-4" />
-                      <circle cx="12" cy="12" r="2" />
-                      {% elif theme == 'cafe' %}
-                      <path d="M2 3h20" />
-                      <path d="M2 21h20" />
-                      <path d="M4 3v18" />
-                      <path d="M20 3v18" />
-                      <path d="M8 15h8" />
-                      <path d="M10 7h4v8h-4z" />
-                      {% elif theme == 'training' or theme == 'track' or theme
-                      == 'race_course' %}
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <path d="M7 10l5 5 5-5" />
-                      <path d="M12 15V3" />
-                      {% else %}
-                      <circle cx="12" cy="12" r="10" />
-                      {% endif %}
-                    </svg>
-                    {{ get_theme_label(theme) }}
-                  </span>
-                  {% endfor %}
-                </div>
-              </div>
-              {% if insight.feature %}
-              <div class="insight-ai__feature">
-                <span class="insight-ai__label">
-                  코스 특징
-                  <svg
-                    class="info-icon"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 16v-4" />
-                    <path d="M12 8h.01" />
-                  </svg>
-                  <div class="tooltip">
-                    AI가 코스 경로와 지형을 분석해 1~2문장으로 요약한
-                    특징입니다. 공개 코스에만 생성됩니다.
-                  </div>
-                </span>
-                <p class="insight-ai__text">{{ insight.feature }}</p>
-              </div>
-              {% endif %}{% if insight.route %}
-              <div class="insight-ai__route">
-                <span class="insight-ai__label">
-                  코스 가이드
-                  <svg
-                    class="info-icon"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 16v-4" />
-                    <path d="M12 8h.01" />
-                  </svg>
-                  <div class="tooltip">
-                    AI가 코스 경로를 따라 주요 포인트와 주의사항을 1~2문장으로
-                    안내합니다. 공개 코스에만 생성됩니다.
-                  </div>
-                </span>
-                <p class="insight-ai__text">{{ insight.route }}</p>
-              </div>
-              {% endif %}
-            </div>
-            {% endif %}
-          </section>
-          {% endif %}
         </div>
         <aside>
           <section class="card">
             <h2>코스 한눈에 보기</h2>
+            {% if insight and insight.level %}
+            <div class="level level--{{ insight.level }}">
+              <div class="level__head">
+                <span class="level__name">난이도</span>
+                <strong class="level__value">Lv.{{ insight.level }} {{ insight.level_label }}</strong>
+              </div>
+              <div class="level__meter" role="img" aria-label="난이도 5단계 중 {{ insight.level }}단계">
+                {% for i in range(1, 6) %}<span{% if i <= insight.level %} class="on"{% endif %}></span>{% endfor %}
+              </div>
+              {% if insight.level_desc %}<p class="level__desc">{{ insight.level_desc }}</p>{% endif %}
+              {% if insight.tags or insight.training %}
+              <ul class="fact-tags" aria-label="코스 성격">
+                {% for tag in insight.tags %}<li>{{ tag }}</li>{% endfor %}
+                {% for t in insight.training %}<li class="fact-tags__training">{{ t }}</li>{% endfor %}
+              </ul>
+              {% endif %}
+              <p class="level__basis">거리와 상승 고도로 계산한 난이도예요.</p>
+            </div>
+            {% endif %}
             <dl>
               <div>
                 <dt>거리</dt>

@@ -46,6 +46,10 @@ TRAINING_KO = {"interval": "인터벌", "tempo": "템포런", "hill_repeat": "�
 THEMES = ("riverside", "park", "lake", "coast", "mountain_forest", "urban", "night_view", "seasonal", "track", "race_course", "commute")
 TERRAIN_KO = {"flat": "평지", "rolling": "완만한 언덕", "hilly": "업힐이 있음", "mountain": "고갯길"}
 SHAPE_KO = {"loop": "순환", "out_and_back": "왕복", "point_to_point": "편도"}
+THEME_KO = {"riverside": "강변", "park": "공원", "lake": "호수", "coast": "해안", "mountain_forest": "산·숲길", "urban": "도심",
+            "night_view": "야경", "seasonal": "계절 명소", "track": "트랙", "race_course": "대회 코스", "commute": "출퇴근"}
+DISTANCE_KO = {"5k": "5km", "10k": "10km", "half": "하프", "full": "풀코스",
+               "short": "단거리", "medium": "중거리", "long": "장거리", "granfondo": "그란폰도"}
 # 필터에 쓰는 태그 (규칙 태그 + AI 테마)
 FILTER_TAGS = set(TRAINING["run"]) | set(TRAINING["bike"]) | set(THEMES) | set(RACE_DISTANCES_KM)
 

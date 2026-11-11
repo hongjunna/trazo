@@ -1073,11 +1073,8 @@ def shared_course_page(token: str, session: Session = Depends(get_session)):
                         status_code=404, media_type="text/html", headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
     # 비공개/링크 공유 코스는 관련 코스 목록에도 노출하지 않습니다.
     related = session.exec(public_course_query().where(Course.id != course.id, Course.sport == course.sport).order_by(Course.id.desc()).limit(3)).all()
-    # 인사이트 데이터 로드 (공개 코스만)
-    from .course_insight import load_insights, insight_view
-    insights = load_insights(session, [course.id])
-    insight = insights.get(course.id)
-    insight_data = insight_view(insight) if insight else None
+    # 코스 분석은 전체 공개 코스에만 보여줍니다 (링크 공유 코스는 분석하지 않습니다).
+    insight_data = insight_view(session.get(CourseInsight, course.id)) if course.visibility == "public" else None
     try:
         from .course_pages import render_course_page
     except ImportError:

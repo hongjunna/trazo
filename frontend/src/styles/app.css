@@ -2367,239 +2367,295 @@
   fill: currentColor;
 }
 
-/* 코스 분석(인사이트) 표시 */
-.viewer__insight {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
+/* 코스 분석: 규칙 기반 난이도·코스 성격 + AI 소개 (components/CourseInsight.jsx)
+ * 난이도 색은 공개 랜딩 페이지(public/course-landing.css)와 같습니다. */
+.lv-1 { --lv: #2e8b57; --lv-ink: #1f6b42; --lv-soft: #e8f4ec; }
+.lv-2 { --lv: #6aa33a; --lv-ink: #44731c; --lv-soft: #eef5e4; }
+.lv-3 { --lv: #d4a017; --lv-ink: #835f00; --lv-soft: #fbf3dc; }
+.lv-4 { --lv: #e07a2e; --lv-ink: #a24a0d; --lv-soft: #fcebdd; }
+.lv-5 { --lv: #c0392b; --lv-ink: #9b2a1e; --lv-soft: #fbe7e4; }
+
+.difficulty-meter {
+  display: inline-grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
 }
 
-.insight-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.difficulty-meter > span {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(21, 38, 44, 0.1);
 }
 
-.insight-item__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--c-text-2);
+.difficulty-meter > span.on {
+  background: var(--lv);
 }
 
-.insight-difficulty__content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.insight-difficulty__level {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-}
-
-.insight-difficulty__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 60px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: var(--radius-full);
-  background: var(--sport);
-  color: var(--on-sport);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.insight-difficulty__num {
-  font-size: 12px;
-  color: var(--c-text-3);
-  font-weight: 500;
-}
-
-.insight-difficulty__desc {
-  margin: 0;
-  font-size: 13px;
-  color: var(--c-text-2);
-  line-height: 1.5;
-}
-
-.insight-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--c-text-2);
-}
-
-.insight-detail {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  background: var(--c-surface-2);
-  border-radius: var(--radius-full);
-  white-space: nowrap;
-  font-size: 12.5px;
-  color: var(--c-text-2);
-}
-
-.insight-detail svg {
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-.insight-training {
-  background: var(--c-primary-soft) !important;
-  color: var(--c-primary) !important;
-}
-
-.insight-ai {
-  border-top: 1px solid var(--c-border);
-  padding-top: 10px;
-}
-
-.insight-ai__themes {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.insight-ai__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--c-text-2);
-}
-
-.insight-ai__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.insight-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  background: var(--c-surface-2);
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  color: var(--c-text-2);
-  white-space: nowrap;
-}
-
-.insight-tag svg {
-  flex-shrink: 0;
-  opacity: 0.6;
-}
-
-.insight-ai__feature,
-.insight-ai__route {
-  margin-top: 8px;
-}
-
-.insight-ai__text {
-  margin: 4px 0 0;
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--c-text-1);
-}
-
-/* 탐색기 코스 카드의 난이도 뱃지 */
-.explore-item__difficulty {
-  display: inline-flex;
-  align-items: center;
-  margin-right: 6px;
-}
-
+/* 목록용 작은 난이도 표시 */
 .difficulty-badge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 48px;
-  height: 20px;
-  padding: 0 6px;
+  gap: 5px;
+  padding: 1px 8px 1px 6px;
   border-radius: var(--radius-full);
-  background: var(--difficulty-color);
-  color: #ffffff;
-  font-size: 10.5px;
+  background: var(--lv-soft);
+  color: var(--lv-ink);
+  font-size: 11.5px;
   font-weight: 700;
-  line-height: 1;
   white-space: nowrap;
 }
 
-/* 난이도 색상 CSS 변수 (랜딩 페이지용) */
-:root {
-  --difficulty-color-1: #4ade80;
-  --difficulty-color-2: #60a5fa;
-  --difficulty-color-3: #fbbf24;
-  --difficulty-color-4: #fb923c;
-  --difficulty-color-5: #ef4444;
+.difficulty-badge .difficulty-meter {
+  gap: 2px;
 }
 
-/* 탐색기 상세 카드의 인사이트 */
-.explore-card__insight {
+.difficulty-badge .difficulty-meter > span {
+  width: 4px;
+  height: 8px;
+  border-radius: 1px;
+}
+
+.insight {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px 0;
-  border-top: 1px solid var(--c-border);
-  border-bottom: 1px solid var(--c-border);
-  margin: 6px 0;
 }
 
-/* 툴팁 */
+.insight-level {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--lv-soft, var(--c-surface-2));
+}
+
+.insight-level__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.insight-level__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.insight-level__name svg {
+  align-self: center;
+}
+
+.insight-level__value {
+  font-size: 16px;
+  color: var(--lv-ink);
+}
+
+.insight-level > .difficulty-meter {
+  display: grid;
+}
+
+.insight-level__desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--c-text);
+}
+
+.insight-level__basis {
+  font-size: 11.5px;
+  color: var(--c-text-3);
+}
+
+.insight-facts,
+.insight-themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.insight-facts li,
+.insight-themes li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.insight-facts li {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  color: var(--c-text);
+}
+
+.insight-facts li svg {
+  color: var(--c-text-3);
+}
+
+.insight-facts li.insight-facts__training {
+  border-color: transparent;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-weight: 600;
+}
+
+.insight-facts__training > span {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.insight-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #e3e5f6;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #f7f7fd 0%, var(--c-surface) 70%);
+}
+
+.insight-ai__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.insight-ai__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: #eceefb;
+  color: #4a4fa8;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.insight-themes li {
+  background: var(--c-surface-3);
+  color: var(--c-primary);
+  font-weight: 600;
+}
+
+.insight-themes li svg {
+  opacity: 0.75;
+}
+
+.insight-ai__feature {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--c-text);
+  overflow-wrap: anywhere;
+}
+
+.insight-ai__route {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.insight-ai__route > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.insight-ai__route p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-text);
+  overflow-wrap: anywhere;
+}
+
+/* 탐색기 지도 위 카드: 좁은 폭에 맞춰 줄입니다. */
+.insight--compact {
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.insight--compact .insight-level {
+  padding: 0;
+  background: none;
+}
+
+.insight--compact .insight-ai {
+  padding: 10px 12px;
+}
+
+.insight--compact .insight-ai__feature {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+/* 도움말 툴팁 (components/ui/Tooltip.jsx) */
 .tooltip-wrapper {
   position: relative;
   display: inline-flex;
 }
 
+.tooltip-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-text-3);
+}
+
+.tooltip-trigger:hover,
+.tooltip-trigger[aria-expanded='true'] {
+  color: var(--c-text-2);
+  background: var(--c-surface-3);
+}
+
 .tooltip {
   position: absolute;
   z-index: 100;
-  max-width: 280px;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  background: #0e2a2e;
+  width: max-content;
+  max-width: min(260px, 70vw);
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: #15262c;
   color: #fff;
   font-size: 12.5px;
+  font-weight: 400;
   line-height: 1.55;
-  box-shadow: var(--shadow-3);
+  box-shadow: var(--shadow-2);
   white-space: normal;
-  animation: fade-up 0.12s var(--ease);
+  animation: tooltip-in 0.12s var(--ease);
 }
 
-.tooltip::before {
-  content: '';
-  position: absolute;
-  width: 0;
-  height: 0;
-  border: 5px solid transparent;
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .tooltip--top {
   bottom: calc(100% + 6px);
   left: 50%;
-  transform: translateX(-50%);
-}
-
-.tooltip--top::before {
-  top: 100%;
-  left: 50%;
-  border-top-color: #0e2a2e;
   transform: translateX(-50%);
 }
 
@@ -2609,37 +2665,9 @@
   transform: translateX(-50%);
 }
 
-.tooltip--bottom::before {
-  bottom: 100%;
-  left: 50%;
-  border-bottom-color: #0e2a2e;
-  transform: translateX(-50%);
-}
-
-.tooltip--left {
-  right: calc(100% + 6px);
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.tooltip--left::before {
-  left: 100%;
-  top: 50%;
-  border-left-color: #0e2a2e;
-  transform: translateY(-50%);
-}
-
-.tooltip--right {
-  left: calc(100% + 6px);
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.tooltip--right::before {
-  right: 100%;
-  top: 50%;
-  border-right-color: #0e2a2e;
-  transform: translateY(-50%);
+.tooltip--bottom-start {
+  top: calc(100% + 6px);
+  left: -8px;
 }
 
 /* 댓글 */

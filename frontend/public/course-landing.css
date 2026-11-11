@@ -177,233 +177,145 @@ a:focus-visible {
   }
 }
 
-/* Insight card styles */
-.insight-card {
-  border-color: #e79645;
-  background: #fffaf5;
+/* 코스 분석: 규칙 기반 난이도 (코스 한눈에 보기) */
+.level {
+  --lv: #2e8b57;
+  --lv-ink: #1f6b42;
+  --lv-soft: #e8f4ec;
+  margin: 0 0 20px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--lv-soft);
 }
-.insight-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #fff3e0;
-  color: #b45c00;
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 12px;
+.level--2 { --lv: #6aa33a; --lv-ink: #44731c; --lv-soft: #eef5e4; }
+.level--3 { --lv: #d4a017; --lv-ink: #835f00; --lv-soft: #fbf3dc; }
+.level--4 { --lv: #e07a2e; --lv-ink: #a24a0d; --lv-soft: #fcebdd; }
+.level--5 { --lv: #c0392b; --lv-ink: #9b2a1e; --lv-soft: #fbe7e4; }
+.level__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
-.insight-badge svg {
-  flex-shrink: 0;
-}
-.insight-difficulty {
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f5e6d3;
-}
-.insight-difficulty__badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 999px;
+.level__name {
   font-size: 13px;
-  font-weight: 700;
-  color: white;
-  margin-bottom: 8px;
-}
-.insight-difficulty__badge[data-difficulty='1'] {
-  background: #4ade80;
-}
-.insight-difficulty__badge[data-difficulty='2'] {
-  background: #60a5fa;
-}
-.insight-difficulty__badge[data-difficulty='3'] {
-  background: #fbbf24;
-}
-.insight-difficulty__badge[data-difficulty='4'] {
-  background: #fb923c;
-}
-.insight-difficulty__badge[data-difficulty='5'] {
-  background: #ef4444;
-}
-.insight-difficulty__desc {
-  font-size: 14px;
   color: #586d6b;
-  line-height: 1.6;
-  margin: 0;
 }
-.insight-details {
+.level__value {
+  font-size: 18px;
+  color: var(--lv-ink);
+}
+.level__meter {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin: 8px 0 10px;
+}
+.level__meter span {
+  height: 6px;
+  border-radius: 3px;
+  background: #173b3e1a;
+}
+.level__meter span.on {
+  background: var(--lv);
+}
+.level__desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.level__basis {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #586d6b;
+}
+.fact-tags,
+.theme-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
 }
-.insight-detail {
+.fact-tags li,
+.theme-tags li {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid #dae5df;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.fact-tags li.fact-tags__training {
+  border-color: transparent;
+  background: #0b4f57;
+  background: #0b4f5714;
+  color: #0b4f57;
+  font-weight: 600;
+}
+.fact-tags li.fact-tags__training::before {
+  content: '추천 ';
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* 코스 분석: AI 소개 */
+.ai-card__head {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 120px;
-}
-.insight-detail dt {
-  font-size: 11px;
-  color: #889e9b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.insight-detail dd {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: #173b3e;
-}
-.insight-training {
-  width: 100%;
-  margin-top: 8px;
-}
-.insight-training dt {
-  font-size: 11px;
-  color: #889e9b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 4px;
 }
-.insight-training dd {
+.ai-card__head h2 {
   margin: 0;
-  font-size: 13px;
-  color: #3a5a58;
 }
-.insight-ai {
-  padding-top: 16px;
-  border-top: 1px solid #f5e6d3;
-}
-.insight-ai__themes {
-  margin-bottom: 12px;
-}
-.insight-ai__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #586d6b;
-  margin-bottom: 8px;
-}
-.insight-ai__label .info-icon {
-  flex-shrink: 0;
-  color: #b45c00;
-  cursor: help;
-  opacity: 0.8;
-  transition: opacity 0.2s;
-}
-.insight-ai__label .info-icon:hover {
-  opacity: 1;
-}
-.insight-ai__label .tooltip {
-  position: absolute;
-  bottom: 120%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #173b3e;
-  color: white;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.2s;
-  z-index: 1000;
-  pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-.insight-ai__label .tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-top-color: #173b3e;
-}
-.insight-ai__label {
-  position: relative;
-}
-.insight-ai__label:hover .tooltip,
-.insight-ai__label:focus-within .tooltip {
-  opacity: 1;
-  visibility: visible;
-  bottom: calc(100% + 4px);
-}
-.insight-ai__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.insight-tag {
+.ai-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 2px 10px;
   border-radius: 999px;
-  background: #fff3e0;
-  color: #b45c00;
+  background: #eef0fb;
+  color: #4a4fa8;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 700;
   white-space: nowrap;
 }
-.insight-tag svg {
-  flex-shrink: 0;
-  opacity: 0.6;
+.theme-tags {
+  margin: 12px 0 4px;
 }
-.insight-tag[data-theme='scenic'] svg {
-  stroke: #0b616a;
+.theme-tags li {
+  background: #f4f7f5;
+  border-color: transparent;
+  color: #0b4f57;
+  font-weight: 600;
 }
-.insight-tag[data-theme='climb'] svg,
-.insight-tag[data-theme='mountain_forest'] svg,
-.insight-tag[data-theme='forest'] svg {
-  stroke: #ef4444;
+.theme-tags li::before {
+  content: '#';
+  margin-right: 2px;
+  opacity: 0.55;
 }
-.insight-tag[data-theme='technical'] svg {
-  stroke: #8b5cf6;
+.ai-block {
+  margin-top: 16px;
 }
-.insight-tag[data-theme='city'] svg,
-.insight-tag[data-theme='urban'] svg {
-  stroke: #3b82f6;
-}
-.insight-tag[data-theme='coastal'] svg,
-.insight-tag[data-theme='lake'] svg {
-  stroke: #06b6d4;
-}
-.insight-tag[data-theme='historic'] svg {
-  stroke: #a855f7;
-}
-.insight-tag[data-theme='cafe'] svg {
-  stroke: #f97316;
-}
-.insight-tag[data-theme='training'] svg,
-.insight-tag[data-theme='track'] svg,
-.insight-tag[data-theme='race_course'] svg {
-  stroke: #eab308;
-}
-.insight-ai__feature,
-.insight-ai__route {
-  margin-bottom: 12px;
-}
-.insight-ai__text {
-  margin: 0;
+.ai-block h3 {
+  margin: 0 0 4px;
   font-size: 14px;
-  line-height: 1.7;
-  color: #173b3e;
+  color: #586d6b;
 }
-
-@media (max-width: 760px) {
-  .hero-action {
-    display: block;
-    margin-top: 20px;
-  }
-  .hero-action p {
-    font-size: 14px;
-    color: #586d6b;
-  }
+.ai-block p {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.ai-note {
+  margin: 18px 0 0;
+  padding-top: 12px;
+  border-top: 1px dashed #dae5df;
+  font-size: 12.5px;
+  color: #586d6b;
 }

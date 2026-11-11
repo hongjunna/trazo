@@ -10,19 +10,11 @@ import { SPORTS, SPORT_IDS } from '../sports';
 import { COLORS } from '../styles/theme';
 import { readStored, writeStored } from '../utils/storage';
 import { timeAgo } from '../utils/share';
-import {
-  getLevelLabel,
-  getLevelDescription,
-  getTerrainLabel,
-  getShapeLabel,
-  getTrainingLabels,
-  getThemeLabels,
-  getThemeObjects,
-} from '../utils/insight';
+import { getTerrainLabel } from '../utils/insight';
 import Button from './ui/Button';
 import Icon from './ui/Icon';
 import SegmentedControl from './ui/SegmentedControl';
-import Tooltip from './ui/Tooltip';
+import CourseInsight, { DifficultyBadge } from './CourseInsight';
 
 const FETCH_DELAY_MS = 250;
 const NONE = [];
@@ -222,31 +214,11 @@ const midpoint = (item) => {
 };
 const sportOf = (item) => SPORTS[item.sport] ?? SPORTS.bike;
 
-// 난이도 뱃지 색상 (난이도별 색상)
-const DIFFICULTY_COLORS = {
-  1: '#4CAF50', // 입문 - 초록
-  2: '#8BC34A', // 쉬움 - 연두
-  3: '#FFC107', // 보통 - 노랑
-  4: '#FF9800', // 어려움 - 주황
-  5: '#F44336', // 매우 어려움 - 빨강
-};
-
 const CourseMeta = ({ item }) => {
   const insight = item.insight;
   return (
     <span className="explore-item__meta">
-      {insight?.difficulty && (
-        <span
-          className="explore-item__difficulty"
-          style={{
-            '--difficulty-color': DIFFICULTY_COLORS[insight.difficulty],
-          }}
-        >
-          <span className="difficulty-badge">
-            {getLevelLabel(insight.difficulty)}
-          </span>
-        </span>
-      )}
+      <DifficultyBadge level={insight?.difficulty} />
       <span>{item.distance_km.toFixed(1)}km</span>
       <span>↗ {item.ascent_m.toLocaleString()}m</span>
       {ROUTE_LABEL[item.route_type] && (
@@ -933,195 +905,7 @@ const CourseExplorer = ({ onOpenCourse }) => {
               </div>
               <strong className="explore-card__title">{selected.title}</strong>
               <CourseMeta item={selected} />
-              {selected.insight && (
-                <div className="explore-card__insight">
-                  {selected.insight.difficulty && (
-                    <div className="insight-item insight-difficulty">
-                      <span className="insight-item__label">
-                        <Icon name="gauge" size={14} />
-                        난이도
-                      </span>
-                      <div className="insight-difficulty__content">
-                        <span
-                          className="insight-difficulty__level"
-                          style={{ '--sport': sportOf(selected).color }}
-                        >
-                          <span className="insight-difficulty__badge">
-                            {getLevelLabel(selected.insight.difficulty)}
-                          </span>
-                          <span className="insight-difficulty__num">
-                            Lv.{selected.insight.difficulty}
-                          </span>
-                        </span>
-                        <p className="insight-difficulty__desc">
-                          {getLevelDescription(
-                            selected.sport,
-                            selected.insight.difficulty,
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {(selected.insight.distance ||
-                    selected.insight.shape ||
-                    selected.insight.terrain ||
-                    selected.insight.training?.length) && (
-                    <div className="insight-item insight-details">
-                      {selected.insight.distance && (
-                        <span className="insight-detail">
-                          <Icon name="flag" size={13} />
-                          {selected.insight.distance === 'short'
-                            ? '단거리'
-                            : selected.insight.distance === 'medium'
-                              ? '중거리'
-                              : selected.insight.distance === 'long'
-                                ? '장거리'
-                                : selected.insight.distance === 'granfondo'
-                                  ? '그란폰도'
-                                  : selected.insight.distance}
-                        </span>
-                      )}
-                      {selected.insight.shape && (
-                        <span className="insight-detail">
-                          <Icon
-                            name={
-                              selected.insight.shape === 'loop'
-                                ? 'loop'
-                                : selected.insight.shape === 'out_and_back'
-                                  ? 'out-and-back'
-                                  : 'point-to-point'
-                            }
-                            size={13}
-                          />
-                          {getShapeLabel(selected.insight.shape)}
-                        </span>
-                      )}
-                      {selected.insight.terrain && (
-                        <span className="insight-detail">
-                          <Icon name="mountain" size={13} />
-                          {getTerrainLabel(selected.insight.terrain)}
-                        </span>
-                      )}
-                      {selected.insight.training?.length && (
-                        <span className="insight-detail insight-training">
-                          <Icon name="target" size={13} />
-                          추천:{' '}
-                          {getTrainingLabels(selected.insight.training).join(
-                            ', ',
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {(selected.insight.themes?.length ||
-                    selected.insight.feature ||
-                    selected.insight.route) && (
-                    <div className="insight-item insight-ai">
-                      {selected.insight.themes?.length && (
-                        <div className="insight-ai__themes">
-                          <span className="insight-ai__label">
-                            <Tooltip
-                              content={() => (
-                                <div style={{ lineHeight: 1.6 }}>
-                                  <strong>AI가 생성한 테마입니다</strong>
-                                  <br />
-                                  공개된 코스에 한해 AI가 경로·고도·지형 등을
-                                  분석해
-                                  <br />
-                                  어울리는 테마를 자동으로 부여합니다.
-                                  <br />
-                                  관리자 승인 후 공개됩니다.
-                                </div>
-                              )}
-                            >
-                              <Icon name="tag" size={13} />
-                              테마
-                              <Icon
-                                name="help"
-                                size={12}
-                                style={{ opacity: 0.6, marginLeft: 2 }}
-                              />
-                            </Tooltip>
-                          </span>
-                          <div className="insight-ai__tags">
-                            {getThemeObjects(selected.insight.themes).map(
-                              ({ label, icon }, idx) => (
-                                <span key={idx} className="insight-tag">
-                                  <Icon name={icon} size={11} />
-                                  {label}
-                                </span>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {selected.insight.feature && (
-                        <div className="insight-ai__feature">
-                          <span className="insight-ai__label">
-                            <Tooltip
-                              content={() => (
-                                <div style={{ lineHeight: 1.6 }}>
-                                  <strong>AI가 생성한 코스 특징입니다</strong>
-                                  <br />
-                                  공개된 코스에 한해 AI가 경로·고도·지형 등을
-                                  분석해
-                                  <br />
-                                  1~2문장으로 요약합니다.
-                                  <br />
-                                  관리자 승인 후 공개됩니다.
-                                </div>
-                              )}
-                            >
-                              <Icon name="sparkles" size={13} />
-                              코스 특징
-                              <Icon
-                                name="help"
-                                size={12}
-                                style={{ opacity: 0.6, marginLeft: 2 }}
-                              />
-                            </Tooltip>
-                          </span>
-                          <p className="insight-ai__text">
-                            {selected.insight.feature}
-                          </p>
-                        </div>
-                      )}
-                      {selected.insight.route && (
-                        <div className="insight-ai__route">
-                          <span className="insight-ai__label">
-                            <Tooltip
-                              content={() => (
-                                <div style={{ lineHeight: 1.6 }}>
-                                  <strong>AI가 생성한 코스 안내입니다</strong>
-                                  <br />
-                                  공개된 코스에 한해 AI가 경로·고도·지형 등을
-                                  분석해
-                                  <br />
-                                  주요 포인트와 주의사항을 1~2문장으로
-                                  안내합니다.
-                                  <br />
-                                  관리자 승인 후 공개됩니다.
-                                </div>
-                              )}
-                            >
-                              <Icon name="map" size={13} />
-                              코스 안내
-                              <Icon
-                                name="help"
-                                size={12}
-                                style={{ opacity: 0.6, marginLeft: 2 }}
-                              />
-                            </Tooltip>
-                          </span>
-                          <p className="insight-ai__text">
-                            {selected.insight.route}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+              <CourseInsight insight={selected.insight} sport={selected.sport} compact />
               <span className="explore-item__author">
                 {selected.nickname ?? '알 수 없음'} · 담기{' '}
                 {selected.share_count}
