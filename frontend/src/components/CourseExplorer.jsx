@@ -17,10 +17,12 @@ import {
   getShapeLabel,
   getTrainingLabels,
   getThemeLabels,
+  getThemeObjects,
 } from '../utils/insight';
 import Button from './ui/Button';
 import Icon from './ui/Icon';
 import SegmentedControl from './ui/SegmentedControl';
+import Tooltip from './ui/Tooltip';
 
 const FETCH_DELAY_MS = 250;
 const NONE = [];
@@ -1018,14 +1020,35 @@ const CourseExplorer = ({ onOpenCourse }) => {
                       {selected.insight.themes?.length && (
                         <div className="insight-ai__themes">
                           <span className="insight-ai__label">
-                            <Icon name="tag" size={13} />
-                            테마
+                            <Tooltip
+                              content={() => (
+                                <div style={{ lineHeight: 1.6 }}>
+                                  <strong>AI가 생성한 테마입니다</strong>
+                                  <br />
+                                  공개된 코스에 한해 AI가 경로·고도·지형 등을
+                                  분석해
+                                  <br />
+                                  어울리는 테마를 자동으로 부여합니다.
+                                  <br />
+                                  관리자 승인 후 공개됩니다.
+                                </div>
+                              )}
+                            >
+                              <Icon name="tag" size={13} />
+                              테마
+                              <Icon
+                                name="help"
+                                size={12}
+                                style={{ opacity: 0.6, marginLeft: 2 }}
+                              />
+                            </Tooltip>
                           </span>
                           <div className="insight-ai__tags">
-                            {getThemeLabels(selected.insight.themes).map(
-                              (theme, idx) => (
+                            {getThemeObjects(selected.insight.themes).map(
+                              ({ label, icon }, idx) => (
                                 <span key={idx} className="insight-tag">
-                                  {theme}
+                                  <Icon name={icon} size={11} />
+                                  {label}
                                 </span>
                               ),
                             )}
@@ -1035,8 +1058,28 @@ const CourseExplorer = ({ onOpenCourse }) => {
                       {selected.insight.feature && (
                         <div className="insight-ai__feature">
                           <span className="insight-ai__label">
-                            <Icon name="sparkles" size={13} />
-                            코스 특징
+                            <Tooltip
+                              content={() => (
+                                <div style={{ lineHeight: 1.6 }}>
+                                  <strong>AI가 생성한 코스 특징입니다</strong>
+                                  <br />
+                                  공개된 코스에 한해 AI가 경로·고도·지형 등을
+                                  분석해
+                                  <br />
+                                  1~2문장으로 요약합니다.
+                                  <br />
+                                  관리자 승인 후 공개됩니다.
+                                </div>
+                              )}
+                            >
+                              <Icon name="sparkles" size={13} />
+                              코스 특징
+                              <Icon
+                                name="help"
+                                size={12}
+                                style={{ opacity: 0.6, marginLeft: 2 }}
+                              />
+                            </Tooltip>
                           </span>
                           <p className="insight-ai__text">
                             {selected.insight.feature}
@@ -1046,8 +1089,29 @@ const CourseExplorer = ({ onOpenCourse }) => {
                       {selected.insight.route && (
                         <div className="insight-ai__route">
                           <span className="insight-ai__label">
-                            <Icon name="map" size={13} />
-                            코스 안내
+                            <Tooltip
+                              content={() => (
+                                <div style={{ lineHeight: 1.6 }}>
+                                  <strong>AI가 생성한 코스 안내입니다</strong>
+                                  <br />
+                                  공개된 코스에 한해 AI가 경로·고도·지형 등을
+                                  분석해
+                                  <br />
+                                  주요 포인트와 주의사항을 1~2문장으로
+                                  안내합니다.
+                                  <br />
+                                  관리자 승인 후 공개됩니다.
+                                </div>
+                              )}
+                            >
+                              <Icon name="map" size={13} />
+                              코스 안내
+                              <Icon
+                                name="help"
+                                size={12}
+                                style={{ opacity: 0.6, marginLeft: 2 }}
+                              />
+                            </Tooltip>
                           </span>
                           <p className="insight-ai__text">
                             {selected.insight.route}

@@ -1073,12 +1073,18 @@ def shared_course_page(token: str, session: Session = Depends(get_session)):
                         status_code=404, media_type="text/html", headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
     # 비공개/링크 공유 코스는 관련 코스 목록에도 노출하지 않습니다.
     related = session.exec(public_course_query().where(Course.id != course.id, Course.sport == course.sport).order_by(Course.id.desc()).limit(3)).all()
+    # 인사이트 데이터 로드 (공개 코스만)
+    from .course_insight import load_insights, insight_view
+    insights = load_insights(session, [course.id])
+    insight = insights.get(course.id)
+    insight_data = insight_view(insight) if insight else None
     try:
         from .course_pages import render_course_page
     except ImportError:
         from course_pages import render_course_page
     content = render_course_page(course, course_summary(course), nickname_of(session, author_uid(course)),
-        [{"token": item.share_token, "title": item.title, "sport": SPORT_LABELS.get(item.sport, "자전거")} for item in related])
+        [{"token": item.share_token, "title": item.title, "sport": SPORT_LABELS.get(item.sport, "자전거")} for item in related],
+        insight_data)
     return Response(content=content, media_type="text/html", headers={"Cache-Control": "no-store"})
 
 @app.post("/shared/{token}/copy")

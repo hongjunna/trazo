@@ -4,9 +4,67 @@ import math
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+# AI 인사이트 관련 상수 (backend/course_insight.py와 동기화)
+LEVEL_LABELS = {1: '입문', 2: '쉬움', 3: '보통', 4: '어려움', 5: '매우 어려움'}
+LEVEL_DESCRIPTIONS = {
+    'run': {
+        1: '평탄한 지형에서 5km 이하로 달리는 코스입니다. 러닝 입문자나 회복 주에 적합합니다.',
+        2: '완만한 기복이 있는 5~10km 코스입니다. 주 2~3회 러닝 경험이 있다면 무리 없이 소화 가능합니다.',
+        3: '고도 변화가 뚜렷한 10~20km 코스입니다. 지속적인 페이스 조절이 필요하며 중급자 이상에게 적합합니다.',
+        4: '가파른 오르막이 포함된 20km 이상 코스입니다. 언덕 훈련 경험이 풍부한 상급자에게 권장됩니다.',
+        5: '극한의 고도 변화와 장거리가 결합된 코스입니다. 전문적인 지구력과 기술이 필요합니다.'
+    },
+    'bike': {
+        1: '평탄한 지형에서 20km 이하로 달리는 코스입니다. 라이딩 입문자나 회복 라이딩에 적합합니다.',
+        2: '완만한 기복이 있는 20~50km 코스입니다. 주말 라이딩 경험이 있다면 편안하게 즐길 수 있습니다.',
+        3: '고도 변화가 뚜렷한 50~100km 코스입니다. 업힐 경험이 있는 중급자 이상에게 적합합니다.',
+        4: '가파른 업힐이 포함된 100km 이상 코스입니다. 긴 오르막 경험이 풍부한 상급자에게 권장됩니다.',
+        5: '극한의 업힐과 장거리가 결합된 코스입니다. 전문적인 등반 능력과 지구력이 필요합니다.'
+    }
+}
+TERRAIN_KO = {'flat': '평지', 'rolling': '완만한 언덕', 'hilly': '언덕', 'mountainous': '산악'}
+SHAPE_KO = {'loop': '순환', 'out_and_back': '왕복', 'point_to_point': '편도'}
+TRAINING_KO = {
+    'interval': '인터벌', 'tempo': '템포', 'hill_repeat': '언덕 반복',
+    'lsd': 'LSD(장거리)', 'recovery': '회복', 'race_pace': '레이스 페이스'
+}
+THEME_LABELS = {
+    'scenic': '경관', 'climb': '업힐', 'technical': '테크니컬',
+    'city': '도심', 'coastal': '해안', 'forest': '숲길',
+    'historic': '역사/문화', 'cafe': '카페', 'training': '훈련'
+}
+
+def get_difficulty_label(level):
+    return LEVEL_LABELS.get(level, '알 수 없음')
+
+def get_difficulty_description(level, sport):
+    return LEVEL_DESCRIPTIONS.get(sport, {}).get(level, '')
+
+def get_terrain_label(terrain):
+    return TERRAIN_KO.get(terrain, terrain)
+
+def get_shape_label(shape):
+    return SHAPE_KO.get(shape, shape)
+
+def get_training_label(training):
+    return TRAINING_KO.get(training, training)
+
+def get_theme_label(theme):
+    return THEME_LABELS.get(theme, theme)
+
 environment = Environment(loader=FileSystemLoader(Path(__file__).parent / 'templates'), autoescape=select_autoescape(['html']))
 
-def render_course_page(course, stats, nickname, related):
+# 템플릿에서 사용할 전역 함수 등록
+environment.globals.update(
+    get_difficulty_label=get_difficulty_label,
+    get_difficulty_description=get_difficulty_description,
+    get_terrain_label=get_terrain_label,
+    get_shape_label=get_shape_label,
+    get_training_label=get_training_label,
+    get_theme_label=get_theme_label
+)
+
+def render_course_page(course, stats, nickname, related, insight=None):
     segments = [[p for p in segment if all(isinstance(p.get(k), (int, float)) and math.isfinite(p[k]) for k in ('lat', 'lng'))]
                 for segment in json.loads(course.polylines_json)]
     segments = [segment for segment in segments if segment]
@@ -35,4 +93,4 @@ def render_course_page(course, stats, nickname, related):
         distance=f'{stats["distance_km"]:.2f}', ascent=f'{stats["ascent_m"]:,}', copies=course.share_count,
         start_url=f'/?course={course.share_token}&action=save', view_url=f'/?course={course.share_token}',
         route_svg=route_svg, elevation_svg=elevation_svg, min_ele=round(low), max_ele=round(high),
-        map_json=json.dumps(map_segments).replace('<','\\u003c'), related=related)
+        map_json=json.dumps(map_segments).replace('<','\\u003c'), related=related, insight=insight)

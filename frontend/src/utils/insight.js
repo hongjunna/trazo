@@ -107,8 +107,39 @@ export const THEME_LABELS = {
 };
 
 /**
+ * 테마별 아이콘 매핑
+ */
+export const THEME_ICONS = {
+  riverside: 'flag',
+  park: 'mountain',
+  lake: 'mountain',
+  coast: 'flag',
+  mountain_forest: 'mountain',
+  urban: 'street',
+  night_view: 'street',
+  seasonal: 'sparkles',
+  track: 'track',
+  race_course: 'target',
+  commute: 'bike',
+};
+
+/**
  * 테마 배열을 한글 라벨 배열로 변환
+ * 알 수 없는 테마는 제외합니다.
  */
 export function getThemeLabels(themes) {
-  return (themes ?? []).map((t) => THEME_LABELS[t] ?? t).filter(Boolean);
+  return (themes ?? []).map((t) => THEME_LABELS[t]).filter(Boolean);
+}
+
+/**
+ * 테마 배열을 {label, icon} 객체 배열로 변환
+ */
+export function getThemeObjects(themes) {
+  return (themes ?? [])
+    .map((t) => {
+      const label = THEME_LABELS[t];
+      if (!label) return null;
+      return { label, icon: THEME_ICONS[t] ?? 'tag' };
+    })
+    .filter(Boolean);
 }
