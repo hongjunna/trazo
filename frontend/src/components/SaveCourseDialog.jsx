@@ -1,6 +1,9 @@
 // src/components/SaveCourseDialog.jsx
 // 저장: 불러온 코스면 "기존 코스 업데이트"와 "새 코스로 저장" 중에서 고르고, 이름·폴더·공개 범위를 정합니다.
+// 러닝 코스를 전체 공개가 아닌 범위로 저장하려 하면, 전체 공개 시 받을 수 있는 AI 리포트를 한 번 더 안내합니다.
 import { useState } from 'react';
+import { AiNudgeDialog } from './AiReport';
+import { isAiReportSport, shouldNudgeAiReport } from '../utils/aiReport';
 import Dialog from './ui/Dialog';
 import Button from './ui/Button';
 import { FolderSelect } from './FolderSelect';
@@ -8,17 +11,25 @@ import { VisibilityPicker } from './ShareDialog';
 
 const TITLE_MAX = 60;
 
-const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, defaultFolderId = null, defaultVisibility = 'public', onSubmit, isSaving }) => {
+const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, defaultFolderId = null, defaultVisibility = 'public', sport, onSubmit, isSaving }) => {
     const [mode, setMode] = useState(existingTitle ? 'update' : 'new');
     const [title, setTitle] = useState(defaultTitle);
     const [folderId, setFolderId] = useState(defaultFolderId);
     const [visibility, setVisibility] = useState(defaultVisibility);
+    const [isNudgeOpen, setIsNudgeOpen] = useState(false);
     const trimmed = title.trim();
+    const aiReport = isAiReportSport(sport);
+
+    const save = (nextVisibility) => onSubmit({ mode, title: trimmed.slice(0, TITLE_MAX), folderId, visibility: nextVisibility });
 
     const submit = (event) => {
         event.preventDefault();
         if (!trimmed || isSaving) return;
-        onSubmit({ mode, title: trimmed.slice(0, TITLE_MAX), folderId, visibility });
+        if (aiReport && visibility !== 'public' && shouldNudgeAiReport()) {
+            setIsNudgeOpen(true);
+            return;
+        }
+        save(visibility);
     };
 
     return (
@@ -74,9 +85,17 @@ const SaveCourseDialog = ({ open, onClose, defaultTitle, existingTitle, defaultF
 
                 <div className="form-group">
                     <span className="form-label">공개 범위</span>
-                    <VisibilityPicker value={visibility} onChange={setVisibility} disabled={isSaving} />
+                    <VisibilityPicker value={visibility} onChange={setVisibility} disabled={isSaving} aiHint={aiReport} />
                 </div>
             </form>
+            {isNudgeOpen && (
+                <AiNudgeDialog
+                    visibility={visibility}
+                    onClose={() => setIsNudgeOpen(false)}
+                    onSavePublic={() => { setIsNudgeOpen(false); setVisibility('public'); save('public'); }}
+                    onSaveAsIs={() => { setIsNudgeOpen(false); save(visibility); }}
+                />
+            )}
         </Dialog>
     );
 };

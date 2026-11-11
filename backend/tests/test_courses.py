@@ -303,7 +303,7 @@ class CommunityTests(unittest.TestCase):
         self.assertEqual((shared['title'], shared['visibility'], shared['is_owner']), ('한강 코스', 'link', False))
         self.assertEqual(shared['polylines'], self.polylines)
         self.assertTrue(self.client.get(f'/shared/{token}', headers=self.owner).json()['is_owner'])
-        # 링크 공유 코스는 커뮤니티에 뜨지 않고, 좋아요·댓글을 쓸 수 없습니다.
+        # 부분 공개 코스는 커뮤니티에 뜨지 않고, 좋아요·댓글을 쓸 수 없습니다.
         self.assertEqual(self.client.get('/community').json()['items'], [])
         self.nickname(self.other, '구경꾼')
         self.assertEqual(self.client.post(f'/shared/{token}/like', headers=self.other).status_code, 404)

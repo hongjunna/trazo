@@ -44,6 +44,8 @@ import CourseExplorer from './components/CourseExplorer';
 import PageFrame from './components/PageFrame';
 import TopNav from './components/TopNav';
 import NicknameDialog from './components/NicknameDialog';
+import WhatsNewDialog from './components/WhatsNewDialog';
+import { shouldShowWhatsNew } from './utils/aiReport';
 import SportPicker from './components/SportPicker';
 import WaypointDialog from './components/WaypointDialog';
 import Button from './components/ui/Button';
@@ -189,6 +191,7 @@ function App() {
   // 처음 방문하면 종목부터 고르게 합니다. 한 번 고른 뒤에는 종목 선택 화면을 닫을 수 있습니다.
   const [hasPickedSport, setHasPickedSport] = useState(isSport(storedSport));
   const [isSportPickerOpen, setIsSportPickerOpen] = useState(!isSport(storedSport) && !INITIAL_SHARE_TOKEN);
+  const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(shouldShowWhatsNew);
   const [routeOptionsBySport, setRouteOptionsBySport] = useState(initialRouteOptions);
   const [speedBySport, setSpeedBySport] = useState(initialSpeeds);
   const [isAutoRouting, setIsAutoRouting] = useState(true);
@@ -1419,6 +1422,7 @@ function App() {
           defaultFolderId={currentMeta ? currentMeta.folderId : readStored('trazo:lastFolder', null)}
           // 새 코스는 전체 공개가 기본입니다. 닉네임을 정하기 전에는 전체 공개를 할 수 없어 비공개로 시작합니다.
           defaultVisibility={currentMeta?.visibility ?? (nickname ? 'public' : 'private')}
+          sport={sport}
           onSubmit={handleSubmitSave}
           isSaving={isSaving}
         />
@@ -1465,6 +1469,11 @@ function App() {
       {imageCourse && (
         <CourseImageDialog course={imageCourse} onDownload={handleDownloadImage} onClose={() => setImageCourse(null)} />
       )}
+      {/* 업데이트 안내는 종목 고르기·공유받은 코스 창이 닫힌 뒤에 보여줍니다. */}
+      <WhatsNewDialog
+        open={isWhatsNewOpen && !isSportPickerOpen && !sharedToken}
+        onClose={() => setIsWhatsNewOpen(false)}
+      />
       <RoutingHelpDialog open={isHelpOpen} onClose={() => setIsHelpOpen(false)} sport={sport} />
       <SportPicker
         open={isSportPickerOpen && page === 'create'}

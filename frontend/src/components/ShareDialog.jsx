@@ -1,5 +1,5 @@
 // src/components/ShareDialog.jsx
-// 공개 범위(비공개·링크 공유·전체 공개)를 바꾸고 공유 링크를 복사합니다.
+// 공개 범위(비공개·부분 공개·전체 공개)를 바꾸고 공유 링크를 복사합니다.
 import { useState } from 'react';
 import { apiErrorMessage, updateCourse } from '../api/courseApi';
 import { VISIBILITY, VISIBILITY_IDS, copyText, shareUrl, visibilityOf } from '../utils/share';
@@ -8,11 +8,19 @@ import Button from './ui/Button';
 import Icon from './ui/Icon';
 import SegmentedControl from './ui/SegmentedControl';
 import { useFeedback } from './ui/feedbackContext';
+import { AiReportHint } from './AiReport';
+import { isAiReportSport } from '../utils/aiReport';
 
 const VISIBILITY_OPTIONS = VISIBILITY_IDS.map(id => ({ value: id, label: VISIBILITY[id].label, icon: VISIBILITY[id].icon }));
 
-export const VisibilityPicker = ({ value, onChange, disabled = false }) => (
+// aiHint: 러닝 코스면 "전체 공개" 위에 AI 리포트 제공 표시를 붙입니다.
+export const VisibilityPicker = ({ value, onChange, disabled = false, aiHint = false }) => (
     <div className="visibility-picker">
+        {aiHint && (
+            <div className="visibility-picker__hint">
+                <AiReportHint active={value === 'public'} />
+            </div>
+        )}
         <SegmentedControl label="공개 범위" value={value} onChange={onChange} disabled={disabled} options={VISIBILITY_OPTIONS} />
         <p className="form-hint">{VISIBILITY[value].desc}</p>
     </div>
@@ -68,7 +76,7 @@ const ShareDialog = ({ course, onUpdated, onClose }) => {
             footer={<Button variant="primary" onClick={onClose}>완료</Button>}
         >
             <span className="form-label">공개 범위</span>
-            <VisibilityPicker value={visibility} onChange={change} disabled={busy} />
+            <VisibilityPicker value={visibility} onChange={change} disabled={busy} aiHint={isAiReportSport(course.sport)} />
             {visibility !== 'private' && course.share_token && (
                 <>
                     <span className="form-label" style={{ marginTop: 16 }}>공유 링크</span>

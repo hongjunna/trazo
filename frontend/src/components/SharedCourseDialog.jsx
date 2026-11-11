@@ -1,5 +1,5 @@
 // src/components/SharedCourseDialog.jsx
-// 공유받은 코스(링크 공유·전체 공개)의 전체 모습: 지도, 거리·고도, 고도 차트, 내 코스에 담기.
+// 공유받은 코스(부분 공개·전체 공개)의 전체 모습: 지도, 거리·고도, 고도 차트, 내 코스에 담기.
 // 전체 공개 코스는 좋아요와 댓글도 남길 수 있습니다. 열려 있는 동안 주소창은 공유 링크(/c/<토큰>)가 됩니다.
 import { useEffect, useMemo, useState } from 'react';
 import {

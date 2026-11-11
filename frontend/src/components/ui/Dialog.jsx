@@ -23,6 +23,8 @@ const Dialog = ({
     className = '',
     bodyClassName = '',
     headerExtra,
+    backdropClassName = '',
+    ariaLabel,
 }) => {
     const dialogRef = useRef(null);
     const onCloseRef = useRef(onClose);
@@ -68,13 +70,14 @@ const Dialog = ({
 
     return createPortal(
         <div
-            className="dialog-backdrop"
+            className={`dialog-backdrop ${backdropClassName}`}
             onMouseDown={(event) => { if (dismissible && event.target === event.currentTarget) onClose?.(); }}
         >
             <div
                 ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
+                aria-label={title ? undefined : ariaLabel}
                 aria-labelledby={title ? `${id}-title` : undefined}
                 aria-describedby={description ? `${id}-desc` : undefined}
                 tabIndex={-1}

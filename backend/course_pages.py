@@ -54,7 +54,7 @@ def render_course_page(course, stats, nickname, related, insight=None):
     map_segments = [segment[::max(1,len(segment)//1000)] + ([segment[-1]] if len(segment)>1 else []) for segment in segments]
     return environment.get_template('course.html').render(
         title=course.title, description=course.description, nickname=nickname or '라이더', sport=sport,
-        visibility='전체 공개' if course.visibility=='public' else '링크 공유',
+        visibility='전체 공개' if course.visibility=='public' else '부분 공개',
         robots='index, follow, max-image-preview:large' if course.visibility=='public' else 'noindex, follow',
         url=f'https://trazo.runvia.app/c/{course.share_token}', summary=summary,
         distance=f'{stats["distance_km"]:.2f}', ascent=f'{stats["ascent_m"]:,}', copies=course.share_count,

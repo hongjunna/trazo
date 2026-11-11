@@ -85,7 +85,7 @@
       allow_ad_personalization_signals: false,
     });
 
-    // 링크 공유 코스(/c/<토큰>, ?course=<토큰>)는 주소를 아는 사람만 열 수 있으므로 토큰과 코스 이름을 보내지 않습니다.
+    // 부분 공개 코스(/c/<토큰>, ?course=<토큰>)는 주소를 아는 사람만 열 수 있으므로 토큰과 코스 이름을 보내지 않습니다.
     var SHARE_PATH = /^\/c\/[A-Za-z0-9_-]{6,64}(?=\/?$)/;
     function redact(href) {
       if (!href) return '';

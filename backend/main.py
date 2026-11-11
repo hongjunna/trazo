@@ -991,7 +991,7 @@ def preview_tags(base: str, path: str, title: str, description: str) -> str:
     image = f"{base}/og-image.png"
     meta = [
         ("name", "description", description),
-        # 공유 페이지는 링크 공유/비공개 전환을 지원하므로 검색 색인 대상에서 제외합니다.
+        # 공유 페이지는 부분 공개/비공개 전환을 지원하므로 검색 색인 대상에서 제외합니다.
         ("name", "robots", "noindex, follow"),
         ("property", "og:type", "website"),
         ("property", "og:site_name", SITE_NAME),
@@ -1071,9 +1071,9 @@ def shared_course_page(token: str, session: Session = Depends(get_session)):
     except HTTPException:
         return Response(content='<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="robots" content="noindex"><title>코스를 볼 수 없어요 | Trazo</title></head><body><h1>코스를 볼 수 없어요</h1><p>공유가 해제됐거나 삭제된 코스입니다.</p><a href="/">Trazo에서 코스 만들기</a></body></html>',
                         status_code=404, media_type="text/html", headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
-    # 비공개/링크 공유 코스는 관련 코스 목록에도 노출하지 않습니다.
+    # 비공개/부분 공개 코스는 관련 코스 목록에도 노출하지 않습니다.
     related = session.exec(public_course_query().where(Course.id != course.id, Course.sport == course.sport).order_by(Course.id.desc()).limit(3)).all()
-    # 코스 분석은 전체 공개 코스에만 보여줍니다 (링크 공유 코스는 분석하지 않습니다).
+    # 코스 분석은 전체 공개 코스에만 보여줍니다 (부분 공개 코스는 분석하지 않습니다).
     insight_data = insight_view(session.get(CourseInsight, course.id)) if course.visibility == "public" else None
     try:
         from .course_pages import render_course_page
@@ -1829,7 +1829,7 @@ async def export_tcx(request: TCXExportRequest):
     )
 # --- 9. AI 연결 (MCP 서버 + OAuth 로그인) ---
 # ChatGPT·Claude 같은 AI 서비스에 https://<도메인>/mcp 를 커넥터로 추가하면, 사용자가 Trazo 계정으로 로그인해
-# 자신의 코스(비공개·링크 공유 포함)와 전체 공개 코스를 AI가 읽을 수 있습니다. 읽기 전용입니다.
+# 자신의 코스(비공개·부분 공개 포함)와 전체 공개 코스를 AI가 읽을 수 있습니다. 읽기 전용입니다.
 #
 # 로그인 흐름 (OAuth 2.1 + PKCE, 동적 클라이언트 등록):
 #  1. AI 서비스가 /mcp 에서 401을 받고 /.well-known/oauth-protected-resource/mcp → /.well-known/oauth-authorization-server 를 읽습니다.
@@ -2443,7 +2443,7 @@ class McpContext:
 class SearchCoursesArgs(BaseModel):
     model_config = ConfigDict(extra="ignore")
     scope: Literal["all", "mine", "public"] = PydanticField(
-        default="all", description="all: 내 코스 + 전체 공개 코스, mine: 내 코스만(비공개·링크 공유 포함), public: 전체 공개 코스만")
+        default="all", description="all: 내 코스 + 전체 공개 코스, mine: 내 코스만(비공개·부분 공개 포함), public: 전체 공개 코스만")
     query: Optional[str] = PydanticField(default=None, max_length=50, description="코스 이름·설명·작성자 닉네임(내 코스는 폴더 이름도)에 포함된 단어. 장소를 찾을 때는 이 값 대신 near_lat/near_lng를 쓰세요.")
     sport: Optional[Sport] = PydanticField(default=None, description="run: 러닝 코스, bike: 자전거 코스")
     near_lat: Optional[float] = PydanticField(default=None, ge=-90, le=90, description="이 위치 근처를 지나는 코스만 찾습니다 (위도, WGS84). near_lng와 함께 씁니다.")
@@ -2638,7 +2638,7 @@ def find_place_tool(ctx: McpContext, args: FindPlaceArgs) -> dict:
     return {"places": places}
 
 MCP_INSTRUCTIONS = """Trazo(트라소, https://trazo.runvia.app)는 지도에 점을 찍어 러닝·자전거 코스를 만들고 저장하는 한국 서비스입니다.
-이 서버로 로그인한 사용자의 코스(비공개·링크 공유 포함)와, 다른 사용자가 커뮤니티에 전체 공개한 코스를 읽을 수 있습니다. 읽기 전용입니다.
+이 서버로 로그인한 사용자의 코스(비공개·부분 공개 포함 — 부분 공개는 링크를 받은 사람만 볼 수 있는 코스)와, 다른 사용자가 커뮤니티에 전체 공개한 코스를 읽을 수 있습니다. 읽기 전용입니다.
 
 - 코스 추천: search_courses로 후보를 찾고, 추천할 코스는 get_course로 고도·경사·오르막·구간 정보를 확인한 뒤 이유와 함께 추천하세요.
 - 장소 기준 검색(예: "한강에서", "여의도 근처"): find_place로 좌표를 얻어 search_courses의 near_lat/near_lng/radius_km에 넣으세요. find_place가 없으면 알고 있는 좌표를 쓰세요. 한강처럼 긴 장소는 여러 지점(예: 여의도·반포·뚝섬·망원)으로 나눠 찾을 수 있습니다.

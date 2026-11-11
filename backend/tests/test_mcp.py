@@ -305,7 +305,7 @@ class McpTests(unittest.TestCase):
         self.assertEqual(courses['남의 공개 코스']['url'], f"{BASE}/c/{other_public['share_token']}")
         self.assertEqual(courses['남의 공개 코스']['course_ref'], other_public['share_token'])
         self.assertEqual(courses['내 비밀 코스']['course_ref'], str(mine['id']))
-        # 링크 공유 코스는 검색되지 않지만 링크를 받으면 읽을 수 있습니다.
+        # 부분 공개 코스는 검색되지 않지만 링크를 받으면 읽을 수 있습니다.
         linked = self.call(token, 'get_course', course_ref=f"{BASE}/c/{other_link['share_token']}")
         self.assertEqual(linked['structuredContent']['title'], '남의 링크 코스')
         self.assertEqual(self.call(token, 'get_course', course_ref=f"https://trazo.runvia.app/?course={other_link['share_token']}")['structuredContent']['title'], '남의 링크 코스')

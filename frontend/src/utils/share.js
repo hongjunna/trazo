@@ -3,7 +3,7 @@
 
 export const VISIBILITY = {
     private: { label: '비공개', icon: 'lock', desc: '나만 볼 수 있어요.' },
-    link: { label: '링크 공유', icon: 'link', desc: '링크를 받은 사람만 볼 수 있어요. 커뮤니티에는 올라가지 않아요.' },
+    link: { label: '부분 공개', icon: 'link', desc: '링크를 받은 사람만 볼 수 있어요. 커뮤니티에는 올라가지 않아요.' },
     public: { label: '전체 공개', icon: 'globe', desc: '커뮤니티에 올라가 누구나 보고 좋아요·댓글을 남길 수 있어요. 검색엔진에도 노출될 수 있어요.' },
 };
 export const VISIBILITY_IDS = Object.keys(VISIBILITY);
