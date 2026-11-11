@@ -853,6 +853,13 @@ def refresh_insight(session: Session, course: Course) -> Optional[CourseInsight]
     digest = course_insight.input_hash(course)
     insight = session.get(CourseInsight, course.id)
     if insight and insight.input_hash == digest and insight.rules_version == course_insight.RULES_VERSION:
+        # PROMPT_VERSION이 변경되었을 경우에도 재분석
+        if insight.prompt_version != course_insight.PROMPT_VERSION:
+            insight.ai_status = "pending"
+            insight.ai_job_id = None
+            insight.updated_at = utc_now()
+            session.add(insight)
+            session.commit()
         return insight
     analysis = course_geo.analyze_route(course.polylines_json, course.sport)
     rules = course_insight.rule_insight(analysis, course.sport)

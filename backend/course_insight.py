@@ -222,8 +222,32 @@ def parse_response(raw: str, analysis: dict, rules: dict) -> tuple:
     issues = [str(i)[:200] for i in (data.get("data_issues") or []) if i][:5]
     warnings = []
     elevation_ok = rules["has_elevation"] and not rules["elevation_suspect"]
-    if not elevation_ok and _ELEVATION_WORDS.search(feature):
-        warnings.append("고도 정보를 쓸 수 없는 코스인데 특징 문장에 지형(평지·오르막 등) 표현이 있음")
+    
+    # 고도 정보가 없는 코스에서는 지형 관련 표현이 포함되지 않도록 처리
+    if not elevation_ok:
+        if _ELEVATION_WORDS.search(feature):
+            warnings.append("고도 정보를 쓸 수 없는 코스인데 특징 문장에 지형(평지·오르막 등) 표현이 있음")
+            # 지형 표현을 제거하여 더 이상 사용하지 않도록 수정
+            feature = re.sub(_ELEVATION_WORDS, "", feature).strip()
+    
+    # 테마 검증: OSM 장소 유형과 비교하여 일치 여부 확인
+    if "places_along_route" in analysis and analysis["places_along_route"]:
+        osm_places = [p for p in analysis["places_along_route"][:5] if p.get("kind")]
+        theme_place_match = False
+        for theme in themes:
+            if theme in ["lake", "river", "ocean", "sea", "beach", "mountain"]:
+                # 예상되는 테마와 OSM 장소 비교
+                for place in osm_places:
+                    if (theme == "lake" and "natural=water" in place.get("kind", "")) or \
+                       (theme in ["river", "stream"] and ("waterway=river" in place.get("kind", "") or "waterway=stream" in place.get("kind", ""))) or \
+                       (theme in ["ocean", "sea"] and "natural=water" in place.get("kind", "")) or \
+                       (theme == "beach" and "natural=beach" in place.get("kind", "")) or \
+                       (theme == "mountain" and ("natural=peak" in place.get("kind", "") or "natural=wood" in place.get("kind", ""))):
+                        theme_place_match = True
+                        break
+        if not theme_place_match and osm_places:
+            warnings.append(f"AI 생성 테마와 근처 장소 유형이 일치하지 않음 (OSM: {', '.join([p['kind'] for p in osm_places[:3]])})")
+    
     distance = analysis["distance_km"]
     allowed = [distance] + [c["length_km"] for c in analysis["climbs"]] + [c["start_km"] for c in analysis["climbs"]]
     for match in _KM_NUMBER.finditer(feature + " " + route):
