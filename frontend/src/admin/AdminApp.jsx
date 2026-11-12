@@ -433,7 +433,7 @@ const InsightsTab = ({ onUnauthorized }) => {
                 <div>
                     <h2 className="admin-subtitle">공개 코스 AI 분석</h2>
                     <p className="admin-muted">
-                        {data.auto_publish ? '분석이 완료되면 자동 공개됩니다.' : '분석 완료 후 검토 대기 상태가 되며, 승인해야 공개됩니다.'}
+                        {data.auto_publish ? '분석이 완료되면 바로 공개되고, 신뢰도가 낮은 결과(경고·자료 문제)만 검토 대기로 남습니다.' : '분석 완료 후 검토 대기 상태가 되며, 승인해야 공개됩니다.'}
                         {data.counts.pending ? ' · 5초마다 자동 갱신 중' : ''}
                     </p>
                 </div>

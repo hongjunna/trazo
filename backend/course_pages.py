@@ -29,6 +29,7 @@ def insight_page_view(insight, sport_code):
         "themes": themes,
         "feature": insight.get("feature"),
         "route": insight.get("route"),
+        "ai_state": insight.get("ai_state"),
     }
 
 def render_course_page(course, stats, nickname, related, insight=None):

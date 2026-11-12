@@ -13,7 +13,7 @@ import { isAiReportSport } from '../utils/aiReport';
 
 const VISIBILITY_OPTIONS = VISIBILITY_IDS.map(id => ({ value: id, label: VISIBILITY[id].label, icon: VISIBILITY[id].icon }));
 
-// aiHint: 러닝 코스면 "전체 공개" 위에 AI 리포트 제공 표시를 붙입니다.
+// aiHint: 러닝·자전거 코스면 "전체 공개" 위에 AI 리포트 제공 표시를 붙입니다.
 export const VisibilityPicker = ({ value, onChange, disabled = false, aiHint = false }) => (
     <div className="visibility-picker">
         {aiHint && (

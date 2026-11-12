@@ -1,5 +1,6 @@
 // src/components/CourseInsight.jsx
-// 전체 공개 코스의 분석 결과. 규칙으로 계산한 난이도·코스 성격과, AI가 쓰고 운영자가 검토한 소개를 나눠 보여줍니다.
+// 전체 공개 코스의 분석 결과. 규칙으로 계산한 난이도·코스 성격과, AI가 쓴 소개를 나눠 보여줍니다.
+// AI 소개가 아직 없으면 ai_state에 따라 분석 중(곧 공개)인지, 운영진 확인 중인지 알려줍니다.
 // compact: 탐색기 지도 위 카드처럼 좁은 곳에서는 추천 훈련과 AI 테마·특징만 보여줍니다.
 import {
   getDistanceLabel,
@@ -15,7 +16,12 @@ import Tooltip from './ui/Tooltip';
 
 const SHAPE_ICONS = { loop: 'loop', out_and_back: 'outback', point_to_point: 'straight' };
 const AI_NOTE =
-  '경로·고도·주변 장소를 바탕으로 AI가 쓰고 운영자가 검토한 글이에요. 전체 공개 코스에만 있어요. 현장 상황과 다를 수 있으니 참고만 해주세요.';
+  '경로·고도·주변 장소를 바탕으로 AI가 쓴 글이에요. 신뢰도가 낮은 글은 운영진이 확인한 뒤 보여줘요. 전체 공개 코스에만 있어요. 현장 상황과 다를 수 있으니 참고만 해주세요.';
+
+const AI_STATUS = {
+  analyzing: { icon: 'loader', title: 'AI가 코스를 분석하고 있어요', desc: '잠시 후 테마와 코스 소개가 이곳에 표시돼요.' },
+  review: { icon: 'clock', title: '운영진이 AI 분석 결과를 확인하고 있어요', desc: '자동 분석의 신뢰도가 낮아 확인을 마친 뒤 코스 소개가 표시돼요.' },
+};
 
 const isLevel = (level) => Number.isInteger(level) && level >= 1 && level <= 5;
 
@@ -51,8 +57,10 @@ const CourseInsight = ({ insight, sport, compact = false }) => {
   const training = getTrainingLabels(insight.training);
   const themes = getThemeObjects(insight.themes);
   const hasAi = themes.length > 0 || Boolean(insight.feature) || (!compact && Boolean(insight.route));
+  // 좁은 카드(compact)에는 상태 안내를 넣지 않습니다.
+  const status = !hasAi && !compact ? AI_STATUS[insight.ai_state] : null;
 
-  if (!level && facts.length === 0 && training.length === 0 && !hasAi) return null;
+  if (!level && facts.length === 0 && training.length === 0 && !hasAi && !status) return null;
 
   return (
     <div className={`insight${compact ? ' insight--compact' : ''}`}>
@@ -90,6 +98,24 @@ const CourseInsight = ({ insight, sport, compact = false }) => {
             </ul>
           )}
           {!compact && level && <p className="insight-level__basis">거리와 상승 고도로 계산했어요.</p>}
+        </section>
+      )}
+
+      {status && (
+        <section className="insight-ai insight-ai--status" aria-label="AI 코스 소개" aria-live="polite">
+          <div className="insight-ai__head">
+            <span className="insight-ai__badge">
+              <Icon name="sparkles" size={12} />
+              AI 소개
+            </span>
+          </div>
+          <p className="insight-ai__status">
+            <Icon name={status.icon} size={14} className={insight.ai_state === 'analyzing' ? 'spin' : undefined} />
+            <span>
+              <b>{status.title}</b>
+              {status.desc}
+            </span>
+          </p>
         </section>
       )}
 

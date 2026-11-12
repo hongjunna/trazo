@@ -1,5 +1,5 @@
 // src/components/AiReport.jsx
-// 전체 공개 러닝 코스에 붙는 AI 리포트 안내: 공개 범위 위의 "AI 리포트 제공" 표시, 소개 대화상자,
+// 전체 공개 러닝·자전거 코스에 붙는 AI 리포트 안내: 공개 범위 위의 "AI 리포트 제공" 표시, 소개 대화상자,
 // 전체 공개가 아닌 범위로 저장할 때 한 번 더 권하는 대화상자.
 import { useState } from 'react';
 import { hideAiNudge } from '../utils/aiReport';
@@ -11,9 +11,9 @@ import Icon from './ui/Icon';
 
 const FEATURES = [
     { icon: 'gauge', title: '난이도 5단계', desc: '거리와 상승 고도로 입문부터 매우 어려움까지 코스 난이도를 매겨요.' },
-    { icon: 'run', title: '추천 훈련', desc: '인터벌·템포런·언덕 반복·LSD 등 코스 성격에 맞는 훈련을 추천해요.' },
+    { icon: 'run', title: '추천 훈련', desc: '러닝은 인터벌·템포런·LSD, 자전거는 업힐 훈련·지구력·회복 라이딩 등 코스 성격에 맞는 훈련을 추천해요.' },
     { icon: 'sparkles', title: 'AI 코스 소개', desc: '경로·고도·주변 장소를 살펴 강변·공원 같은 테마와 코스 특징, 코스 안내를 써 드려요.' },
-    { icon: 'users', title: '더 많은 러너에게', desc: '커뮤니티와 코스 탐색에 난이도·테마가 함께 보여 다른 러너가 코스를 고르기 쉬워져요.' },
+    { icon: 'users', title: '더 많은 러너·라이더에게', desc: '커뮤니티와 코스 탐색에 난이도·테마가 함께 보여 다른 사람이 코스를 고르기 쉬워져요.' },
 ];
 
 const SAMPLE_INSIGHT = {
@@ -53,7 +53,7 @@ export const AiReportDialog = ({ open, onClose }) => (
         open={open}
         onClose={onClose}
         title="AI 코스 리포트"
-        description="전체 공개한 러닝 코스를 AI가 분석해 코스에 리포트를 붙여 드려요."
+        description="전체 공개한 러닝·자전거 코스를 AI가 분석해 코스에 리포트를 붙여 드려요."
         initialFocus="dialog"
         footer={<Button variant="primary" onClick={onClose} data-autofocus>확인</Button>}
     >
@@ -73,7 +73,7 @@ export const AiReportDialog = ({ open, onClose }) => (
             <CourseInsight insight={SAMPLE_INSIGHT} sport="run" />
         </div>
         <p className="form-hint">
-            저장하면 분석이 시작되고, AI 소개는 운영자가 검토한 뒤 보여요. 부분 공개·비공개 코스는 분석하지 않아요.
+            저장하면 바로 분석을 시작하고 끝나는 대로 보여요. 신뢰도가 낮은 AI 소개는 운영진이 확인한 뒤 보여요. 부분 공개·비공개 코스는 분석하지 않아요.
         </p>
     </Dialog>
 );

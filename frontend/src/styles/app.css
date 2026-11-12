@@ -501,7 +501,8 @@
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* 거리·상승 고도는 내용만큼, 남는 폭은 예상 시간(최대 "99시간 10분")에 줍니다. */
+  grid-template-columns: auto auto minmax(0, 1fr);
   padding: 8px 6px 12px;
 }
 
@@ -2550,6 +2551,26 @@
 
 .insight-themes li svg {
   opacity: 0.75;
+}
+
+.insight-ai__status {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-text-2);
+}
+
+.insight-ai__status svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: #4a4fa8;
+}
+
+.insight-ai__status b {
+  display: block;
+  color: var(--c-text);
+  font-weight: 700;
 }
 
 .insight-ai__feature {

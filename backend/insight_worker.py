@@ -3,7 +3,8 @@
 1. 분석 대기(pending) 코스를 모아 OSM에서 경로 근처 장소를 찾고, Junlab AI 브릿지(NVIDIA AI API, docs/ai연동가이드.md)에 바로 요청합니다.
 2. 브릿지가 실패하면(404 등 오류·응답 형식 불량) 곧바로 Groq 무료 API로 다시 요청합니다.
 3. Groq도 실패하면(한도 초과 등) 재시도 대기(queued)로 두고 관리자 디스코드로 알린 뒤, 일정 시간(기본 30분)마다 다시 시도합니다.
-결과는 검증·저장하고 관리자 디스코드로 검토 요청을 보냅니다.
+결과는 검증해 바로 공개하고(신뢰도가 낮으면 검토 대기), 관리자 디스코드로 알립니다.
+분석할 코스가 생기면 기다리지 않고 바로 처리하며, 할 일이 없을 때만 잠깐(기본 10초) 쉬었다가 다시 확인합니다.
 규칙 분석(난이도·추천 훈련)은 백엔드가 코스를 저장할 때 바로 계산하고, 여기서는 AI 부분(소개 문장·테마)만 다룹니다.
 """
 import datetime
@@ -33,7 +34,8 @@ GROQ_DAILY_LIMIT = int(os.getenv("COURSE_INSIGHT_GROQ_DAILY_LIMIT", "30"))
 RETRY_AFTER_S = float(os.getenv("COURSE_INSIGHT_RETRY_MINUTES", "30")) * 60
 DISCORD_WEBHOOK = os.getenv("COURSE_INSIGHT_DISCORD_WEBHOOK", "").strip()
 OSM_PBF = os.getenv("OSM_PBF", "/data/south-korea-latest.osm.pbf")
-INTERVAL_S = 60
+# 할 일이 없을 때 다음 확인까지 기다리는 시간. 처리할 코스가 있으면 기다리지 않고 바로 이어서 처리합니다.
+IDLE_S = float(os.getenv("COURSE_INSIGHT_IDLE_SECONDS", "10"))
 # 한 번에 장소를 찾는 코스 수 (OSM 파일을 한 번 훑는 데 약 2~3분, 메모리는 경로 주변 점 수에 비례)
 BATCH = 6
 MAX_ATTEMPTS = 3
@@ -89,7 +91,7 @@ def notify(insight: CourseInsight, course: Course, warnings: list):
     training = ", ".join(course_insight.TRAINING_KO.get(t, t) for t in rules.get("training") or []) or "-"
     themes = ", ".join(json.loads(insight.themes_json or "[]")) or "-"
     issues = json.loads(insight.issues_json or "[]")
-    status = "바로 공개됨" if insight.ai_status == "published" else "검토 대기"
+    status = "바로 공개됨" if insight.ai_status == "published" else ("검토 대기 (신뢰도 낮음)" if main.INSIGHT_AUTO_PUBLISH else "검토 대기")
     lines = [
         f"🗺️ **코스 AI 분석 · {status}** #{course.id} {course.title}",
         f"{'●' * level}{'○' * (5 - level)} {course_insight.LEVEL_LABELS.get(level, '-')} · 추천 훈련: {training} · 테마: {themes}",
@@ -157,7 +159,9 @@ def finish(session: Session, course: Course, insight: CourseInsight, raw: str, p
     insight.ai_hash = insight.input_hash
     insight.ai_provider, insight.ai_model = provider, model
     insight.prompt_version = course_insight.PROMPT_VERSION
-    insight.ai_status = "published" if main.INSIGHT_AUTO_PUBLISH else "review"
+    # 검증 경고나 AI가 짚은 자료 문제가 있으면 신뢰도가 낮은 결과로 보고 운영진 확인을 거칩니다.
+    confident = not warnings and not parsed["data_issues"]
+    insight.ai_status = "published" if main.INSIGHT_AUTO_PUBLISH and confident else "review"
     insight.ai_job_id = None
     insight.ai_error = None
     insight.updated_at = utc_now()
@@ -244,7 +248,8 @@ def prepare_prompts(session: Session, rows: list):
     session.commit()
 
 
-def submit_pending():
+def submit_pending() -> int:
+    """분석할 코스를 한 묶음 처리하고, 실제로 AI에 요청한 코스 수를 돌려줍니다."""
     retry_before = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=RETRY_AFTER_S)).isoformat()
     with Session(engine) as session:
         due = (CourseInsight.ai_status == "pending") | (
@@ -255,9 +260,9 @@ def submit_pending():
                 due, Course.is_deleted == False, Course.visibility == "public")
             .order_by(CourseInsight.updated_at).limit(BATCH)).all()
         if not rows:
-            return
+            return 0
         prepare_prompts(session, rows)
-        deferred = []
+        deferred, handled = [], 0
         for insight, course in rows:
             course, insight = current(session, insight.course_id)
             if not course or not insight.ai_prompt:
@@ -265,10 +270,12 @@ def submit_pending():
             was_queued = insight.ai_status == "queued"
             reason = analyze(session, course, insight)
             session.commit()
+            handled += 1
             # 이미 재시도 대기였던 코스는 다시 알리지 않습니다 (처음 넘어갈 때만 알림).
             if reason and not was_queued:
                 deferred.append((course, reason))
         notify_deferred(deferred)
+        return handled
 
 
 def release_hidden():
@@ -292,13 +299,16 @@ def run():
              "켜짐" if bridge_enabled() else "꺼짐", BRIDGE_MODEL, "켜짐" if GROQ_KEY else "꺼짐",
              RETRY_AFTER_S / 60, main.INSIGHT_AUTO_PUBLISH)
     while True:
+        handled = 0
         try:
             if bridge_enabled() or GROQ_KEY:
                 release_hidden()
-                submit_pending()
+                handled = submit_pending()
         except Exception:
             log.exception("작업 중 오류")
-        time.sleep(INTERVAL_S)
+        # 방금 처리한 코스가 있으면 남은 코스를 바로 이어서 처리합니다.
+        if not handled:
+            time.sleep(IDLE_S)
 
 
 if __name__ == "__main__":

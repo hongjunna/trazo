@@ -76,7 +76,19 @@
               <p>{{ insight.route }}</p>
             </div>
             {% endif %}
-            <p class="ai-note">경로·고도·주변 장소를 바탕으로 AI가 쓰고 운영자가 검토한 글이에요. 현장 상황과 다를 수 있어요.</p>
+            <p class="ai-note">경로·고도·주변 장소를 바탕으로 AI가 쓴 글이에요. 현장 상황과 다를 수 있어요.</p>
+          </section>
+          {% elif insight and insight.ai_state in ('analyzing', 'review') %}
+          <section class="card ai-card ai-card--pending" aria-labelledby="ai-card-title">
+            <div class="ai-card__head">
+              <h2 id="ai-card-title">코스 소개</h2>
+              <span class="ai-badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>AI 작성</span>
+            </div>
+            {% if insight.ai_state == 'analyzing' %}
+            <p class="ai-status"><b>AI가 코스를 분석하고 있어요.</b> 잠시 후 테마와 코스 소개가 이곳에 표시돼요.</p>
+            {% else %}
+            <p class="ai-status"><b>운영진이 AI 분석 결과를 확인하고 있어요.</b> 자동 분석의 신뢰도가 낮아 확인을 마친 뒤 코스 소개가 표시돼요.</p>
+            {% endif %}
           </section>
           {% endif %}
           <section class="card map-card">

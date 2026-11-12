@@ -319,3 +319,17 @@ a:focus-visible {
   font-size: 12.5px;
   color: #586d6b;
 }
+/* AI 소개를 아직 보여줄 수 없을 때 (분석 중·운영진 확인 중) */
+.ai-status {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f4f7f5;
+  color: #586d6b;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.ai-status b {
+  display: block;
+  color: #173b3e;
+}

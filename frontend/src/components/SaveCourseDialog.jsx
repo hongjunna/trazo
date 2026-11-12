@@ -1,6 +1,6 @@
 // src/components/SaveCourseDialog.jsx
 // 저장: 불러온 코스면 "기존 코스 업데이트"와 "새 코스로 저장" 중에서 고르고, 이름·폴더·공개 범위를 정합니다.
-// 러닝 코스를 전체 공개가 아닌 범위로 저장하려 하면, 전체 공개 시 받을 수 있는 AI 리포트를 한 번 더 안내합니다.
+// 러닝·자전거 코스를 전체 공개가 아닌 범위로 저장하려 하면, 전체 공개 시 받을 수 있는 AI 리포트를 한 번 더 안내합니다.
 import { useState } from 'react';
 import { AiNudgeDialog } from './AiReport';
 import { isAiReportSport, shouldNudgeAiReport } from '../utils/aiReport';

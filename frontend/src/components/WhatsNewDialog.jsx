@@ -11,14 +11,19 @@ import Icon from './ui/Icon';
 
 const FEATURES = [
     {
+        icon: 'bike',
+        title: '자전거 코스도 AI 리포트',
+        desc: '이제 전체 공개한 자전거 코스도 AI가 분석해 난이도, 업힐 훈련·회복 라이딩 같은 추천 훈련, 테마와 코스 소개를 붙여 드려요.',
+    },
+    {
         icon: 'sparkles',
-        title: 'AI 코스 리포트',
-        desc: '전체 공개한 러닝 코스를 AI가 분석해 난이도, 추천 훈련, 테마와 코스 소개를 붙여 드려요.',
+        title: '분석이 끝나면 바로 공개',
+        desc: '코스를 전체 공개로 저장하면 바로 분석을 시작하고, 끝나는 대로 코스에 리포트가 보여요.',
     },
     {
         icon: 'gauge',
         title: '한눈에 보는 난이도·테마',
-        desc: '커뮤니티와 코스 탐색에서 난이도와 강변·공원 같은 테마를 보고 오늘 달릴 코스를 골라 보세요.',
+        desc: '커뮤니티와 코스 탐색에서 난이도와 강변·공원 같은 테마를 보고 오늘 달리고 탈 코스를 골라 보세요.',
     },
     {
         icon: 'message',
@@ -44,7 +49,7 @@ const WhatsNewDialog = ({ open, onClose }) => {
                 onClose={close}
                 className="whats-new"
                 backdropClassName="dialog-backdrop--blur"
-                ariaLabel="Trazo AI 업데이트 안내"
+                ariaLabel="Trazo 자전거 AI 리포트 업데이트 안내"
                 initialFocus="dialog"
                 footer={<>
                     <label className="check-row whats-new__hide">
@@ -56,10 +61,10 @@ const WhatsNewDialog = ({ open, onClose }) => {
                 </>}
             >
                 <div className="whats-new__hero">
-                    <span className="whats-new__mark"><Icon name="sparkles" size={26} /></span>
+                    <span className="whats-new__mark"><Icon name="bike" size={26} /></span>
                     <span className="whats-new__tag">NEW UPDATE</span>
-                    <h2 className="whats-new__title">Trazo에 AI가 더해졌어요</h2>
-                    <p className="whats-new__lead">코스를 만들고 공유하는 일에 AI가 함께해요.</p>
+                    <h2 className="whats-new__title">자전거 코스도 AI 리포트를 받아요</h2>
+                    <p className="whats-new__lead">러닝에 이어 자전거 코스까지, 코스를 만들고 공유하는 일에 AI가 함께해요.</p>
                 </div>
                 <ul className="ai-features">
                     {FEATURES.map(({ icon, title, desc, link }) => (
@@ -74,10 +79,7 @@ const WhatsNewDialog = ({ open, onClose }) => {
                 </ul>
                 <div className="whats-new__soon">
                     <span className="whats-new__soon-tag">COMING SOON</span>
-                    <p>
-                        <Icon name="bike" size={15} /> <b>자전거 코스도 곧 AI 리포트를 지원해요.</b>
-                    </p>
-                    <p>그리고 이건 시작일 뿐이에요. AI와 함께하는 더 다양한 기능을 준비하고 있으니 기대해 주세요.</p>
+                    <p>AI와 함께하는 더 다양한 기능을 준비하고 있으니 기대해 주세요.</p>
                 </div>
             </Dialog>
             <AiReportDialog open={open && isReportOpen} onClose={() => setIsReportOpen(false)} />

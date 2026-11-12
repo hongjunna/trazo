@@ -906,8 +906,14 @@ def insight_view(insight: Optional[CourseInsight]) -> Optional[dict]:
     view = {"difficulty": insight.difficulty, "distance": rules.get("distance"), "shape": rules.get("shape"),
             "terrain": rules.get("terrain"), "training": rules.get("training") or [],
             "has_elevation": bool(rules.get("has_elevation")), "elevation_suspect": bool(rules.get("elevation_suspect")),
-            "themes": [], "feature": None, "route": None}
+            "themes": [], "feature": None, "route": None, "ai_state": None}
+    # ai_state: ready(AI 소개 공개됨) · analyzing(분석 중, 곧 공개) · review(신뢰도가 낮아 운영진 확인 후 공개) · None(보여줄 AI 소개 없음)
+    if insight.ai_status in ("pending", "queued"):
+        view["ai_state"] = "analyzing"
+    elif insight.ai_status == "review":
+        view["ai_state"] = "review"
     if insight.ai_status == "published" and insight.ai_hash == insight.input_hash:
+        view["ai_state"] = "ready"
         try:
             themes = json.loads(insight.themes_json or "[]")
         except ValueError:
@@ -1552,10 +1558,11 @@ def admin_course_detail(course_id: int, session: Session = Depends(get_session))
     }
 
 # --- 6-5. 관리자: 코스 분석 검토 ---
-# AI가 만든 소개 문장·테마는 처음에는 관리자가 승인해야 공개됩니다 (COURSE_INSIGHT_AUTO_PUBLISH=true면 바로 공개).
+# AI가 만든 소개 문장·테마는 분석이 끝나면 바로 공개합니다. 검증 경고나 AI가 짚은 자료 문제가 있는(신뢰도가 낮은) 결과만
+# 검토 대기로 두고 관리자가 승인해야 공개됩니다. COURSE_INSIGHT_AUTO_PUBLISH=false면 모든 결과를 검토 대기로 둡니다.
 
 INSIGHT_STATUSES = ("pending", "queued", "review", "published", "rejected", "failed")
-INSIGHT_AUTO_PUBLISH = os.getenv("COURSE_INSIGHT_AUTO_PUBLISH", "").strip().lower() == "true"
+INSIGHT_AUTO_PUBLISH = os.getenv("COURSE_INSIGHT_AUTO_PUBLISH", "").strip().lower() not in ("false", "0", "no", "off")
 
 def load_json(raw: Optional[str], default):
     try:

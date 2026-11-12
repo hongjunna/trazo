@@ -2,15 +2,15 @@
 // AI 리포트 안내와 업데이트 안내를 다시 보여줄지 기억합니다.
 import { readStored, writeStored } from './storage';
 
-// AI 리포트는 지금 러닝 코스에만 안내합니다 (자전거는 준비 중).
-export const isAiReportSport = (sport) => sport === 'run';
+// AI 리포트는 러닝과 자전거 코스 모두에 붙습니다.
+export const isAiReportSport = (sport) => sport === 'run' || sport === 'bike';
 
 const NUDGE_KEY = 'trazo:hideAiNudge';
 export const shouldNudgeAiReport = () => !readStored(NUDGE_KEY, false);
 export const hideAiNudge = () => writeStored(NUDGE_KEY, true);
 
 // 다음 업데이트를 알릴 때는 UPDATE_ID와 WhatsNewDialog 내용을 바꾸세요.
-const UPDATE_ID = '2026-11-ai-report';
+const UPDATE_ID = '2026-11-bike-ai-report';
 const SEEN_KEY = 'trazo:seenUpdate';
 const SESSION_KEY = 'trazo:updateClosed';
 
