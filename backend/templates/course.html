@@ -229,7 +229,7 @@
         <h2>{% if related[0].near_km is not none %}근처의 다른 코스{% else %}함께 둘러볼 공개 코스{% endif %}</h2>
         <div class="related-grid">
           {% for item in related %}<a class="card" href="/c/{{ item.token }}"
-            ><strong>{{ item.title }}</strong><span>{{ item.sport }}{% if item.distance_km %} · {{ item.distance_km }}km{% endif %}{% if item.near_km is not none %} · {{ item.near_km }}km 떨어짐{% endif %}</span></a
+            ><strong>{{ item.title }}</strong><span>{{ item.sport }}{% if item.distance_km %} · {{ item.distance_km }}km{% endif %}{% if item.near_km is not none %} · {% if item.near_km < 0.1 %}같은 출발점{% else %}{{ item.near_km }}km 떨어짐{% endif %}{% endif %}</span></a
           >{% endfor %}
         </div>
       </section>

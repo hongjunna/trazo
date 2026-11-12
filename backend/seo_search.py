@@ -8,7 +8,7 @@ import re
 
 # 검색어 표현 → 같은 뜻으로 보는 말 (문서 쪽 표현)
 SYNONYMS = {
-    "러닝": ("러닝", "달리기", "런", "조깅", "뛰기", "뛸", "달릴", "running", "run"),
+    "러닝": ("러닝", "달리기", "런", "조깅", "뛰기", "뛸", "달릴", "마라톤", "running", "run"),
     "자전거": ("자전거", "라이딩", "사이클", "싸이클", "로드", "라이드", "cycling", "bike", "그란폰도"),
     "순환": ("순환", "순환런", "루프", "한바퀴", "한 바퀴", "loop"),
     "왕복": ("왕복",),
@@ -71,6 +71,9 @@ def parse_query(query: str) -> dict:
                 # 장소를 뜻하는 말(공원·호수·강변)은 '광교호수공원'처럼 이름의 일부라 검색어에 남깁니다.
                 if key not in PLACE_CONCEPTS:
                     rest = rest.replace(word, " ")
+        # '순환런'·'한강런'처럼 '~런'으로 끝나면 러닝 코스를 찾는 말입니다.
+        if token.endswith("런") and "러닝" not in concepts:
+            concepts.append("러닝")
         for word in sorted(STOPWORDS, key=len, reverse=True):
             rest = rest.replace(word, " ")
         for part in rest.split():
