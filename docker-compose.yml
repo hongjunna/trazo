@@ -199,6 +199,8 @@ services:
       - JUNLAB_AI_BASE_URL=${JUNLAB_AI_BASE_URL:-}
       - JUNLAB_AI_API_KEY=${JUNLAB_AI_API_KEY:-}
       - JUNLAB_AI_MODEL=${JUNLAB_AI_MODEL:-google/gemma-4-31b-it}
+      # 기본 모델이 실패하면 차례로 시도할 브릿지 모델 (비우면 backend/insight_worker.py의 기본 목록)
+      - JUNLAB_AI_FALLBACK_MODELS=${JUNLAB_AI_FALLBACK_MODELS:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-}
       - COURSE_INSIGHT_AUTO_PUBLISH=${COURSE_INSIGHT_AUTO_PUBLISH:-}

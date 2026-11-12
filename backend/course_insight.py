@@ -253,7 +253,9 @@ def parse_response(raw: str, analysis: dict, rules: dict) -> tuple:
             warnings.append(f"AI 생성 테마와 근처 장소 유형이 일치하지 않음 (OSM: {', '.join([p['kind'] for p in osm_places[:3]])})")
     
     distance = analysis["distance_km"]
-    allowed = [distance] + [c["length_km"] for c in analysis["climbs"]] + [c["start_km"] for c in analysis["climbs"]]
+    # 난이도 설명("5km 미만", "10km를 쉬지 않고")과 대회 거리에 나오는 숫자는 자료에 있는 숫자로 봅니다.
+    allowed = ([distance] + [c["length_km"] for c in analysis["climbs"]] + [c["start_km"] for c in analysis["climbs"]]
+               + [b for bounds in DISTANCE_BOUNDS_KM.values() for b in bounds] + list(RACE_DISTANCES_KM.values()))
     for match in _KM_NUMBER.finditer(feature + " " + route):
         value = float(match.group(1))
         if not any(abs(value - a) <= max(0.15, a * 0.02) for a in allowed):
