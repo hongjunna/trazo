@@ -1,7 +1,8 @@
 // src/components/CourseMap.jsx
 // 공유받은 코스를 보여주는 작은 지도 (편집 없음). 코스 전체가 보이도록 맞추고, 고도 차트를 훑는 위치를 점으로 표시합니다.
 import { useEffect, useMemo, useState } from 'react';
-import { CustomOverlayMap, Map, MapMarker, Polyline } from 'react-kakao-maps-sdk';
+import { latLng, mapBounds } from '../maps/settings';
+import { CustomOverlayMap, Map, MapMarker, Polyline } from '../maps/Map';
 import { markerIcons, HOVER_MARKER_ICON } from '../constants';
 import { flattenCourse } from '../utils/course';
 import { COLORS } from '../styles/theme';
@@ -21,8 +22,8 @@ const CourseMap = ({ polylines, markers, waypoints = [], color, hoverPoint }) =>
         if (!map || !points.length) return;
         const fit = () => {
             map.relayout();
-            const bounds = new window.kakao.maps.LatLngBounds();
-            points.forEach(point => bounds.extend(new window.kakao.maps.LatLng(point.lat, point.lng)));
+            const bounds = mapBounds();
+            points.forEach(point => bounds.extend(latLng(point.lat, point.lng)));
             map.setBounds(bounds, 28, 28, 28, 28);
         };
         fit();
@@ -33,7 +34,7 @@ const CourseMap = ({ polylines, markers, waypoints = [], color, hoverPoint }) =>
 
     return (
         <div className="course-map">
-            <Map center={start ?? { lat: 37.5665, lng: 126.978 }} level={6} style={{ width: '100%', height: '100%' }} onCreate={setMap}>
+            <Map showLayerPicker center={start ?? { lat: 37.5665, lng: 126.978 }} level={6} style={{ width: '100%', height: '100%' }} onCreate={setMap}>
                 {polylines.map((path, idx) => (
                     <Polyline key={`o-${idx}`} path={path} strokeWeight={8} strokeColor={COLORS.primary} strokeOpacity={0.45} strokeStyle="solid" />
                 ))}

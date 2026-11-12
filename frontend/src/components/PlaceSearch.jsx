@@ -3,7 +3,7 @@
 // 결과는 목록과 지도 위 번호 핀으로 보여주고, 고르면 그 위치로 옮깁니다. 닫으면 결과 핀도 함께 지웁니다.
 // 상태는 hooks/usePlaceSearch.js
 import { useEffect, useRef, useState } from 'react';
-import { CustomOverlayMap } from 'react-kakao-maps-sdk';
+import { CustomOverlayMap } from '../maps/Map';
 import Button from './ui/Button';
 import Icon from './ui/Icon';
 

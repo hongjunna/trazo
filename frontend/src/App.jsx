@@ -3,7 +3,9 @@
 // 코스 생성 화면은 데스크톱에서 왼쪽 사이드바 + 지도 + 아래 고도 패널, 모바일에서 전체 지도 + 아래 시트입니다.
 // 다른 화면으로 옮겨도 만들던 코스가 사라지지 않도록 코스 생성 화면은 숨겨 두기만 합니다.
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
+import { createHoverOverlay } from './maps/external';
+import { latLng, mapBounds, mapPoint } from './maps/settings';
+import { Map, MapMarker, Polyline, CustomOverlayMap } from './maps/Map';
 import { onAuthStateChanged } from 'firebase/auth';
 
 import { markerIcons } from './constants';
@@ -104,7 +106,7 @@ const LONG_PRESS_MS = 450;
 const metersPerPixelOf = (map) => {
   const projection = map.getProjection();
   const at = (y) => {
-    const coords = projection.coordsFromContainerPoint(new window.kakao.maps.Point(0, y));
+    const coords = projection.coordsFromContainerPoint(mapPoint(0, y));
     return { lat: coords.getLat(), lng: coords.getLng() };
   };
   return (distanceKm(at(0), at(100)) * 1000) / 100;
@@ -182,7 +184,6 @@ function App() {
   const mapAreaRef = useRef(null);
   const hoverMarkerRef = useRef(null);
   const [hoverBus] = useState(createHoverBus);
-  const [isSatellite, setIsSatellite] = useState(() => readStored('trazo:satellite', false) === true);
   const [myLocation, setMyLocation] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
 
@@ -262,9 +263,7 @@ function App() {
     const content = document.createElement('div');
     content.className = 'hover-dot';
     content.setAttribute('aria-hidden', 'true');
-    const marker = new window.kakao.maps.CustomOverlay({ position: map.getCenter(), content, zIndex: 100, clickable: false });
-    marker.setMap(map);
-    marker.setVisible(false);
+    const marker = createHoverOverlay(map, content);
     hoverMarkerRef.current = marker;
     return () => marker.setMap(null);
   }, [map]);
@@ -278,22 +277,13 @@ function App() {
     return () => observer.disconnect();
   }, [map, isMobile]);
 
-  // 일반 지도와 위성 지도(지명·도로 이름 포함)를 바꿔 보여주고,
-  // 자전거 코스에서만 카카오 자전거 지도(자전거도로 표시)를 겹쳐 보여줍니다.
+  // 지도 종류는 공통 지도 계층에서 적용합니다. 카카오에서만 자전거 지도를 겹칩니다.
   useEffect(() => {
-    if (!map) return;
+    if (!map || map.provider) return;
     const { MapTypeId } = window.kakao.maps;
-    map.setMapTypeId(isSatellite ? MapTypeId.HYBRID : MapTypeId.ROADMAP);
     map.removeOverlayMapTypeId(MapTypeId.BICYCLE);
     if (currentSport.showBicycleOverlay) map.addOverlayMapTypeId(MapTypeId.BICYCLE);
-  }, [map, isSatellite, currentSport.showBicycleOverlay]);
-
-  const handleToggleSatellite = () => {
-    setIsSatellite(on => {
-      writeStored('trazo:satellite', !on);
-      return !on;
-    });
-  };
+  }, [map, currentSport.showBicycleOverlay]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -308,8 +298,8 @@ function App() {
 
   const fitToPoints = useCallback((points) => {
     if (!map || !points.length) return;
-    const bounds = new window.kakao.maps.LatLngBounds();
-    points.forEach(point => bounds.extend(new window.kakao.maps.LatLng(point.lat, point.lng)));
+    const bounds = mapBounds();
+    points.forEach(point => bounds.extend(latLng(point.lat, point.lng)));
     const bottom = isMobile ? sheetPeek + 24 : 48;
     map.setBounds(bounds, isMobile ? 90 : 48, isMobile ? 64 : 80, bottom, isMobile ? 24 : 48);
   }, [map, isMobile, sheetPeek]);
@@ -474,7 +464,7 @@ function App() {
     const projection = map.getProjection();
     const radius = GRAB_PX.mouse;
     const onMarker = currentMarkers.some(marker => {
-      const p = projection.containerPointFromCoords(new window.kakao.maps.LatLng(marker.lat, marker.lng));
+      const p = projection.containerPointFromCoords(latLng(marker.lat, marker.lng));
       return Math.hypot(p.x - screenPoint.x, p.y - screenPoint.y) <= radius;
     });
     return onMarker ? null : nearestOnTrack(trackIndex, point, radius * metersPerPixelOf(map));
@@ -582,6 +572,25 @@ function App() {
       writeStored('trazo:routeOptions', next);
       return next;
     });
+  };
+
+  // 저장된 코스에도 새 길찾기 규칙을 적용합니다. 실패하면 기존 코스를 유지하고 한 번에 되돌릴 수 있습니다.
+  const handleRecalculate = () => {
+    if (!hasCourse) return;
+    runRouting(async signal => {
+      const polylines = [];
+      const markers = [];
+      for (let i = 0; i < currentMarkers.length - 1; i++) {
+        if (signal.aborted) return currentState;
+        const from = markers.at(-1) ?? currentMarkers[i];
+        const segment = await findRoute(from, currentMarkers[i + 1], 'turn-by-turn', signal);
+        polylines.push(segment);
+        if (!i) markers.push(onRoad(segment[0]));
+        markers.push(onRoad(segment.at(-1)));
+      }
+      if (isLoop) markers[markers.length - 1] = markers[0];
+      return { markers, polylines };
+    }, () => toast('전체 경로를 다시 찾지 못했어요. 기존 코스는 그대로 유지됩니다.', { tone: 'error' }));
   };
 
   const handleChangeSpeed = (speedKmh) => {
@@ -903,7 +912,7 @@ function App() {
         const point = { lat: position.coords.latitude, lng: position.coords.longitude };
         setMyLocation(point);
         map?.setLevel(Math.min(map.getLevel(), 4));
-        map?.panTo(new window.kakao.maps.LatLng(point.lat, point.lng));
+        map?.panTo(latLng(point.lat, point.lng));
         setIsLocating(false);
       },
       (error) => {
@@ -925,7 +934,7 @@ function App() {
     const marker = hoverMarkerRef.current;
     if (!marker) return;
     if (coord) {
-      marker.setPosition(new window.kakao.maps.LatLng(coord.lat, coord.lng));
+      marker.setPosition(latLng(coord.lat, coord.lng));
       marker.setVisible(true);
     } else {
       marker.setVisible(false);
@@ -951,7 +960,6 @@ function App() {
   useEffect(() => {
     const node = mapAreaRef.current;
     if (!map || !node) return;
-    const { kakao } = window;
     let gesture = null;
     let hoverFrame = 0;
     let dragFrame = 0;
@@ -964,7 +972,7 @@ function App() {
       return { x: event.clientX - rect.left, y: event.clientY - rect.top };
     };
     const toLatLng = ({ x, y }) => {
-      const coords = map.getProjection().coordsFromContainerPoint(new kakao.maps.Point(x, y));
+      const coords = map.getProjection().coordsFromContainerPoint(mapPoint(x, y));
       return { lat: coords.getLat(), lng: coords.getLng() };
     };
     const metersPerPixel = () => metersPerPixelOf(map);
@@ -976,7 +984,7 @@ function App() {
       const projection = map.getProjection();
       let best = null;
       markers.forEach((marker, i) => {
-        const p = projection.containerPointFromCoords(new kakao.maps.LatLng(marker.lat, marker.lng));
+        const p = projection.containerPointFromCoords(latLng(marker.lat, marker.lng));
         const d = Math.hypot(p.x - pos.x, p.y - pos.y);
         if (d <= radius && (!best || d <= best.d)) best = { d, index: i };
       });
@@ -1184,6 +1192,7 @@ function App() {
       onToggleSmoothStraight={handleToggleSmoothStraight}
       routeOptions={routeOptionsBySport[sport]}
       onToggleRouteOption={handleToggleRouteOption}
+      onRecalculate={handleRecalculate}
       onOpenHelp={() => setIsHelpOpen(true)}
       speedKmh={speedBySport[sport]}
       onChangeSpeed={handleChangeSpeed}
@@ -1311,8 +1320,6 @@ function App() {
         isLocating={isLocating}
         onFit={handleFit}
         canFit={hasMarkers}
-        isSatellite={isSatellite}
-        onToggleSatellite={handleToggleSatellite}
       />
       <PlaceSearchPanel search={placeSearch} />
     </div>

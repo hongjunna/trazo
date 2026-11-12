@@ -1843,8 +1843,12 @@
 
 .library__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 10px;
+}
+
+.library__list > li {
+  min-width: 0;
 }
 
 .course-card {
@@ -1896,6 +1900,9 @@
 }
 
 .course-card__title {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
   font-size: 15px;
   font-weight: 700;
   overflow: hidden;
@@ -1991,7 +1998,7 @@
 
 @media (max-width: 767px) {
   .library__list {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .library__toolbar .segmented {
@@ -2249,7 +2256,6 @@
   cursor: pointer;
 }
 
-.community-card .course-card__title,
 .community-card .course-card__meta,
 .community-card .counts {
   display: flex;

@@ -480,8 +480,13 @@ class RouteRequestTests(unittest.TestCase):
         body = api.build_route_request(['37.5,127.0', '37.6,127.1'], 'run', ['avoid_stairs', 'avoid_stairs', 'prefer_trails'])
         self.assertEqual(body['points'], [[127.0, 37.5], [127.1, 37.6]])
         self.assertEqual(body['profile'], 'run')
-        self.assertEqual(len(body['custom_model']['priority']), 2)
-        self.assertNotIn('custom_model', api.build_route_request(['37.5,127.0', '37.6,127.1'], 'bike', []))
+        self.assertEqual(len(body['custom_model']['priority']), 3)
+        self.assertEqual(body['custom_model']['distance_influence'], 1000)
+
+    def test_ferries_are_blocked_even_without_user_options(self):
+        for profile in ('bike', 'run'):
+            body = api.build_route_request(['37.52547,126.935112', '37.574746,126.84375'], profile, [])
+            self.assertIn({'if': 'road_environment == FERRY', 'multiply_by': '0'}, body['custom_model']['priority'])
 
     def test_rejects_unknown_profile_option_and_points(self):
         from fastapi import HTTPException

@@ -1,6 +1,7 @@
 // src/hooks/usePlaceSearch.js
 // 코스 생성 지도의 장소 검색 상태 (카카오 지도 키워드 검색). 검색창과 지도 위 결과 핀이 함께 씁니다.
 import { useCallback, useRef, useState } from 'react';
+import { latLng, mapBounds } from '../maps/settings';
 
 const MAX_RESULTS = 15;
 
@@ -22,7 +23,7 @@ export const usePlaceSearch = (map) => {
         setState(prev => ({ ...prev, status: 'loading', searched: keyword }));
         const options = { size: MAX_RESULTS };
         // 지금 보고 있는 지도 가운데와 가까운 곳을 먼저 보여줍니다.
-        if (map) options.location = map.getCenter();
+        if (map) { const c = map.getCenter(); options.location = new window.kakao.maps.LatLng(c.getLat(), c.getLng()); }
         service.keywordSearch(keyword, (data, status) => {
             if (request !== requestRef.current) return;
             const { Status } = window.kakao.maps.services;
@@ -38,8 +39,8 @@ export const usePlaceSearch = (map) => {
                 setState({ status: 'done', results, searched: keyword });
                 setActiveId(null);
                 if (map && results.length) {
-                    const bounds = new window.kakao.maps.LatLngBounds();
-                    results.forEach(place => bounds.extend(new window.kakao.maps.LatLng(place.lat, place.lng)));
+                    const bounds = mapBounds();
+                    results.forEach(place => bounds.extend(latLng(place.lat, place.lng)));
                     map.setBounds(bounds, 80, 80, 80, 80);
                 }
             } else {
@@ -52,7 +53,7 @@ export const usePlaceSearch = (map) => {
         setActiveId(place.id);
         if (!map) return;
         if (map.getLevel() > 4) map.setLevel(4);
-        map.panTo(new window.kakao.maps.LatLng(place.lat, place.lng));
+        map.panTo(latLng(place.lat, place.lng));
     }, [map]);
 
     const close = useCallback(() => {

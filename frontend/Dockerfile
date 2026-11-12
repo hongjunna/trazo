@@ -13,6 +13,9 @@ ARG VITE_FIREBASE_PROJECT_ID
 ARG VITE_FIREBASE_APP_ID
 # 선택: 비워 두면 Google Analytics를 넣지 않습니다.
 ARG VITE_GA_MEASUREMENT_ID
+ARG VITE_GOOGLE_MAPS_API_KEY
+ARG VITE_OSM_TILE_URL
+ARG VITE_OSM_ATTRIBUTION
 RUN test -n "$VITE_FIREBASE_API_KEY" && test -n "$VITE_FIREBASE_AUTH_DOMAIN" \
     && test -n "$VITE_FIREBASE_PROJECT_ID" && test -n "$VITE_FIREBASE_APP_ID" \
     || (echo "Firebase 설정이 누락됐습니다. docker compose로 빌드하고 .env의 VITE_FIREBASE 값을 확인해주세요." >&2; exit 1)

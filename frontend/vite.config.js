@@ -50,8 +50,32 @@ function aiConnectPages() {
 }
 
 // https://vite.dev/config/
+// 공유 페이지는 백엔드 HTML에서 JS를 직접 읽으므로 공통 지도 CSS도 고정 이름의 CSS에 포함합니다.
+function courseViewerStyles() {
+  return {
+    name: 'trazo-course-viewer-styles',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const entry = bundle['course-viewer.js']
+      if (!entry) return
+      const css = new Set()
+      const seen = new Set()
+      const collect = chunk => {
+        if (!chunk || chunk.type !== 'chunk' || seen.has(chunk.fileName)) return
+        seen.add(chunk.fileName)
+        chunk.viteMetadata?.importedCss?.forEach(name => css.add(name))
+        chunk.imports.forEach(name => collect(bundle[name]))
+      }
+      collect(entry)
+      const shared = [...css].filter(name => name !== 'course-viewer.css').map(name => bundle[name]?.source || '').join('\n')
+      if (bundle['course-viewer.css']) bundle['course-viewer.css'].source += '\n' + shared
+      else this.emitFile({ type: 'asset', fileName: 'course-viewer.css', source: shared })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), analytics(), aiConnectPages()],
+  plugins: [react(), analytics(), aiConnectPages(), courseViewerStyles()],
   // 관리자 페이지(/admin/)는 코스 편집 화면과 따로 빌드합니다.
   build: {
     rollupOptions: {

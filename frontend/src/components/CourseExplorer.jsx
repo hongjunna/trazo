@@ -4,7 +4,8 @@
 // 데스크톱은 왼쪽 목록 + 지도, 모바일은 전체 화면 지도 + 아래 접히는 목록입니다.
 // '전체'와 '트랙' 보기에서는 육상 트랙(OpenStreetMap·관리자 등록)도 트랙 모양 선이나 핀으로 함께 보여줍니다.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Map, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
+import { latLng, mapBounds, mapPoint } from '../maps/settings';
+import { Map, Polyline, CustomOverlayMap } from '../maps/Map';
 import { getCourseMap, getTrackMap } from '../api/courseApi';
 import { SPORTS, SPORT_IDS } from '../sports';
 import { COLORS } from '../styles/theme';
@@ -454,27 +455,27 @@ const CourseExplorer = ({ onOpenCourse }) => {
     if (!fit && map) {
       const projection = map.getProjection();
       const point = projection.containerPointFromCoords(
-        new window.kakao.maps.LatLng(track.lat, track.lng),
+        latLng(track.lat, track.lng),
       );
       const node = map.getNode?.();
       const height = node?.clientHeight ?? 600;
       if (point.y < 300)
         map.panTo(
           projection.coordsFromContainerPoint(
-            new window.kakao.maps.Point(point.x, point.y - height * 0.25),
+            mapPoint(point.x, point.y - height * 0.25),
           ),
         );
     }
     if (fit && map) {
       if (track.path?.length) {
-        const box = new window.kakao.maps.LatLngBounds();
+        const box = mapBounds();
         track.path.forEach(([lat, lng]) =>
-          box.extend(new window.kakao.maps.LatLng(lat, lng)),
+          box.extend(latLng(lat, lng)),
         );
         map.setBounds(box, 80, 80, 80, 80);
       } else {
         map.setLevel(3);
-        map.panTo(new window.kakao.maps.LatLng(track.lat, track.lng));
+        map.panTo(latLng(track.lat, track.lng));
       }
     }
   };
@@ -493,9 +494,9 @@ const CourseExplorer = ({ onOpenCourse }) => {
     setSelectedTrackId(null);
     setSelectedToken(item.token);
     if (fit && map) {
-      const box = new window.kakao.maps.LatLngBounds();
+      const box = mapBounds();
       item.path.forEach(([lat, lng]) =>
-        box.extend(new window.kakao.maps.LatLng(lat, lng)),
+        box.extend(latLng(lat, lng)),
       );
       map.setBounds(box, 60, 60, 60, 60);
     }
@@ -515,7 +516,7 @@ const CourseExplorer = ({ onOpenCourse }) => {
         };
         setMyLocation(point);
         map?.setLevel(6);
-        map?.panTo(new window.kakao.maps.LatLng(point.lat, point.lng));
+        map?.panTo(latLng(point.lat, point.lng));
       },
       () => {},
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
@@ -630,7 +631,7 @@ const CourseExplorer = ({ onOpenCourse }) => {
       </aside>
 
       <div className={`explore__map ${muted ? 'is-muted' : ''}`} ref={areaRef}>
-        <Map
+        <Map showLayerPicker
           center={view.center}
           level={view.level}
           className="map-canvas"

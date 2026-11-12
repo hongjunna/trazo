@@ -99,6 +99,9 @@ services:
         VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:?VITE_FIREBASE_PROJECT_ID 값을 .env에 입력해주세요}
         VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:?VITE_FIREBASE_APP_ID 값을 .env에 입력해주세요}
         VITE_GA_MEASUREMENT_ID: ${VITE_GA_MEASUREMENT_ID:-}
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+        VITE_OSM_TILE_URL: ${VITE_OSM_TILE_URL:-}
+        VITE_OSM_ATTRIBUTION: ${VITE_OSM_ATTRIBUTION:-© OpenStreetMap contributors}
     restart: unless-stopped
     ports:
       # 호스트 nginx가 127.0.0.1:3000으로 연결하므로 외부에는 열지 않습니다. 다른 기기에서 직접 접속하려면 FRONTEND_BIND=0.0.0.0

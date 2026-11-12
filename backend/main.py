@@ -414,7 +414,7 @@ UNPAVED = " || ".join(f"surface == {s}" for s in ("UNPAVED", "COMPACTED", "FINE_
 
 # 클라이언트가 임의 규칙을 보낼 수 없도록, 허용된 옵션 이름만 GraphHopper 규칙으로 바꿉니다.
 # 옵션은 길의 선호도를 조금씩만 조정합니다. 값이 너무 크면(예: 0.3) 곧게 갈 수 있는 길도 크게 돌아가므로,
-# 서울 시내 68개 구간으로 확인했을 때 최단 거리 대비 평균 4~5% 이내로 우회하도록 맞춘 값입니다.
+# 러닝은 보도·횡단보도 선호가 과해지지 않도록 완화했습니다. 재현 수치는 docs/map-providers.md에 있습니다.
 ROUTE_OPTIONS = {
     "bike": {
         "prefer_bikeway": [{"if": "road_class == CYCLEWAY || bike_network != MISSING", "multiply_by": "1.2"}],
@@ -429,10 +429,10 @@ ROUTE_OPTIONS = {
         "prefer_trails": [{
             "if": "road_class == FOOTWAY || road_class == PATH || road_class == PEDESTRIAN || road_class == CYCLEWAY"
                   " || road_class == LIVING_STREET || foot_network != MISSING",
-            "multiply_by": "1.4",
+            "multiply_by": "1.05",
         }],
         # 보도가 있는 일반 간선도로(2·3차로급)는 그대로 두고, 대로만 덜 지나갑니다.
-        "avoid_big_roads": [{"if": "road_class == PRIMARY || road_class == TRUNK", "multiply_by": "0.7"}],
+        "avoid_big_roads": [{"if": "road_class == PRIMARY || road_class == TRUNK", "multiply_by": "0.95"}],
         "avoid_stairs": [{"if": "road_class == STEPS", "multiply_by": "0.1"}],
         "avoid_unpaved": [{"if": UNPAVED, "multiply_by": "0.4"}],
         "avoid_hills": [{"if": "average_slope >= 5", "multiply_by": "0.5"}],
@@ -453,7 +453,8 @@ def build_route_request(points: List[str], profile: str, options: List[str]) -> 
         if not (-90 <= lat <= 90 and -180 <= lng <= 180):
             raise HTTPException(status_code=400, detail="Invalid point")
         coordinates.append([lng, lat])
-    priority = []
+    # snap_preventions는 점을 붙이는 위치만 제한합니다. 이동 중 배 이용도 별도로 금지합니다.
+    priority = [{"if": "road_environment == FERRY", "multiply_by": "0"}]
     for option in dict.fromkeys(options):
         rules = ROUTE_OPTIONS[profile].get(option)
         if rules is None:
@@ -469,8 +470,11 @@ def build_route_request(points: List[str], profile: str, options: List[str]) -> 
         "points_encoded": False,
         "instructions": False,
     }
-    if priority:
-        body["custom_model"] = {"priority": priority}
+    body["custom_model"] = {"priority": priority}
+    if profile == "run":
+        # 횡단보도도 FOOTWAY에 포함됩니다. 보행로 가산점 때문에 큰길을 두고
+        # 여러 번 횡단하거나 골목으로 돌아가지 않도록 거리의 비중을 높입니다.
+        body["custom_model"]["distance_influence"] = 1000
     return body
 
 # --- 5. 헬퍼 함수들 ---
@@ -1717,6 +1721,8 @@ def seo_documents(session: Session) -> list:
             "names": [seo_search.normalize(n) for n in names if n],
             "sport": course.sport, "terrain": seo["terrain"], "shape": (view or {}).get("shape"),
             "distance_km": stats["distance_km"],
+            "difficulty": level, "distance_kind": (view or {}).get("distance"),
+            "training": (view or {}).get("training") or [],
             "page": {"course_id": course.id, "token": course.share_token, "url": f"{PUBLIC_SITE_URL}/c/{course.share_token}",
                      "title": seo["page_title"], "description": seo["summary"], "sport": course.sport,
                      "region": region.get("short"), "ai_state": (view or {}).get("ai_state"),

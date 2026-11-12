@@ -9,7 +9,13 @@ import re
 # 검색어 표현 → 같은 뜻으로 보는 말 (문서 쪽 표현)
 SYNONYMS = {
     "러닝": ("러닝", "달리기", "런", "조깅", "뛰기", "뛸", "달릴", "마라톤", "running", "run"),
-    "자전거": ("자전거", "라이딩", "사이클", "싸이클", "로드", "라이드", "cycling", "bike", "그란폰도"),
+    "자전거": ("자전거", "라이딩", "사이클", "싸이클", "로드", "라이드", "cycling", "bike"),
+    "초보": ("초보자", "초심자", "초보용", "입문용", "입문자", "초보", "입문", "쉬운", "쉬움", "부담없는", "beginner"),
+    "그란폰도": ("그란폰도", "그란 폰도", "그랜드폰도", "granfondo", "gran fondo"),
+    "지구력": ("지구력", "장거리", "롱런", "lsd", "엔듀런스", "endurance"),
+    "회복": ("회복", "리커버리", "가볍게", "recovery"),
+    "인터벌": ("인터벌", "인터발", "interval"),
+    "템포": ("템포", "tempo"),
     "순환": ("순환", "순환런", "루프", "한바퀴", "한 바퀴", "loop"),
     "왕복": ("왕복",),
     "편도": ("편도",),
@@ -25,10 +31,14 @@ PLACE_CONCEPTS = {"공원", "호수", "강변"}
 TERRAIN_WORDS = {"평지": ("flat",), "언덕": ("rolling", "hilly", "mountain")}
 SHAPE_WORDS = {"순환": "loop", "왕복": "out_and_back", "편도": "point_to_point"}
 # 어디에나 붙어 순위를 가르지 못하는 말
-STOPWORDS = {"코스", "추천", "근처", "주변", "좋은", "곳", "길", "어디", "코스추천", "추천해줘", "알려줘", "찾기", "인근", "부근"}
-JOSA = ("에서", "에서의", "으로", "부터", "까지", "근처", "주변", "의", "에", "로", "을", "를", "은", "는", "이", "가")
-DISTANCE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(km|키로|킬로|k)\b", re.I)
-NAMED_DISTANCES = {"하프": 21.1, "풀코스": 42.2, "마라톤": 42.2, "10k": 10.0, "5k": 5.0}
+STOPWORDS = {"코스", "추천", "근처", "주변", "좋은", "좋을", "곳", "길", "어디", "코스추천", "추천해줘", "알려줘", "찾기", "인근", "부근",
+             "대비", "준비", "훈련", "연습", "위한", "위해", "하기", "할", "수", "있는", "좀", "주세요", "추천해", "추천해주세요",
+             "알려주세요", "찾아줘", "찾아주세요", "용", "에게", "에서", "까지", "정도", "약"}
+JOSA = ("에서의", "에서도", "으로", "부터", "까지", "근처", "주변", "에게", "에서", "의", "에", "로", "을", "를", "은", "는", "이", "가", "도", "만")
+DISTANCE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(km|킬로미터|키로|킬로|k)(?![a-z])", re.I)
+NAMED_DISTANCES = {"하프마라톤": 21.1, "풀마라톤": 42.2, "하프": 21.1, "풀코스": 42.2, "10k": 10.0, "5k": 5.0}
+TRAINING_WORDS = {"지구력": ("lsd", "endurance"), "회복": ("recovery", "recovery_ride"), "인터벌": ("interval",), "템포": ("tempo",)}
+KNOWN_WORDS = {word.replace(' ', '') for words in SYNONYMS.values() for word in words} | set(NAMED_DISTANCES)
 
 FIELD_WEIGHTS = {"title": 3.0, "description": 2.0, "body": 1.0}
 
@@ -38,6 +48,8 @@ def normalize(text: str) -> str:
 
 
 def strip_josa(token: str) -> str:
+    if token in KNOWN_WORDS:
+        return token
     for suffix in JOSA:
         if len(token) > len(suffix) + 1 and token.endswith(suffix):
             return token[: -len(suffix)]
@@ -46,18 +58,27 @@ def strip_josa(token: str) -> str:
 
 def parse_query(query: str) -> dict:
     """검색어 → 일반 낱말, 뜻으로 묶인 낱말(종목·지형·형태 등), 거리 조건"""
-    text = normalize(query)
+    text = re.sub(r"[^\w.\s]", " ", normalize(query))
+    # 띄어쓴 동의어도 한 개의 개념으로 읽습니다.
+    for words in SYNONYMS.values():
+        for word in words:
+            if ' ' in word:
+                text = text.replace(word, word.replace(' ', ''))
+    text = text.replace('부담 없는', '부담없는')
     distance = None
     match = DISTANCE_RE.search(text)
     if match:
         distance = float(match.group(1))
         text = text.replace(match.group(0), " ")
+    named_race = False
     for word, km in NAMED_DISTANCES.items():
         if word in text:
             distance = distance or km
-    terms, concepts, ignored = [], [], []
+            named_race = named_race or word in {"하프마라톤", "풀마라톤", "하프", "풀코스"}
+            text = text.replace(word, " ")
+    terms, concepts, ignored = [], ["러닝"] if named_race else [], []
     # 긴 표현부터 찾아 지웁니다 ('무언덕'을 '언덕'으로 다시 읽지 않도록).
-    vocabulary = sorted(((w, key) for key, words in SYNONYMS.items() for w in words), key=lambda item: -len(item[0]))
+    vocabulary = sorted(((w.replace(' ', ''), key) for key, words in SYNONYMS.items() for w in words), key=lambda item: -len(item[0]))
     for raw in text.split():
         token = strip_josa(raw)
         if token in STOPWORDS:
@@ -65,12 +86,13 @@ def parse_query(query: str) -> dict:
             continue
         rest = token
         for word, key in vocabulary:
-            if word in rest:
+            pattern = rf"(?<![a-z]){re.escape(word)}(?![a-z])" if word.isascii() else re.escape(word)
+            if re.search(pattern, rest):
                 if key not in concepts:
                     concepts.append(key)
                 # 장소를 뜻하는 말(공원·호수·강변)은 '광교호수공원'처럼 이름의 일부라 검색어에 남깁니다.
                 if key not in PLACE_CONCEPTS:
-                    rest = rest.replace(word, " ")
+                    rest = re.sub(pattern, " ", rest)
         # '순환런'·'한강런'처럼 '~런'으로 끝나면 러닝 코스를 찾는 말입니다.
         if token.endswith("런") and "러닝" not in concepts:
             concepts.append("러닝")
@@ -80,6 +102,8 @@ def parse_query(query: str) -> dict:
             part = strip_josa(part)
             if part and part not in STOPWORDS and part not in NAMED_DISTANCES:
                 terms.append(part)
+    if "그란폰도" in concepts and "자전거" not in concepts:
+        concepts.append("자전거")
     return {"terms": list(dict.fromkeys(terms)), "concepts": concepts, "distance": distance, "ignored": ignored}
 
 
@@ -116,6 +140,13 @@ def score_document(query: dict, doc: dict) -> dict:
             if not ok:
                 score -= 4
                 notes.append(f"종목이 달라요 ({'러닝' if doc['sport'] == 'run' else '자전거'} 코스)")
+        elif concept == "초보":
+            ok = doc.get("difficulty") in (1, 2)
+        elif concept == "그란폰도":
+            ok = (doc["sport"] == "bike" and (doc.get("distance_km") or 0) >= 80
+                  and ("endurance" in doc.get("training", []) or doc.get("distance_kind") in ("long", "granfondo")))
+        elif concept in TRAINING_WORDS:
+            ok = bool(set(doc.get("training", [])) & set(TRAINING_WORDS[concept]))
         elif concept in TERRAIN_WORDS:
             ok = doc.get("terrain") in TERRAIN_WORDS[concept]
         elif concept in SHAPE_WORDS:
@@ -125,6 +156,9 @@ def score_document(query: dict, doc: dict) -> dict:
             matched.append({"term": concept, "field": hit or "data"})
         else:
             missing.append(concept)
+        # 종목·입문 난이도·훈련 목적이 다르면 추천 후보를 억지로 채우지 않습니다.
+        if not ok and (concept in SPORT_WORDS or concept in TRAINING_WORDS or concept in {"초보", "그란폰도"}):
+            return {"score": 0, "coverage": 0, "matched": matched, "missing": missing, "notes": notes}
     if query["distance"]:
         target, actual = query["distance"], doc.get("distance_km") or 0
         closeness = max(0.0, 1 - abs(actual - target) / max(target * 0.5, 1.0))

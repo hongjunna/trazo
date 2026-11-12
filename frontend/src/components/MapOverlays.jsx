@@ -1,12 +1,13 @@
 // src/components/MapOverlays.jsx
 // 지도 위에 떠 있는 요소: 오른쪽 도구 버튼, 우클릭 메뉴, 처음 안내, 길찾기 진행·실패 알림
 import { useEffect, useRef, useState } from 'react';
+import MapLayerPicker from '../maps/MapLayerPicker';
 import { SPORTS } from '../sports';
 import { readStored, writeStored } from '../utils/storage';
 import Button from './ui/Button';
 import Icon from './ui/Icon';
 
-export const MapControls = ({ onUndo, onRedo, canUndo, canRedo, onLocate, isLocating, onFit, canFit, isSatellite, onToggleSatellite }) => (
+export const MapControls = ({ onUndo, onRedo, canUndo, canRedo, onLocate, isLocating, onFit, canFit }) => (
     <div className="map-controls">
         <div className="control-group" role="group" aria-label="편집">
             <Button variant="ghost" icon="undo" iconSize={20} onClick={onUndo} disabled={!canUndo} aria-label="되돌리기" title="되돌리기 (Ctrl+Z)" />
@@ -15,16 +16,7 @@ export const MapControls = ({ onUndo, onRedo, canUndo, canRedo, onLocate, isLoca
         <div className="control-group" role="group" aria-label="지도 보기">
             <Button variant="ghost" icon="locate" iconSize={20} onClick={onLocate} loading={isLocating} aria-label="내 위치로 이동" title="내 위치로 이동" />
             <Button variant="ghost" icon="fit" iconSize={20} onClick={onFit} disabled={!canFit} aria-label="코스 전체 보기" title="코스 전체 보기" />
-            <Button
-                variant="ghost"
-                icon="layers"
-                iconSize={20}
-                className={isSatellite ? 'is-active' : undefined}
-                onClick={onToggleSatellite}
-                aria-pressed={isSatellite}
-                aria-label="위성 지도"
-                title={isSatellite ? '일반 지도로 보기' : '위성 지도로 보기'}
-            />
+            <MapLayerPicker />
         </div>
     </div>
 );

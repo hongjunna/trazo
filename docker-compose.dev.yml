@@ -22,6 +22,9 @@ services:
       VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:?VITE_FIREBASE_PROJECT_ID 값을 .env에 입력해주세요}
       VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:?VITE_FIREBASE_APP_ID 값을 .env에 입력해주세요}
       DEV_API_PROXY: http://backend:8000
+      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+      VITE_OSM_TILE_URL: ${VITE_OSM_TILE_URL:-}
+      VITE_OSM_ATTRIBUTION: ${VITE_OSM_ATTRIBUTION:-© OpenStreetMap contributors}
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules

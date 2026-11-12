@@ -2,7 +2,7 @@
 // 공유 코스 페이지(/c/<토큰>, 백엔드 templates/course.html)의 지도와 고도 프로필.
 // 코스 보기 모달과 같은 CourseMap·ElevationPanel을 그대로 써서 경로 색·마커·경사 색·확대가 앱과 같게 보이고,
 // 고도 차트를 훑으면 지도에 같은 위치가 표시됩니다.
-// 서버가 그린 SVG 경로·고도선은 스크립트나 카카오 지도를 쓸 수 없을 때 남는 대체 화면입니다.
+// 서버가 그린 SVG 경로·고도선은 자바스크립트를 쓸 수 없을 때 남는 대체 화면입니다.
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -28,24 +28,13 @@ const mountTarget = (node) => {
     return container;
 };
 
-// 카카오 지도 SDK(autoload=false)를 다 읽으면 지도 칸을 돌려줍니다. SDK를 못 읽으면 null이라 SVG 미리보기가 남습니다.
-const useKakaoTarget = (node) => {
+// 지도 공급자와 관계없이 공통 지도를 마운트합니다. SDK 실패 시에도 다른 지도를 고를 수 있습니다.
+const useMapTarget = (node) => {
     const [target, setTarget] = useState(null);
     useEffect(() => {
         if (!node) return undefined;
-        let tries = 0;
-        let timer;
-        let cancelled = false;
-        const check = () => {
-            if (window.kakao?.maps?.load) {
-                window.kakao.maps.load(() => { if (!cancelled) setTarget(mountTarget(node)); });
-                return;
-            }
-            // defer로 읽는 SDK가 늦게 도착하는 경우를 위해 잠시(최대 15초) 기다립니다.
-            if (tries++ < 60) timer = window.setTimeout(check, 250);
-        };
-        check();
-        return () => { cancelled = true; window.clearTimeout(timer); };
+        const timer = window.setTimeout(() => setTarget(mountTarget(node)), 0);
+        return () => window.clearTimeout(timer);
     }, [node]);
     return target;
 };
@@ -53,7 +42,7 @@ const useKakaoTarget = (node) => {
 const Viewer = ({ mapNode, elevationTarget, polylines, rawWaypoints, sport }) => {
     const [hoverPoint, setHoverPoint] = useState(null);
     const waypoints = useMemo(() => locateWaypoints(polylines, rawWaypoints), [polylines, rawWaypoints]);
-    const mapTarget = useKakaoTarget(mapNode);
+    const mapTarget = useMapTarget(mapNode);
 
     return (
         <>

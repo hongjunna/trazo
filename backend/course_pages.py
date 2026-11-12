@@ -88,9 +88,22 @@ def region_view(area_names):
             "dongs": dongs[:6]}
 
 
-def course_keywords(region, sport_label, shape, terrain, km, places):
-    """페이지 아래 '관련 키워드' (데이터로 확인한 것만, 최대 6개)"""
+def audience_keywords(sport_code, km, insight):
+    """난이도·훈련 데이터로 확인한 검색 의도를 실제 페이지에도 표시합니다."""
+    insight = insight or {}
+    sport = '러닝' if sport_code == 'run' else '자전거'
     words = []
+    if insight.get('difficulty') in (1, 2):
+        words.append(f'초보 {sport} 추천 코스')
+    if sport_code == 'bike' and km >= 80 and ('endurance' in insight.get('training', [])
+                                              or insight.get('distance') in ('long', 'granfondo')):
+        words.append('그란폰도 대비 장거리 자전거 코스')
+    return words
+
+
+def course_keywords(region, sport_label, shape, terrain, km, places, audience=()):
+    """페이지 아래 '관련 키워드' (데이터로 확인한 것만, 최대 6개)"""
+    words = list(audience)
     if region:
         words.append(f"{region['city']} {sport_label} 코스")
         words += [f"{gu} {sport_label} 코스" for gu in region["gus"][:1]]
@@ -138,10 +151,13 @@ def seo_view(course, stats, insight=None, place_data=None):
         sentences.append(', '.join(facts) + '.')
     if places:
         sentences.append('·'.join(p['name'] for p in places[:3]) + ' 경유.')
+    audience = audience_keywords(course.sport, km, insight)
+    if audience:
+        sentences.append(' · '.join(audience) + '.')
     sentences.append('고도 그래프·GPX 무료 다운로드.')
     summary = ' '.join(sentences)
     return {"page_title": page_title, "summary": summary, "region": region, "places": places, "shape": shape,
-            "terrain": terrain, "terrain_ko": terrain_ko, "keywords": course_keywords(region, sport, shape, terrain, km, places)}
+            "terrain": terrain, "terrain_ko": terrain_ko, "keywords": course_keywords(region, sport, shape, terrain, km, places, audience)}
 
 
 def render_course_page(course, stats, nickname, related, insight=None, place_data=None):

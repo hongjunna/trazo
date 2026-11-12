@@ -14,8 +14,8 @@ const ORIENTATION_OPTIONS = [
     { value: 'landscape', label: '가로' },
 ];
 const MAP_OPTIONS = [
-    { value: 'roadmap', label: '일반 지도' },
-    { value: 'satellite', label: '위성 지도' },
+    { value: 'roadmap', label: '카카오 일반 지도' },
+    { value: 'satellite', label: '카카오 위성 지도' },
 ];
 
 const CourseImageDialog = ({ course, onDownload, onClose }) => {

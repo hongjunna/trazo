@@ -95,7 +95,7 @@ class TestAIInsight(unittest.TestCase):
             "elevation": None,
             "splits": [],
             "places_along_route": [
-                {"name": "대청호", "kind": "natural=water"},
+                {"name": "도심공원", "kind": "leisure=park"},
                 {"name": "자연공원", "kind": "leisure=nature_reserve"}
             ]
         }

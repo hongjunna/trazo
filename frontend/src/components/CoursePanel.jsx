@@ -301,6 +301,7 @@ export const CourseSettings = ({
   onToggleSmoothStraight,
   routeOptions,
   onToggleRouteOption,
+  onRecalculate,
   onOpenHelp,
   speedKmh,
   onChangeSpeed,
@@ -388,6 +389,10 @@ export const CourseSettings = ({
             </div>
           </>
         )}
+        {isAutoRouting && hasCourse && <>
+          <Button variant="secondary" size="sm" icon="loop" onClick={onRecalculate} disabled={isBusy}>전체 경로 다시 찾기</Button>
+          <p className="section__note">지금 선택한 옵션으로 모든 구간을 다시 이어요. 직선 구간도 길을 따라 바뀌며, 되돌리기로 복원할 수 있어요.</p>
+        </>}
         {isAutoRouting && (
           <p className="section__note">옵션은 다음에 찍는 점부터 적용돼요.</p>
         )}
