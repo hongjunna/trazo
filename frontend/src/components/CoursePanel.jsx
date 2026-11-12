@@ -57,6 +57,19 @@ const EditableTitle = ({ title, onRename }) => {
   );
 };
 
+// 예상 시간: "시간·분"을 km·m처럼 작은 단위 글씨로 써서 99시간 10분까지 한 줄에 들어가게 합니다.
+const DurationValue = ({ hours }) => {
+  const text = formatDuration(hours);
+  const parts = [...text.matchAll(/(\d+)(시간|분)/g)];
+  return parts.map(([, number, unit], i) => (
+    <span key={unit}>
+      {i > 0 && ' '}
+      {number}
+      <span className="stat__unit">{unit}</span>
+    </span>
+  ));
+};
+
 const Stat = ({ label, value, unit, sub }) => (
   <div className="stat">
     <span className="stat__label">{label}</span>
@@ -134,7 +147,7 @@ export const CourseSummary = ({
         />
         <Stat
           label="예상 시간"
-          value={formatDuration(stats.distanceKm / speedKmh)}
+          value={<DurationValue hours={stats.distanceKm / speedKmh} />}
           sub={speedLabel}
         />
       </div>
