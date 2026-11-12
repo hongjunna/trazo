@@ -52,6 +52,13 @@ def render_course_page(course, stats, nickname, related, insight=None):
     summary = f'{course.title} · {sport} 코스 {stats["distance_km"]:.2f}km · 상승 고도 {stats["ascent_m"]}m. Trazo에서 코스를 저장하고 내 경로로 편집하세요.'
     # JSON script에 사용자 입력을 넣지 않으며, 스크립트 종료 문자도 이스케이프합니다.
     map_segments = [segment[::max(1,len(segment)//1000)] + ([segment[-1]] if len(segment)>1 else []) for segment in segments]
+    # 고도 프로필에 표시할 웨이포인트 (위치·종류·이름만)
+    try:
+        raw_waypoints = json.loads(course.waypoints_json or '[]')
+    except ValueError:
+        raw_waypoints = []
+    waypoints = [{k: w[k] for k in ('lat', 'lng', 'type', 'name') if k in w} for w in raw_waypoints if isinstance(w, dict)
+                 and all(isinstance(w.get(k), (int, float)) and math.isfinite(w[k]) for k in ('lat', 'lng'))] if isinstance(raw_waypoints, list) else []
     return environment.get_template('course.html').render(
         title=course.title, description=course.description, nickname=nickname or '라이더', sport=sport,
         visibility='전체 공개' if course.visibility=='public' else '부분 공개',
@@ -60,4 +67,5 @@ def render_course_page(course, stats, nickname, related, insight=None):
         distance=f'{stats["distance_km"]:.2f}', ascent=f'{stats["ascent_m"]:,}', copies=course.share_count,
         start_url=f'/?course={course.share_token}&action=save', view_url=f'/?course={course.share_token}',
         route_svg=route_svg, elevation_svg=elevation_svg, min_ele=round(low), max_ele=round(high),
-        map_json=json.dumps(map_segments).replace('<','\\u003c'), related=related, insight=insight_page_view(insight, 'run' if course.sport == 'run' else 'bike'))
+        map_json=json.dumps(map_segments).replace('<','\\u003c'), waypoints_json=json.dumps(waypoints, ensure_ascii=False).replace('<','\\u003c'),
+        sport_code='run' if course.sport == 'run' else 'bike', related=related, insight=insight_page_view(insight, 'run' if course.sport == 'run' else 'bike'))

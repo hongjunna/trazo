@@ -92,7 +92,7 @@ h2 {
   width: 100%;
   height: 100%;
 }
-.elevation {
+.elevation-fallback {
   width: 100%;
   height: 160px;
 }

@@ -1,0 +1,154 @@
+/* 공유 코스 페이지의 고도 프로필. 앱(src/styles/app.css)의 고도 패널 스타일을 #course-elevation 안에서만 씁니다. */
+#course-elevation {
+  --c-primary: #0B4F57;
+  --c-surface: #FFFFFF;
+  --c-surface-3: #EDF1F2;
+  --c-border: #E2E7E9;
+  --c-border-strong: #CBD3D6;
+  --c-text: #15262C;
+  --c-text-2: #536269;
+  --c-text-3: #869399;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --shadow-2: 0 4px 14px rgba(16, 40, 46, 0.12), 0 1px 3px rgba(16, 40, 46, 0.08);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  line-height: 1.4;
+}
+
+#course-elevation h3 { margin: 0; }
+#course-elevation button { font: inherit; cursor: pointer; }
+
+#course-elevation .elevation {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+#course-elevation .elevation__bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px 4px;
+}
+#course-elevation .elevation__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 750;
+  color: var(--c-text);
+}
+#course-elevation .elevation__title svg { color: var(--c-primary); }
+#course-elevation .elevation__facts {
+  display: flex;
+  gap: 14px;
+  font-size: 12.5px;
+  color: var(--c-text-2);
+  font-variant-numeric: tabular-nums;
+}
+#course-elevation .elevation__facts b { color: var(--c-text); font-weight: 700; }
+#course-elevation .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  width: 100%;
+}
+#course-elevation .legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--c-text-2);
+  white-space: nowrap;
+}
+#course-elevation .legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+#course-elevation .elevation__chart {
+  height: 220px;
+  padding: 0 6px 6px 0;
+}
+
+#course-elevation .chart {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+}
+#course-elevation .chart__hud {
+  position: absolute;
+  top: 4px;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(21, 38, 44, 0.92);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: var(--shadow-2);
+  font-variant-numeric: tabular-nums;
+}
+#course-elevation .chart__hud b { font-weight: 700; }
+#course-elevation .chart__hud span { color: rgba(255, 255, 255, 0.65); margin-right: 4px; }
+#course-elevation .chart__hud-wpt {
+  font-weight: 750;
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+#course-elevation .chart__reset {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  z-index: 4;
+}
+#course-elevation .chart__scroll {
+  position: absolute;
+  bottom: 0;
+  left: 44px;
+  right: 8px;
+  height: 4px;
+  background: var(--c-surface-3);
+  border-radius: 2px;
+  pointer-events: none;
+}
+#course-elevation .chart__scroll div {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--c-text-3);
+  border-radius: 2px;
+}
+
+/* 확대 후 나타나는 '전체 보기' 버튼 (app.css의 .btn 일부) */
+#course-elevation .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--c-border-strong);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+#course-elevation .btn:hover { background: var(--c-surface-3); }
+#course-elevation .btn svg { flex-shrink: 0; }
+
+@media (max-width: 640px) {
+  #course-elevation .elevation__chart { height: 190px; }
+}

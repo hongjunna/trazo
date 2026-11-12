@@ -60,6 +60,12 @@ export default defineConfig({
         admin: fileURLToPath(new URL('./admin/index.html', import.meta.url)),
         // AI 서비스 로그인 동의 화면(/oauth/authorize)
         oauth: fileURLToPath(new URL('./oauth/index.html', import.meta.url)),
+        // 공유 코스 페이지(/c/<토큰>)의 고도 프로필. 백엔드 템플릿이 고정 주소로 불러서 이름에 해시를 붙이지 않습니다.
+        'course-elevation': fileURLToPath(new URL('./src/landing/courseElevation.jsx', import.meta.url)),
+      },
+      output: {
+        entryFileNames: (chunk) => chunk.name === 'course-elevation' ? 'course-elevation.js' : 'assets/[name]-[hash].js',
+        assetFileNames: (asset) => (asset.names ?? []).includes('course-elevation.css') ? 'course-elevation.css' : 'assets/[name]-[hash][extname]',
       },
     },
   },

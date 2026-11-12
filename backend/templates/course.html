@@ -9,6 +9,7 @@
     <link rel="canonical" href="{{ url }}" />
     <link rel="icon" href="/favicon.svg" />
     <link rel="stylesheet" href="/course-landing.css" />
+    <link rel="stylesheet" href="/course-elevation.css" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Trazo" />
     <meta property="og:locale" content="ko_KR" />
@@ -114,20 +115,24 @@
           </section>
           <section class="card">
             <h2>고도 프로필</h2>
-            {% if elevation_svg %}<svg
-              class="elevation"
-              viewBox="0 0 800 160"
-              role="img"
-              aria-label="코스 진행 방향의 고도 변화"
-            >
-              <polyline
-                points="{{ elevation_svg }}"
-                fill="none"
-                stroke="#0b616a"
-                stroke-width="3"
-              />
-            </svg>
-            <p class="muted">최저 {{ min_ele }}m · 최고 {{ max_ele }}m</p>
+            {% if elevation_svg %}
+            <!-- course-elevation.js가 코스 보기 모달과 같은 고도 차트로 바꿉니다. 스크립트가 실패하면 아래 SVG가 남습니다. -->
+            <div id="course-elevation" data-sport="{{ sport_code }}">
+              <svg
+                class="elevation-fallback"
+                viewBox="0 0 800 160"
+                role="img"
+                aria-label="코스 진행 방향의 고도 변화"
+              >
+                <polyline
+                  points="{{ elevation_svg }}"
+                  fill="none"
+                  stroke="#0b616a"
+                  stroke-width="3"
+                />
+              </svg>
+              <p class="muted">최저 {{ min_ele }}m · 최고 {{ max_ele }}m</p>
+            </div>
             {% else %}
             <p>고도 정보가 없는 코스입니다.</p>
             {% endif %}
@@ -210,6 +215,10 @@
       src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=c3b4179a9bd3e0eb5e124c5e0cc5da49&amp;autoload=false"
       defer
     ></script>
+    <script id="course-waypoints" type="application/json">
+      {{ waypoints_json | safe }}
+    </script>
     <script src="/course-landing.js" defer></script>
+    <script type="module" src="/course-elevation.js"></script>
   </body>
 </html>
