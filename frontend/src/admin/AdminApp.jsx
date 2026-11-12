@@ -369,7 +369,7 @@ const CourseDetail = ({ courseId, onClose, onUnauthorized, onShowOwner }) => {
 
 const INSIGHT_STATUSES = [
     { id: 'review', label: '검토 대기' },
-    { id: 'queued', label: '처리 중' },
+    { id: 'queued', label: '재시도 대기' },
     { id: 'pending', label: '대기' },
     { id: 'published', label: '공개됨' },
     { id: 'failed', label: '실패' },
@@ -405,7 +405,7 @@ const InsightsTab = ({ onUnauthorized }) => {
     }, [load]);
 
     useEffect(() => {
-        if (!data || (!data.counts.pending && !data.counts.queued)) return undefined;
+        if (!data || !data.counts.pending) return undefined;
         const timer = window.setInterval(() => load(), 5000);
         return () => window.clearInterval(timer);
     }, [data, load]);
@@ -434,7 +434,7 @@ const InsightsTab = ({ onUnauthorized }) => {
                     <h2 className="admin-subtitle">공개 코스 AI 분석</h2>
                     <p className="admin-muted">
                         {data.auto_publish ? '분석이 완료되면 자동 공개됩니다.' : '분석 완료 후 검토 대기 상태가 되며, 승인해야 공개됩니다.'}
-                        {data.counts.pending || data.counts.queued ? ' · 5초마다 자동 갱신 중' : ''}
+                        {data.counts.pending ? ' · 5초마다 자동 갱신 중' : ''}
                     </p>
                 </div>
                 <Button size="sm" variant="soft" icon="zoom-reset" onClick={() => load()}>새로고침</Button>

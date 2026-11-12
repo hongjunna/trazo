@@ -1,9 +1,9 @@
 """전체 공개 코스의 AI 분석 작업기 (docker-compose의 insight-worker, 운영 전용).
 
-1. 분석 대기(pending) 코스를 모아 OSM에서 경로 근처 장소를 찾고, 데스크톱 AI(Junlab AI Service, docs/ai연동가이드.md)의 작업 큐에 넣습니다.
-   데스크톱은 평소 잠들어 있어, 큐에 넣어 두면 깨어났을 때 처리됩니다.
-2. 큐 작업을 주기적으로 조회해 끝난 결과를 검증·저장하고, 관리자 디스코드로 검토 요청을 보냅니다.
-3. 데스크톱이 오래(기본 6시간) 처리하지 못하거나 거듭 실패하면 Groq 무료 API로 대신 요청합니다.
+1. 분석 대기(pending) 코스를 모아 OSM에서 경로 근처 장소를 찾고, Junlab AI 브릿지(NVIDIA AI API, docs/ai연동가이드.md)에 바로 요청합니다.
+2. 브릿지가 실패하면(404 등 오류·응답 형식 불량) 곧바로 Groq 무료 API로 다시 요청합니다.
+3. Groq도 실패하면(한도 초과 등) 재시도 대기(queued)로 두고 관리자 디스코드로 알린 뒤, 일정 시간(기본 30분)마다 다시 시도합니다.
+결과는 검증·저장하고 관리자 디스코드로 검토 요청을 보냅니다.
 규칙 분석(난이도·추천 훈련)은 백엔드가 코스를 저장할 때 바로 계산하고, 여기서는 AI 부분(소개 문장·테마)만 다룹니다.
 """
 import datetime
@@ -24,12 +24,13 @@ log = logging.getLogger("trazo.insight")
 
 BRIDGE_URL = os.getenv("JUNLAB_AI_BASE_URL", "").strip().rstrip("/")
 BRIDGE_KEY = os.getenv("JUNLAB_AI_API_KEY", "").strip()
-BRIDGE_MODEL = os.getenv("JUNLAB_AI_MODEL", "").strip() or "gemma4:12b"
+BRIDGE_MODEL = os.getenv("JUNLAB_AI_MODEL", "").strip() or "google/gemma-4-31b-it"
 GROQ_KEY = os.getenv("GROQ_API_KEY", "").strip()
 GROQ_MODEL = os.getenv("GROQ_MODEL", "").strip() or "openai/gpt-oss-120b"
 # railnow와 같은 Groq 무료 한도(하루 20만 토큰)를 나눠 쓰므로 하루 요청 수를 제한합니다 (건당 약 2천 토큰).
 GROQ_DAILY_LIMIT = int(os.getenv("COURSE_INSIGHT_GROQ_DAILY_LIMIT", "30"))
-FALLBACK_AFTER_S = float(os.getenv("COURSE_INSIGHT_FALLBACK_HOURS", "6")) * 3600
+# 브릿지·Groq가 모두 실패한 코스를 다시 시도하기까지 기다리는 시간
+RETRY_AFTER_S = float(os.getenv("COURSE_INSIGHT_RETRY_MINUTES", "30")) * 60
 DISCORD_WEBHOOK = os.getenv("COURSE_INSIGHT_DISCORD_WEBHOOK", "").strip()
 OSM_PBF = os.getenv("OSM_PBF", "/data/south-korea-latest.osm.pbf")
 INTERVAL_S = 60
@@ -48,23 +49,16 @@ def messages(prompt: str) -> list:
     return [{"role": "system", "content": course_insight.SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
 
 
-# --- 데스크톱 AI (비동기 작업 큐) ---
+# --- Junlab AI 브릿지 (NVIDIA AI API) ---
 
-def bridge_submit(prompt: str) -> str:
-    body = {"request": {"model": BRIDGE_MODEL, "temperature": 0.2, "max_tokens": 1500,
-                        "response_format": {"type": "json_object"}, "messages": messages(prompt)}}
-    response = httpx.post(f"{BRIDGE_URL}/jobs", json=body, timeout=30, headers={"Authorization": f"Bearer {BRIDGE_KEY}"})
-    response.raise_for_status()
-    return response.json()["id"]
-
-
-def bridge_job(job_id: str) -> dict | None:
-    """작업 상태. 브릿지가 작업을 잃어버렸으면 None."""
-    response = httpx.get(f"{BRIDGE_URL}/jobs/{job_id}", timeout=30, headers={"Authorization": f"Bearer {BRIDGE_KEY}"})
-    if response.status_code == 404:
-        return None
-    response.raise_for_status()
-    return response.json()
+def bridge_call(prompt: str) -> str:
+    body = {"model": BRIDGE_MODEL, "temperature": 0.2, "max_tokens": 1500,
+            "response_format": {"type": "json_object"}, "messages": messages(prompt)}
+    response = httpx.post(f"{BRIDGE_URL}/chat/completions", json=body, timeout=180,
+                          headers={"Authorization": f"Bearer {BRIDGE_KEY}"})
+    if response.status_code != 200:
+        raise RuntimeError(f"HTTP {response.status_code}")
+    return response.json()["choices"][0]["message"].get("content") or ""
 
 
 # --- Groq (대체 경로) ---
@@ -81,7 +75,7 @@ def groq_call(prompt: str) -> str:
     response = httpx.post("https://api.groq.com/openai/v1/chat/completions", json=body, timeout=60,
                           headers={"Authorization": f"Bearer {GROQ_KEY}"})
     if response.status_code != 200:
-        raise RuntimeError(f"Groq HTTP {response.status_code}")
+        raise RuntimeError(f"HTTP {response.status_code}" + (" (한도 초과)" if response.status_code == 429 else ""))
     return response.json()["choices"][0]["message"].get("content") or ""
 
 
@@ -114,6 +108,19 @@ def notify(insight: CourseInsight, course: Course, warnings: list):
         log.warning("디스코드 알림 실패: %s", error)
 
 
+def notify_deferred(items: list):
+    """브릿지·Groq가 모두 실패해 재시도 대기로 넘어간 코스들을 알립니다. items: [(course, 사유)]"""
+    if not DISCORD_WEBHOOK or not items:
+        return
+    lines = [f"⏳ **코스 AI 분석 실패 · 재시도 대기 {len(items)}개** ({RETRY_AFTER_S / 60:.0f}분 뒤 다시 시도)"]
+    lines += [f"#{course.id} {course.title} — {reason}" for course, reason in items]
+    lines.append(f"검토: {main.PUBLIC_BASE_URL}/admin/")
+    try:
+        httpx.post(DISCORD_WEBHOOK, json={"content": "\n".join(lines)[:1900]}, timeout=10).raise_for_status()
+    except httpx.HTTPError as error:
+        log.warning("디스코드 알림 실패: %s", error)
+
+
 # --- 결과 저장 ---
 
 def current(session: Session, course_id: int):
@@ -136,13 +143,13 @@ def fail(session: Session, insight: CourseInsight, error: str):
     log.warning("코스 #%s AI 분석 실패 (%s회): %s", insight.course_id, insight.ai_attempts, error)
 
 
-def finish(session: Session, course: Course, insight: CourseInsight, raw: str, provider: str, model: str) -> bool:
+def finish(session: Session, course: Course, insight: CourseInsight, raw: str, provider: str, model: str) -> str | None:
+    """응답을 검증해 저장합니다. 성공하면 None, 응답이 형식에 맞지 않으면 그 사유."""
     analysis = course_geo.analyze_route(course.polylines_json, course.sport)
     rules = course_insight.rule_insight(analysis, course.sport)
     parsed, warnings = course_insight.parse_response(raw, analysis, rules)
     if not parsed:
-        fail(session, insight, f"{provider}: {'; '.join(warnings)}")
-        return False
+        return "; ".join(warnings) or "응답 형식 오류"
     insight.feature_ko = parsed["feature_ko"]
     insight.route_ko = parsed["route_ko"]
     insight.themes_json = json.dumps(parsed["themes"])
@@ -158,19 +165,48 @@ def finish(session: Session, course: Course, insight: CourseInsight, raw: str, p
     session.commit()
     log.info("코스 #%s AI 분석 완료 (%s %s) → %s", course.id, provider, model, insight.ai_status)
     notify(insight, course, warnings)
-    return True
+    return None
 
 
-def run_groq(session: Session, course: Course, insight: CourseInsight, reason: str):
-    if not GROQ_KEY:
-        fail(session, insight, f"{reason} (Groq 키 없음)")
-        return
-    try:
-        raw = groq_call(insight.ai_prompt)
-    except (httpx.HTTPError, RuntimeError, KeyError, ValueError) as error:
-        fail(session, insight, f"{reason}; Groq: {error}")
-        return
-    finish(session, course, insight, raw, "groq", GROQ_MODEL)
+def defer(session: Session, insight: CourseInsight, error: str):
+    """모든 AI가 일시적으로 실패: 시도 횟수는 그대로 두고 재시도 대기로 둡니다."""
+    insight.ai_status = "queued"
+    insight.ai_error = error[:300]
+    insight.ai_job_id = None
+    insight.ai_requested_at = utc_now()
+    insight.updated_at = utc_now()
+    session.add(insight)
+    log.warning("코스 #%s AI 분석 재시도 대기: %s", insight.course_id, error)
+
+
+def analyze(session: Session, course: Course, insight: CourseInsight) -> str | None:
+    """브릿지 → Groq 순서로 요청합니다. 저장했거나 응답 형식 오류로 실패 처리했으면 None,
+    모든 AI를 쓸 수 없어 재시도 대기로 넘겼으면 그 사유."""
+    errors, bad_format = [], []
+    providers = []
+    if bridge_enabled():
+        providers.append(("nvidia", BRIDGE_MODEL, bridge_call))
+    if GROQ_KEY:
+        providers.append(("groq", GROQ_MODEL, groq_call))
+    for provider, model, call in providers:
+        try:
+            raw = call(insight.ai_prompt)
+        except (httpx.HTTPError, RuntimeError, KeyError, IndexError, TypeError, ValueError) as error:
+            errors.append(f"{provider}: {error}")
+            log.warning("코스 #%s %s 요청 실패: %s", course.id, provider, error)
+            continue
+        problem = finish(session, course, insight, raw, provider, model)
+        if problem is None:
+            return None
+        bad_format.append(f"{provider}: {problem}")
+        log.warning("코스 #%s %s 응답 형식 오류: %s", course.id, provider, problem)
+    if bad_format:
+        # 응답은 받았지만 쓸 수 없었음: 시도 횟수를 세고, 거듭되면 실패로 둡니다.
+        fail(session, insight, "; ".join(errors + bad_format))
+        return None
+    reason = "; ".join(errors) or "사용할 AI가 없음"
+    defer(session, insight, reason)
+    return reason
 
 
 # --- 주기 작업 ---
@@ -209,83 +245,56 @@ def prepare_prompts(session: Session, rows: list):
 
 
 def submit_pending():
+    retry_before = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=RETRY_AFTER_S)).isoformat()
     with Session(engine) as session:
+        due = (CourseInsight.ai_status == "pending") | (
+            (CourseInsight.ai_status == "queued")
+            & ((CourseInsight.ai_requested_at == None) | (CourseInsight.ai_requested_at < retry_before)))  # noqa: E711
         rows = session.exec(
             select(CourseInsight, Course).join(Course, Course.id == CourseInsight.course_id).where(
-                CourseInsight.ai_status == "pending", Course.is_deleted == False, Course.visibility == "public")
+                due, Course.is_deleted == False, Course.visibility == "public")
             .order_by(CourseInsight.updated_at).limit(BATCH)).all()
         if not rows:
             return
         prepare_prompts(session, rows)
+        deferred = []
         for insight, course in rows:
             course, insight = current(session, insight.course_id)
             if not course or not insight.ai_prompt:
                 continue
-            if bridge_enabled() and insight.ai_attempts < MAX_ATTEMPTS - 1:
-                try:
-                    insight.ai_job_id = bridge_submit(insight.ai_prompt)
-                    insight.ai_status = "queued"
-                    insight.ai_requested_at = utc_now()
-                    insight.ai_provider, insight.ai_model = "desktop", BRIDGE_MODEL
-                    insight.updated_at = utc_now()
-                    session.add(insight)
-                    session.commit()
-                    log.info("코스 #%s 데스크톱 AI 큐에 넣음 (%s)", course.id, insight.ai_job_id)
-                    continue
-                except (httpx.HTTPError, KeyError, ValueError) as error:
-                    log.warning("데스크톱 AI 큐에 넣지 못함: %s → Groq로 요청", error)
-            run_groq(session, course, insight, "데스크톱 AI를 쓸 수 없음")
+            was_queued = insight.ai_status == "queued"
+            reason = analyze(session, course, insight)
             session.commit()
+            # 이미 재시도 대기였던 코스는 다시 알리지 않습니다 (처음 넘어갈 때만 알림).
+            if reason and not was_queued:
+                deferred.append((course, reason))
+        notify_deferred(deferred)
 
 
-def poll_queued():
-    if not bridge_enabled():
-        return
+def release_hidden():
+    """재시도 대기 중 비공개로 바뀌거나 경로가 바뀐 코스는 대기에서 뺍니다 (다시 공개·저장할 때 새로 요청)."""
     with Session(engine) as session:
         ids = session.exec(select(CourseInsight.course_id).where(CourseInsight.ai_status == "queued")).all()
         for course_id in ids:
             insight = session.get(CourseInsight, course_id)
-            course, live = current(session, course_id)
-            if not live:
-                # 비공개로 바뀌었거나 경로가 바뀐 코스: 다시 공개·저장할 때 새로 요청합니다.
-                if insight and insight.ai_status == "queued" and (not course or course.visibility != "public"):
-                    insight.ai_status, insight.ai_job_id = "pending", None
-                    session.add(insight)
-                    session.commit()
-                continue
-            try:
-                job = bridge_job(insight.ai_job_id)
-            except httpx.HTTPError as error:
-                log.warning("데스크톱 AI 작업 조회 실패: %s", error)
-                return
-            if job is None:
-                fail(session, insight, "데스크톱 AI 작업을 찾지 못함")
-            elif job.get("status") == "done":
-                try:
-                    raw = job["result"]["choices"][0]["message"].get("content") or ""
-                except (KeyError, IndexError, TypeError):
-                    raw = ""
-                finish(session, course, insight, raw, "desktop", BRIDGE_MODEL)
-            elif job.get("status") == "error":
-                fail(session, insight, f"데스크톱 AI: {job.get('error')}")
-            else:
-                requested = datetime.datetime.fromisoformat(insight.ai_requested_at)
-                waited = (datetime.datetime.now(datetime.timezone.utc) - requested).total_seconds()
-                if waited > FALLBACK_AFTER_S:
-                    run_groq(session, course, insight, f"데스크톱 AI가 {waited / 3600:.0f}시간 동안 처리하지 못함")
-            session.commit()
+            course = session.get(Course, course_id)
+            if insight and (not course or course.is_deleted or course.visibility != "public"):
+                insight.ai_status, insight.ai_job_id = "pending", None
+                session.add(insight)
+        session.commit()
 
 
 def run():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if not bridge_enabled() and not GROQ_KEY:
         log.warning("JUNLAB_AI_BASE_URL·JUNLAB_AI_API_KEY와 GROQ_API_KEY가 모두 없어 AI 분석을 하지 않습니다.")
-    log.info("코스 AI 분석 작업기 시작 (데스크톱 %s, 모델 %s, Groq %s, 자동 공개 %s)",
-             "켜짐" if bridge_enabled() else "꺼짐", BRIDGE_MODEL, "켜짐" if GROQ_KEY else "꺼짐", main.INSIGHT_AUTO_PUBLISH)
+    log.info("코스 AI 분석 작업기 시작 (브릿지 %s, 모델 %s, Groq %s, 재시도 %.0f분, 자동 공개 %s)",
+             "켜짐" if bridge_enabled() else "꺼짐", BRIDGE_MODEL, "켜짐" if GROQ_KEY else "꺼짐",
+             RETRY_AFTER_S / 60, main.INSIGHT_AUTO_PUBLISH)
     while True:
         try:
             if bridge_enabled() or GROQ_KEY:
-                poll_queued()
+                release_hidden()
                 submit_pending()
         except Exception:
             log.exception("작업 중 오류")
