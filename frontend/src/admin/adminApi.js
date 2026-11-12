@@ -28,6 +28,8 @@ export const getSummary = () => client.get('/summary');
 export const getInsights = (params, signal) => client.get('/insights', { params, signal });
 export const reviewInsight = (courseId, changes) => client.put(`/insights/${courseId}`, changes);
 export const rerunInsight = (courseId) => client.post(`/insights/${courseId}/rerun`);
+// SEO 테스트: 검색어로 전체 공개 코스 페이지를 채점합니다
+export const getSeoSearch = (q) => client.get('/seo/search', { params: { q } });
 // params: { q, offset, limit }
 export const getUsers = (params, signal) => client.get('/users', { params, signal });
 // params: { q, uid, sport, visibility, deleted, sort, offset, limit }

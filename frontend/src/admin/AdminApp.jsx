@@ -6,6 +6,7 @@ import Dialog from '../components/ui/Dialog';
 import Icon from '../components/ui/Icon';
 import CourseMap from '../components/CourseMap';
 import CourseThumbnail from '../components/CourseThumbnail';
+import SeoTab from './SeoTab';
 import { useFeedback } from '../components/ui/feedbackContext';
 import { SPORTS } from '../sports';
 import { VISIBILITY, copyText, sharePath } from '../utils/share';
@@ -16,6 +17,7 @@ const COURSE_PAGE = 30;
 const TABS = [
     { id: 'overview', label: '개요', icon: 'chart' },
     { id: 'insights', label: 'AI 분석', icon: 'gauge' },
+    { id: 'seo', label: 'SEO 테스트', icon: 'search' },
     { id: 'users', label: '회원', icon: 'users' },
     { id: 'courses', label: '코스', icon: 'route' },
     { id: 'virtual', label: '가상 계정', icon: 'user' },
@@ -852,6 +854,7 @@ const AdminApp = () => {
             <main className="admin-main">
                 {tab === 'overview' && <Overview onUnauthorized={handleUnauthorized} />}
                 {tab === 'insights' && <InsightsTab onUnauthorized={handleUnauthorized} />}
+                {tab === 'seo' && <SeoTab onUnauthorized={handleUnauthorized} />}
                 {tab === 'users' && <UsersTab onUnauthorized={handleUnauthorized} onShowCourses={showCourses} />}
                 {/* 회원을 바꾸면 필터와 쪽을 처음부터 다시 봅니다. */}
                 {tab === 'virtual' && <VirtualTab onUnauthorized={handleUnauthorized} />}

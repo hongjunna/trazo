@@ -139,7 +139,7 @@ small {
 }
 .related-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
 }
 .related a {
@@ -332,4 +332,97 @@ a:focus-visible {
 .ai-status b {
   display: block;
   color: #173b3e;
+}
+/* 상단 버튼 묶음: 담기 + GPX 다운로드 */
+.hero-buttons {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.button--ghost {
+  background: white;
+  color: #0b4f57;
+  border: 1px solid #ccdcd5;
+}
+@media (max-width: 640px) {
+  .hero-buttons { grid-template-columns: 1fr; }
+}
+/* 코스 정보 (위치·지나는 곳·파일) */
+.course-facts dl {
+  margin-bottom: 12px;
+}
+.course-facts dl > div {
+  align-items: flex-start;
+  gap: 16px;
+}
+.course-facts dt {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.course-facts dd {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.keyword-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.keyword-tags li {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f4f7f5;
+  color: #586d6b;
+  font-size: 13px;
+}
+.keyword-tags li::before {
+  content: '#';
+  margin-right: 2px;
+  opacity: 0.55;
+}
+/* 모바일: 코스 소개 → 한눈에 보기 → 경로 → 고도 → 나머지 순서로 한 줄에 쌓고, 상단과 겹치는 정보는 줄여 세로 길이를 줄입니다. */
+@media (max-width: 760px) {
+  .layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .layout > div,
+  .layout > aside {
+    display: contents;
+  }
+  .slot-intro { order: 1; }
+  .slot-glance { order: 2; }
+  .slot-map { order: 3; }
+  .slot-elevation { order: 4; }
+  .slot-rest { order: 5; }
+  .slot-custom { display: none; }
+  .layout .card {
+    margin-bottom: 0;
+    padding: 16px;
+    border-radius: 16px;
+  }
+  h1 { font-size: 26px; margin: 8px 0; }
+  h2 { font-size: 16px; margin-bottom: 10px; }
+  .hero { padding: 8px 0 16px; }
+  .hero-action p { margin: 0 0 10px; }
+  #course-map { height: 280px; }
+  .map-card .muted { margin: 8px 0 0; font-size: 12.5px; }
+  /* 거리·상승 고도와 담기 버튼은 상단에 이미 있습니다 */
+  .glance-stats,
+  .glance-cta,
+  .glance-note { display: none; }
+  .slot-glance .level { margin-bottom: 12px; }
+  .ai-block { margin-top: 10px; }
+  .ai-note { margin-top: 12px; padding-top: 10px; }
+  .course-facts dl > div { padding: 9px 0; }
+  .course-facts .muted { font-size: 12.5px; margin: 0; }
+  .related { margin-top: 20px; }
+  .related-grid { gap: 8px; }
+  .related-grid .card { padding: 12px 14px; margin: 0; border-radius: 14px; }
 }

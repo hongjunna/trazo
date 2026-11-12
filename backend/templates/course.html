@@ -3,17 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ title }} | Trazo {{ sport }} 코스</title>
+    <title>{{ page_title }}</title>
     <meta name="description" content="{{ summary }}" />
     <meta name="robots" content="{{ robots }}" />
     <link rel="canonical" href="{{ url }}" />
     <link rel="icon" href="/favicon.svg" />
     <link rel="stylesheet" href="/course-landing.css" />
-    <link rel="stylesheet" href="/course-elevation.css" />
+    <script type="application/ld+json">{{ json_ld | safe }}</script>
+    <link rel="stylesheet" href="/course-viewer.css" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Trazo" />
     <meta property="og:locale" content="ko_KR" />
-    <meta property="og:title" content="{{ title }} | Trazo {{ sport }} 코스" />
+    <meta property="og:title" content="{{ page_title }}" />
     <meta property="og:description" content="{{ summary }}" />
     <meta property="og:url" content="{{ url }}" />
     <meta property="og:image" content="https://trazo.runvia.app/og-image.png" />
@@ -21,7 +22,7 @@
     <meta property="og:image:height" content="900" />
     <meta property="og:image:alt" content="Trazo 자전거·러닝 코스 플래너" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="{{ title }}" />
+    <meta name="twitter:title" content="{{ page_title }}" />
     <meta name="twitter:description" content="{{ summary }}" />
     <meta
       name="twitter:image"
@@ -40,7 +41,7 @@
     </header>
     <main>
       <section class="hero">
-        <p class="eyebrow">{{ sport }} · {{ visibility }}</p>
+        <p class="eyebrow">{{ sport }}{% if region %} · {{ region.short }}{% endif %} · {{ visibility }}</p>
         <h1>{{ title }}</h1>
         <p class="author">{{ nickname }}님이 공유한 코스</p>
         {% if description %}
@@ -48,13 +49,16 @@
         {% endif %}
         <div class="hero-action">
           <p>거리 {{ distance }}km · 상승 고도 {{ ascent }}m</p>
-          <a class="button" href="{{ start_url }}">내 코스에 담고 편집하기</a>
+          <div class="hero-buttons">
+            <a class="button" href="{{ start_url }}">내 코스에 담고 편집하기</a>
+            <a class="button button--ghost" href="{{ gpx_url }}" download rel="nofollow">GPX 다운로드</a>
+          </div>
         </div>
       </section>
       <div class="layout">
         <div>
           {% if insight and (insight.feature or insight.route or insight.themes) %}
-          <section class="card ai-card" aria-labelledby="ai-card-title">
+          <section class="card ai-card slot-intro" aria-labelledby="ai-card-title">
             <div class="ai-card__head">
               <h2 id="ai-card-title">코스 소개</h2>
               <span class="ai-badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>AI 작성</span>
@@ -79,7 +83,7 @@
             <p class="ai-note">경로·고도·주변 장소를 바탕으로 AI가 쓴 글이에요. 현장 상황과 다를 수 있어요.</p>
           </section>
           {% elif insight and insight.ai_state in ('analyzing', 'review') %}
-          <section class="card ai-card ai-card--pending" aria-labelledby="ai-card-title">
+          <section class="card ai-card ai-card--pending slot-intro" aria-labelledby="ai-card-title">
             <div class="ai-card__head">
               <h2 id="ai-card-title">코스 소개</h2>
               <span class="ai-badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>AI 작성</span>
@@ -91,9 +95,9 @@
             {% endif %}
           </section>
           {% endif %}
-          <section class="card map-card">
+          <section class="card map-card slot-map">
             <h2>코스 경로</h2>
-            <div id="course-map">
+            <div id="course-map" data-sport="{{ sport_code }}">
               <svg
                 viewBox="0 0 800 440"
                 role="img"
@@ -120,15 +124,12 @@
                 />
               </svg>
             </div>
-            <p class="muted">
-              지도 로딩 전에는 경로 모양을 보여줍니다. 현장의 통행 가능 여부를
-              확인하세요.
-            </p>
+            <p class="muted">현장의 통행 가능 여부를 확인하세요.</p>
           </section>
-          <section class="card">
+          <section class="card slot-elevation">
             <h2>고도 프로필</h2>
             {% if elevation_svg %}
-            <!-- course-elevation.js가 코스 보기 모달과 같은 고도 차트로 바꿉니다. 스크립트가 실패하면 아래 SVG가 남습니다. -->
+            <!-- course-viewer.js가 코스 보기 모달과 같은 고도 차트로 바꿉니다. 스크립트가 실패하면 아래 SVG가 남습니다. -->
             <div id="course-elevation" data-sport="{{ sport_code }}">
               <svg
                 class="elevation-fallback"
@@ -149,10 +150,29 @@
             <p>고도 정보가 없는 코스입니다.</p>
             {% endif %}
           </section>
+          <section class="card course-facts slot-rest" aria-labelledby="course-facts-title">
+            <h2 id="course-facts-title">코스 정보</h2>
+            <dl>
+              {% if region %}
+              <div><dt>위치</dt><dd>{{ region.full }}{% if region.cities|length > 1 %} 외 {{ region.cities[1:]|join('·') }}{% endif %}</dd></div>
+              {% if region.dongs %}<div><dt>지나는 동네</dt><dd>{{ region.dongs|join(', ') }}</dd></div>{% endif %}
+              {% endif %}
+              {% if places %}<div><dt>지나는 곳</dt><dd>{% for p in places %}{{ p.name }}{% if not loop.last %} · {% endif %}{% endfor %}</dd></div>{% endif %}
+              {% if shape or terrain_ko %}<div><dt>코스 성격</dt><dd>{{ shape or '' }}{% if shape and terrain_ko %} · {% endif %}{{ terrain_ko or '' }}</dd></div>{% endif %}
+              <div><dt>코스 파일</dt><dd><a href="{{ gpx_url }}" download rel="nofollow">GPX 다운로드</a><br/>
+                FIT·TCX는 <a href="{{ view_url }}">서비스 내에서 받기</a></dd></div>
+            </dl>
+            <p class="muted">GPX 파일은 가민·와후·코로스·순토 등 대부분의 GPS 시계와 자전거 컴퓨터, 스트라바 경로로 가져올 수 있어요.</p>
+            {% if keywords %}
+            <ul class="keyword-tags" aria-label="관련 키워드">
+              {% for k in keywords %}<li>{{ k }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+          </section>
 
         </div>
         <aside>
-          <section class="card">
+          <section class="card slot-glance">
             <h2>코스 한눈에 보기</h2>
             {% if insight and insight.level %}
             <div class="level level--{{ insight.level }}">
@@ -173,7 +193,7 @@
               <p class="level__basis">거리와 상승 고도로 계산한 난이도예요.</p>
             </div>
             {% endif %}
-            <dl>
+            <dl class="glance-stats">
               <div>
                 <dt>거리</dt>
                 <dd>{{ distance }}<small>km</small></dd>
@@ -187,14 +207,14 @@
                 <dd>{{ copies }}<small>명</small></dd>
               </div>
             </dl>
-            <a class="button" href="{{ start_url }}">내 코스에 담고 편집하기</a>
-            <p class="muted">
-              구글 로그인 후 내 코스에 저장하세요. 나만의 경로로 수정하고
-              GPX·FIT·TCX로 내려받을 수 있어요.
+            <a class="button glance-cta" href="{{ start_url }}">내 코스에 담고 편집하기</a>
+            <p class="muted glance-note">
+              GPX 파일은 로그인 없이 바로 받을 수 있어요. 구글 로그인 후 내 코스에 저장하면
+              나만의 경로로 수정하고 FIT·TCX로도 내려받을 수 있어요.
             </p>
             <a class="secondary" href="{{ view_url }}">지도에서 자세히 보기</a>
           </section>
-          <section class="card">
+          <section class="card slot-custom">
             <h2>이 코스에서 나만의 코스로</h2>
             <p>
               출발점을 바꾸거나 경유점을 추가해 보세요. 거리와 고도를 확인하며
@@ -206,10 +226,10 @@
       </div>
       {% if related %}
       <section class="related">
-        <h2>함께 둘러볼 공개 코스</h2>
+        <h2>{% if related[0].near_km is not none %}근처의 다른 코스{% else %}함께 둘러볼 공개 코스{% endif %}</h2>
         <div class="related-grid">
           {% for item in related %}<a class="card" href="/c/{{ item.token }}"
-            ><strong>{{ item.title }}</strong><span>{{ item.sport }}</span></a
+            ><strong>{{ item.title }}</strong><span>{{ item.sport }}{% if item.distance_km %} · {{ item.distance_km }}km{% endif %}{% if item.near_km is not none %} · {{ item.near_km }}km 떨어짐{% endif %}</span></a
           >{% endfor %}
         </div>
       </section>
@@ -230,7 +250,6 @@
     <script id="course-waypoints" type="application/json">
       {{ waypoints_json | safe }}
     </script>
-    <script src="/course-landing.js" defer></script>
-    <script type="module" src="/course-elevation.js"></script>
+    <script type="module" src="/course-viewer.js"></script>
   </body>
 </html>

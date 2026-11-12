@@ -240,8 +240,10 @@ class CourseInsight(SQLModel, table=True):
     themes_json: Optional[str] = None
     # AI가 지적한 데이터 문제와 응답 검증 경고 (관리자 확인용)
     issues_json: Optional[str] = None
-    # AI에게 넘긴 장소 목록 (관리자 확인용)
+    # AI에게 넘긴 장소 목록 (관리자 확인용, 공유 페이지의 '지나는 곳')
     places_json: Optional[str] = None
+    # 코스가 지나는 법정동 이름 목록 (예: "경기도 수원시 영통구 하동"). 공유 페이지의 위치 정보·검색용 제목에 씁니다.
+    areas_json: Optional[str] = None
     # AI에게 넘긴 자료. 다시 요청하거나 대체 AI로 넘길 때 장소를 다시 찾지 않고 씁니다. 코스가 바뀌면 지웁니다.
     ai_prompt: Optional[str] = None
     ai_error: Optional[str] = None
@@ -269,6 +271,7 @@ COURSE_MIGRATIONS = {
 }
 
 TRACK_MIGRATIONS = {"info_json": "TEXT", "manual_info_json": "TEXT"}
+INSIGHT_MIGRATIONS = {"areas_json": "TEXT"}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -283,6 +286,10 @@ async def lifespan(app: FastAPI):
         for name, definition in TRACK_MIGRATIONS.items():
             if name not in track_columns:
                 connection.execute(text(f"ALTER TABLE track ADD COLUMN {name} {definition}"))
+        insight_columns = {column["name"] for column in inspect(connection).get_columns("course_insight")}
+        for name, definition in INSIGHT_MIGRATIONS.items():
+            if name not in insight_columns:
+                connection.execute(text(f"ALTER TABLE course_insight ADD COLUMN {name} {definition}"))
     backfill_route_stats()
     backfill_insights()
     yield
@@ -1067,8 +1074,98 @@ def course_sitemap(page: int, session: Session = Depends(get_session)):
     courses = session.exec(public_course_query().order_by(Course.id).offset((page-1)*SITEMAP_PAGE_SIZE).limit(SITEMAP_PAGE_SIZE)).all()
     if not courses:
         raise HTTPException(status_code=404, detail="Sitemap not found")
+    # lastmod: 공개한 시각과 AI 소개가 바뀐 시각 중 늦은 쪽 (검색엔진이 바뀐 페이지를 먼저 다시 읽도록)
+    insights = load_insights(session, [course.id for course in courses])
+    def lastmod(course):
+        stamps = [course.published_at or course.created_at]
+        insight = insights.get(course.id)
+        if insight and insight.ai_status == "published":
+            stamps.append(insight.updated_at)
+        return max(s for s in stamps if s)[:10]
     return sitemap_response('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
-        ''.join(f'<url><loc>{PUBLIC_SITE_URL}/c/{escape(course.share_token)}</loc></url>' for course in courses) + '</urlset>')
+        ''.join(f'<url><loc>{PUBLIC_SITE_URL}/c/{escape(course.share_token)}</loc><lastmod>{lastmod(course)}</lastmod></url>'
+                for course in courses) + '</urlset>')
+
+# 공유 페이지의 '함께 둘러볼 코스': 출발점이 가까운 전체 공개 코스를 먼저 보여줍니다 (같은 종목 우선).
+# 가까운 코스끼리 서로 링크하면 방문자와 검색엔진이 같은 동네 코스를 이어서 찾기 쉽습니다.
+NEARBY_LIMIT = 4
+NEARBY_MAX_KM = 30
+
+def nearby_courses(session: Session, course: Course) -> list:
+    rows = session.exec(select(Course, func.length(Course.polylines_json)).where(
+        Course.visibility == "public", Course.is_deleted == False, Course.share_token != None, Course.id != course.id)
+        .order_by(Course.id.desc()).limit(MCP_SEARCH_CANDIDATES)).all()
+    if not rows:
+        return []
+    analyses = light_analyses(session, [(course, None)] + list(rows))
+    start = (analyses.get(course.id) or {}).get("start")
+    def item(other, km=None):
+        return {"token": other.share_token, "title": other.title, "sport": SPORT_LABELS.get(other.sport, "자전거"),
+                "distance_km": round((analyses.get(other.id) or {}).get("distance_km") or 0, 1), "near_km": km}
+    near = []
+    if start:
+        for other, _ in rows:
+            other_start = (analyses.get(other.id) or {}).get("start")
+            if other_start:
+                km = haversine_distance(start["lat"], start["lng"], other_start["lat"], other_start["lng"]) / 1000
+                if km <= NEARBY_MAX_KM:
+                    near.append((other.sport != course.sport, km, other))
+    near.sort(key=lambda entry: entry[:2])
+    picked = [item(other, round(km, 1)) for _, km, other in near[:NEARBY_LIMIT]]
+    if len(picked) < NEARBY_LIMIT:
+        # 근처 코스가 모자라면 같은 종목의 최신 공개 코스로 채웁니다.
+        used = {entry["token"] for entry in picked}
+        for other, _ in rows:
+            if len(picked) >= NEARBY_LIMIT:
+                break
+            if other.sport == course.sport and other.share_token not in used:
+                picked.append(item(other))
+    return picked
+
+def page_place_data(insight: Optional[CourseInsight]) -> dict:
+    """공유 페이지의 위치 정보: 지나는 법정동과 주변 장소 (전체 공개 코스만)."""
+    if not insight:
+        return {"areas": [], "places": []}
+    areas = load_json(insight.areas_json, None)
+    if areas is None:
+        # 지역 컬럼이 생기기 전에 분석한 코스는 AI에게 넘긴 자료에서 꺼냅니다.
+        areas = load_json(insight.ai_prompt, {}).get("areas_passed") or [] if insight.ai_prompt else []
+    places = load_json(insight.places_json, [])
+    return {"areas": [a for a in areas if isinstance(a, str)],
+            "places": [p for p in places if isinstance(p, dict) and p.get("name")]}
+
+# 웨이포인트 종류별 (이름, GPX 기호). frontend/src/waypoints.js의 WAYPOINT_TYPES와 같습니다.
+GPX_WAYPOINT_TYPES = {'generic': ('일반', 'Flag, Blue'), 'summit': ('정상', 'Summit'), 'valley': ('계곡', 'Valley'), 'water': ('급수', 'Drinking Water'), 'food': ('음식', 'Restaurant'), 'danger': ('위험', 'Danger Area'), 'left': ('좌회전', 'Left'), 'right': ('우회전', 'Right'), 'straight': ('직진', 'Straight'), 'first_aid': ('응급처치', 'First Aid'), 'fourth_category': ('4등급 오르막', 'Summit'), 'third_category': ('3등급 오르막', 'Summit'), 'second_category': ('2등급 오르막', 'Summit'), 'first_category': ('1등급 오르막', 'Summit'), 'hors_category': ('초특급(HC) 오르막', 'Summit'), 'sprint': ('스프린트', 'Flag, Green')}
+
+def course_gpx(course: Course) -> str:
+    points = [p for segment in load_json(course.polylines_json, []) for p in segment
+              if isinstance(p, dict) and all(isinstance(p.get(k), (int, float)) and math.isfinite(p[k]) for k in ("lat", "lng"))]
+    waypoints = [w for w in load_waypoints(course)
+                 if isinstance(w, dict) and all(isinstance(w.get(k), (int, float)) and math.isfinite(w[k]) for k in ("lat", "lng"))]
+    def ele(p):
+        value = p.get("ele")
+        return f"<ele>{value:.1f}</ele>" if isinstance(value, (int, float)) and math.isfinite(value) else ""
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
+             '<gpx version="1.1" creator="Trazo" xmlns="http://www.topografix.com/GPX/1/1">',
+             f'  <metadata><name>{escape(course.title)}</name><link href="{PUBLIC_SITE_URL}/c/{escape(course.share_token)}"><text>Trazo</text></link></metadata>']
+    for w in waypoints:
+        label, sym = GPX_WAYPOINT_TYPES.get(w.get("type"), GPX_WAYPOINT_TYPES["generic"])
+        name = escape(str(w.get("name") or "").strip() or label)
+        note = f"<desc>{escape(str(w['note']))}</desc>" if w.get("note") else ""
+        lines.append(f'  <wpt lat="{w["lat"]:.7f}" lon="{w["lng"]:.7f}">{ele(w)}<name>{name}</name>{note}<sym>{sym}</sym></wpt>')
+    lines.append(f'  <trk><name>{escape(course.title)}</name><type>{"running" if course.sport == "run" else "cycling"}</type><trkseg>')
+    lines += [f'    <trkpt lat="{p["lat"]:.7f}" lon="{p["lng"]:.7f}">{ele(p)}</trkpt>' for p in points]
+    lines += ['  </trkseg></trk>', '</gpx>']
+    return "\n".join(lines)
+
+# 공유 코스 GPX 파일 (로그인 없이 받을 수 있음). 페이지가 검색에 노출되고, 파일 자체는 색인하지 않습니다.
+@app.api_route("/pages/c/{token}.gpx", methods=["GET", "HEAD"])
+def shared_course_gpx(token: str, session: Session = Depends(get_session)):
+    course = get_shared_course(session, token)
+    filename = re.sub(r'[\\/:*?"<>|\r\n]+', " ", course.title).strip()[:80] or "trazo-course"
+    return Response(content=course_gpx(course), media_type="application/gpx+xml", headers={
+        "Content-Disposition": f"attachment; filename=\"trazo-course.gpx\"; filename*=UTF-8''{urllib.parse.quote(filename)}.gpx",
+        "Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
 
 @app.api_route("/pages/c/{token}", methods=["GET", "HEAD"])
 def shared_course_page(token: str, session: Session = Depends(get_session)):
@@ -1077,17 +1174,15 @@ def shared_course_page(token: str, session: Session = Depends(get_session)):
     except HTTPException:
         return Response(content='<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="robots" content="noindex"><title>코스를 볼 수 없어요 | Trazo</title></head><body><h1>코스를 볼 수 없어요</h1><p>공유가 해제됐거나 삭제된 코스입니다.</p><a href="/">Trazo에서 코스 만들기</a></body></html>',
                         status_code=404, media_type="text/html", headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
-    # 비공개/부분 공개 코스는 관련 코스 목록에도 노출하지 않습니다.
-    related = session.exec(public_course_query().where(Course.id != course.id, Course.sport == course.sport).order_by(Course.id.desc()).limit(3)).all()
     # 코스 분석은 전체 공개 코스에만 보여줍니다 (부분 공개 코스는 분석하지 않습니다).
-    insight_data = insight_view(session.get(CourseInsight, course.id)) if course.visibility == "public" else None
+    insight_row = session.get(CourseInsight, course.id) if course.visibility == "public" else None
+    insight_data = insight_view(insight_row)
     try:
         from .course_pages import render_course_page
     except ImportError:
         from course_pages import render_course_page
     content = render_course_page(course, course_summary(course), nickname_of(session, author_uid(course)),
-        [{"token": item.share_token, "title": item.title, "sport": SPORT_LABELS.get(item.sport, "자전거")} for item in related],
-        insight_data)
+        nearby_courses(session, course), insight_data, page_place_data(insight_row))
     return Response(content=content, media_type="text/html", headers={"Cache-Control": "no-store"})
 
 @app.post("/shared/{token}/copy")
@@ -1581,6 +1676,61 @@ def admin_insight_json(insight: CourseInsight, course: Course) -> dict:
         "issues": load_json(insight.issues_json, []), "places": load_json(insight.places_json, []),
         "reviewed_at": insight.reviewed_at, "updated_at": insight.updated_at,
     }
+
+# --- 6-6. 관리자: SEO 테스트 ---
+# 검색어를 넣으면 전체 공개 코스 페이지(검색엔진이 색인하는 페이지)를 페이지와 같은 제목·설명·본문으로 채점해
+# 검색 결과처럼 보여줍니다. 실제 구글·빙·네이버 순위가 아니라 '우리 페이지가 이 검색어를 담고 있는지'를 봅니다.
+
+def seo_documents(session: Session) -> list:
+    try:
+        from .course_pages import seo_view
+        from . import seo_search
+    except ImportError:
+        from course_pages import seo_view
+        import seo_search
+    courses = session.exec(public_course_query().order_by(Course.id.desc()).limit(MCP_SEARCH_CANDIDATES)).all()
+    insights = load_insights(session, [course.id for course in courses])
+    docs = []
+    for course in courses:
+        row = insights.get(course.id)
+        view = insight_view(row)
+        place_data = page_place_data(row)
+        stats = course_summary(course)
+        seo = seo_view(course, stats, view, place_data)
+        region = seo["region"] or {}
+        sport_label = SPORT_LABELS.get(course.sport, "자전거")
+        level = (view or {}).get("difficulty")
+        body = " ".join(str(x) for x in [
+            course.description, sport_label, region.get("full"), " ".join(region.get("dongs") or []),
+            " ".join(p["name"] for p in seo["places"]), " ".join(seo["keywords"]), seo["shape"], seo["terrain_ko"],
+            course_insight.LEVEL_LABELS.get(level), (view or {}).get("feature"), (view or {}).get("route"),
+            " ".join(course_insight.THEME_KO.get(t, t) for t in (view or {}).get("themes") or []),
+            " ".join(course_insight.TRAINING_KO.get(t, t) for t in (view or {}).get("training") or []),
+            "GPX 다운로드 GPX FIT TCX 코스 파일", f"{stats['distance_km']:.1f}km",
+        ] if x)
+        names = [region.get("city")] + list(region.get("gus") or []) + [g[:-1] for g in region.get("gus") or []]
+        names += [d for d in region.get("dongs") or []] + [d[:-1] for d in region.get("dongs") or [] if len(d) > 2]
+        names += [p["name"] for p in seo["places"]] + course.title.split()
+        docs.append({
+            "fields": {"title": seo_search.normalize(seo["page_title"]), "description": seo_search.normalize(seo["summary"]),
+                       "body": seo_search.normalize(body)},
+            "names": [seo_search.normalize(n) for n in names if n],
+            "sport": course.sport, "terrain": seo["terrain"], "shape": (view or {}).get("shape"),
+            "distance_km": stats["distance_km"],
+            "page": {"course_id": course.id, "token": course.share_token, "url": f"{PUBLIC_SITE_URL}/c/{course.share_token}",
+                     "title": seo["page_title"], "description": seo["summary"], "sport": course.sport,
+                     "region": region.get("short"), "ai_state": (view or {}).get("ai_state"),
+                     "distance_km": stats["distance_km"]},
+        })
+    return docs
+
+@app.get("/admin/seo/search", dependencies=[Depends(require_admin)])
+def admin_seo_search(q: str = Query(min_length=1, max_length=100), session: Session = Depends(get_session)):
+    try:
+        from . import seo_search
+    except ImportError:
+        import seo_search
+    return seo_search.search(q, seo_documents(session))
 
 @app.get("/admin/insights", dependencies=[Depends(require_admin)])
 def admin_insights(
